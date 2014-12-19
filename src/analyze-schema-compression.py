@@ -44,7 +44,7 @@ import re
 import getpass
 import time
 
-VERSION = ".9.1.1"
+VERSION = ".9.1.2"
 
 OK = 0
 ERROR = 1
