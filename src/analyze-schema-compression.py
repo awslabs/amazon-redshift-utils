@@ -2,7 +2,7 @@
 
 '''
 analyze-schema-compression.py
-v .9.1.2
+v .9.1.3
 
 * Copyright 2014, Amazon.com, Inc. or its affiliates. All Rights Reserved.
 *
@@ -44,7 +44,7 @@ import re
 import getpass
 import time
 
-VERSION = ".9.1.2"
+__version__ = ".9.1.3"
 
 OK = 0
 ERROR = 1
@@ -178,6 +178,88 @@ def get_table_attribute(description_list,column_name,index):
     for item in description_list:
         if item[0] == column_name:
             return item[index]
+
+def get_foreign_keys(conn,analyze_schema,target_schema,table_name):
+    fk_cur = conn.cursor();
+    has_fks = False
+    
+    fk_statement = '''SELECT conname,
+  pg_catalog.pg_get_constraintdef(cons.oid, true) as condef
+ FROM pg_catalog.pg_constraint cons,
+ pg_namespace pgn,
+ pg_class pgc
+ WHERE cons.conrelid = pgc.oid
+ and pgn.nspname = '%s'
+ and pgc.relnamespace = pgn.oid
+ and pgc.oid = '%s'::regclass
+ AND cons.contype = 'f'
+ ORDER BY 1
+''' % (analyze_schema,table_name)
+
+    if (debug):
+        comment(fk_statement)
+    
+    fk_cur.execute(fk_statement)
+    foreign_keys = fk_cur.fetchall()
+    fk_statements = []
+    
+    for fk in foreign_keys:
+        has_fks = True
+        references_clause = fk[1].replace('REFERENCES ','REFERENCES %s.' % (target_schema))      
+        fk_statements.append('alter table %s.%s add constraint %s %s;\n' % (target_schema,table_name,fk[0],references_clause))
+    
+    fk_cur.close()
+    
+    if has_fks:
+        return fk_statements
+    else:
+        return None
+            
+def get_primary_key(conn, table_schema, target_schema, original_table, new_table):
+    pk_statement = 'alter table %s.%s add primary key (' % (target_schema,new_table)
+    has_pks = False
+    
+    # get the primary key columns
+    pk_cur = conn.cursor();
+    statement = '''SELECT       
+  att.attname
+FROM pg_index ind, pg_class cl, pg_attribute att, pg_namespace pgn
+WHERE 
+  cl.oid = '%s'::regclass 
+  AND ind.indrelid = cl.oid 
+  AND att.attrelid = cl.oid
+  and cl.relnamespace = pgn.oid
+  and pgn.nspname = '%s'
+  and (ind.indkey[0] = att.attnum or 
+       ind.indkey[1] = att.attnum or
+       ind.indkey[2] = att.attnum or
+       ind.indkey[3] = att.attnum or
+       ind.indkey[4] = att.attnum
+      )
+  and attnum > 0
+  AND ind.indisprimary
+order by att.attnum;
+''' % (original_table, table_schema)
+
+    if debug:
+        comment(statement)
+        
+    pk_cur.execute(statement)
+    pks = pk_cur.fetchall()
+    
+    for pk in pks:
+        has_pks = True
+        pk_statement = pk_statement + pk[0] + ','
+        
+    pk_statement = pk_statement[:-1] + ');\n'
+
+    pk_cur.close()
+    
+    if has_pks:
+        return pk_statement
+    else:
+        return None
+    
         
 def get_table_desc(conn,table_name):
     # get the table definition from the dictionary so that we can get relevant details for each column
@@ -198,20 +280,20 @@ def get_table_desc(conn,table_name):
     return description
 
 def run_commands(conn,commands):
-    # RUNIT
     cur = conn.cursor()
 
     for c in commands:
-        comment('[%s] Running %s: \n' % (str(os.getpid()),c))
-            
-        try:
-            cur.execute(c)            
-            comment(cur.statusmessage)
-        except Exception as e:
-            # cowardly bail on errors
-            conn.rollback()
-            write(e.message)
-            return False
+        if c != None:
+            comment('[%s] Running %s: \n' % (str(os.getpid()),c))
+                
+            try:
+                cur.execute(c)            
+                comment(cur.statusmessage)
+            except Exception as e:
+                # cowardly bail on errors
+                conn.rollback()
+                write(e.message)
+                return False
         
     cur.close()
     
@@ -312,7 +394,8 @@ def analyze(tables):
                 
             # extract null/not null setting
             col_null = get_table_attribute(descr,col,5)
-            if col_null == 'true':
+            
+            if col_null:
                 col_null = 'NOT NULL'
             else:
                 col_null = ''
@@ -344,7 +427,10 @@ def analyze(tables):
             
             # run the create table statement
             statements.extend([create_table])         
-                    
+            
+            # get the primary key statement
+            statements.extend([get_primary_key(local_conn,analyze_schema,target_schema,table_name,target_table)]);
+            
             # insert the old data into the new table
             insert = '-- migrating data to new structure\ninsert into %s.%s select * from %s.%s;\n' % (target_schema,target_table,analyze_schema,tables[0])
             statements.extend([insert])
@@ -364,7 +450,10 @@ def analyze(tables):
                         
                 # rename the migrate table to the old table name
                 rename = 'alter table %s.%s rename to %s;\n' % (target_schema,target_table,table_name)
-                statements.extend([rename])        
+                statements.extend([rename])
+            
+            # add foreign keys
+            fks = get_foreign_keys(local_conn,analyze_schema,target_schema,table_name)
             
             statements.extend(['commit;\n'])
             
@@ -382,12 +471,15 @@ def analyze(tables):
     
     print_statements(statements)
     
-    return OK
+    return (OK,fks)
 
-def usage():
+def usage(with_message):
     write('Usage: analyze-schema-compression.py')
-    write('       Generates a script to optimise Redshift column encodings on all tables in a schema')
-    write('')
+    write('       Generates a script to optimise Redshift column encodings on all tables in a schema\n')
+    
+    if with_message != None:
+        write(with_message + "\n")
+        
     write('Arguments: --db             - The Database to Use')
     write('           --db-user        - The Database User to connect to')
     write('           --db-host        - The Cluster endpoint')
@@ -415,7 +507,7 @@ def main(argv):
         optlist, remaining = getopt.getopt(sys.argv[1:], "", supported_args.split())
     except getopt.GetoptError as err:
         print str(err)
-        usage()
+        usage(None)
     
     # setup globals
     global master_conn
@@ -510,9 +602,16 @@ def main(argv):
             usage()
     
     # Validate that we've got all the args needed
-    if db == None or db_user == None or db_host == None or \
-    db_port == None or output_file == None:
-        usage()
+    if db == None:
+        usage("Missing Parameter 'db'")
+    if db_user == None:
+        usage("Missing Parameter 'db-user'")
+    if db_host == None:
+        usage("Missing Parameter 'db-host'")
+    if db_port == None:
+        usage("Missing Parameter 'db-port'")
+    if output_file == None:
+        usage("Missing Parameter 'output-file'")
     
     if target_schema == None:
         target_schema = analyze_schema
@@ -590,13 +689,11 @@ order by 2
 
     # setup executor pool
     p = Pool(threads)
-    worker_output = []
     
     if analyze_tables != None:
         try:
             # run all concurrent steps and block on completion
-            result = p.map(analyze,analyze_tables)
-            worker_output.append([result])            
+            result = p.map(analyze,analyze_tables)                    
         except KeyboardInterrupt:
             # To handle Ctrl-C from user
             p.close()
@@ -611,19 +708,37 @@ order by 2
     else:
         comment("No Tables Found to Analyze")
         
+    # TODO write out all foreign key definitions generated by workers
+    
+        
     # do a final vacuum if needed
     if drop_old_data:
         write("vacuum delete only;\n")
 
     p.terminate()
-    comment('Processing Complete')
-    cleanup()
     
     # return any non-zero worker output statuses
-    for ret in worker_output:
-        if ret != OK:
-            sys.exit(ret)
+    for ret in result:        
+        return_code = ret[0]
+        fk_commands = ret[1];        
+        
+        if fk_commands != None and len(fk_commands) > 0:
+            print_statements(fk_commands)
             
+            if do_execute:
+                if not run_commands(master_conn,fk_commands):
+                    if not ignore_errors:
+                        sys.exit(ERROR)
+            
+        if return_code != OK:
+            sys.exit(return_code)
+    
+    if (do_execute):
+        if not run_commands(master_conn,['commit']):
+            sys.exit(ERROR)
+    
+    comment('Processing Complete')
+    cleanup()    
     sys.exit(OK)
 
 if __name__ == "__main__":
