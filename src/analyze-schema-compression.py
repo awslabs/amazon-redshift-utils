@@ -2,7 +2,7 @@
 
 '''
 analyze-schema-compression.py
-v .9.1.3
+v .9.1.3.1
 
 * Copyright 2014, Amazon.com, Inc. or its affiliates. All Rights Reserved.
 *
@@ -37,14 +37,14 @@ Amazon Web Services (2014)
 
 import sys
 from multiprocessing import Pool
-import psycopg2
+import pg
 import getopt
 import os
 import re
 import getpass
 import time
 
-__version__ = ".9.1.3"
+__version__ = ".9.1.3.1"
 
 OK = 0
 ERROR = 1
@@ -76,23 +76,47 @@ force = False
 drop_old_data = False
 comprows = None
     
+def execute_query(str):
+    conn = get_pg_conn()
+    
+    result = conn.query(str).getresult()
+    
+    if debug:
+        comment('Query Execution returned %s Results' % (len(result)))
+        
+    return result
+
+def commit():
+    execute_query('commit')
+    
+def rollback():
+    execute_query('rollback')    
+    
+def close_conn(conn):
+    try:
+        conn.close()
+    except Exception as e:
+        if debug:
+            print(e)
+            
 def cleanup():
     # close all connections and close the output file
     if master_conn != None:
-        master_conn.close()
+        close_conn(master_conn)
     
     for key in db_connections:
-        if db_connections[key] != None:
-            db_connections[key].close() 
+        if db_connections[key] != None:            
+            close_conn(db_connections[key]) 
     
     if output_file_handle != None:
         output_file_handle.close()
 
 def comment(string):
-    if re.match('.*\\n.*',string) != None:
-        write('/* [%s]\n%s\n*/\n' % (str(os.getpid()),string))
-    else:
-        write('-- [%s] %s' % (str(os.getpid()),string))
+    if (string != None):
+        if re.match('.*\\n.*',string) != None:
+            write('/* [%s]\n%s\n*/\n' % (str(os.getpid()),string))
+        else:
+            write('-- [%s] %s' % (str(os.getpid()),string))
 
 def print_statements(statements):
     if statements != None:
@@ -106,8 +130,8 @@ def write(s):
     if output_file_handle != None:
         output_file_handle.write(s)
         output_file_handle.flush()
-    
-def get_conn():
+        
+def get_pg_conn():
     global db_connections
     pid = str(os.getpid())
     
@@ -125,27 +149,24 @@ def get_conn():
             comment('Connect [%s] %s:%s:%s:%s' % (pid,db_host,db_port,db,db_user))
             
         try:
-            conn = psycopg2.connect(database=db, user=db_user, host=db_host, password=db_pwd, port=db_port)
-        except:
+            conn = pg.connect(dbname=db, user=db_user, host=db_host, passwd=db_pwd, port=int(db_port))
+        except Exception as e:
+            write(e)
             write('Unable to connect to Cluster Endpoint')
             
-            return None
+            return None        
         
-        # turn off the default autocommit behaviour
-        conn.autocommit = False
-        
-        # set default search path
-        cur = conn.cursor()
-        search_path = 'set search_path = \'$user\',public,%s' % (analyze_schema,)
-        if target_schema != None:
+        # set default search path        
+        search_path = 'set search_path = \'$user\',public,%s' % (analyze_schema)
+        if target_schema != None and target_schema != analyze_schema:
             search_path = search_path + ', %s' % (target_schema)
             
         if debug:
             comment(search_path)
         
         try:
-            cur.execute(search_path)
-        except psycopg2.ProgrammingError as e:
+            conn.query(search_path)
+        except pg.ProgrammingError as e:
             if re.match('schema "%s" does not exist' % (analyze_schema,),e.message) != None:
                 write('Schema %s does not exist' % (analyze_schema,))
             else:
@@ -158,19 +179,20 @@ def get_conn():
             if debug:
                 comment(set_slot_count)
                 
-            cur.execute(set_slot_count)
+            conn.query(set_slot_count)
             
         # set a long statement timeout
         set_timeout = "set statement_timeout = '1200000'"
         if debug:
             comment(set_timeout)
             
-        cur.execute(set_timeout)
+        conn.query(set_timeout)
         
         # cache the connection
         db_connections[pid] = conn
         
     return conn
+
 
 def get_table_attribute(description_list,column_name,index):
     # get a specific value requested from the table description structure based on the index and column name
@@ -179,8 +201,7 @@ def get_table_attribute(description_list,column_name,index):
         if item[0] == column_name:
             return item[index]
 
-def get_foreign_keys(conn,analyze_schema,target_schema,table_name):
-    fk_cur = conn.cursor();
+def get_foreign_keys(analyze_schema,target_schema,table_name):
     has_fks = False
     
     fk_statement = '''SELECT conname,
@@ -199,28 +220,24 @@ def get_foreign_keys(conn,analyze_schema,target_schema,table_name):
     if (debug):
         comment(fk_statement)
     
-    fk_cur.execute(fk_statement)
-    foreign_keys = fk_cur.fetchall()
+    foreign_keys = execute_query(fk_statement)
     fk_statements = []
     
     for fk in foreign_keys:
         has_fks = True
         references_clause = fk[1].replace('REFERENCES ','REFERENCES %s.' % (target_schema))      
-        fk_statements.append('alter table %s.%s add constraint %s %s;\n' % (target_schema,table_name,fk[0],references_clause))
-    
-    fk_cur.close()
+        fk_statements.append('alter table %s.%s add constraint %s %s;\n' % (target_schema,table_name,fk[0],references_clause))    
     
     if has_fks:
         return fk_statements
     else:
         return None
             
-def get_primary_key(conn, table_schema, target_schema, original_table, new_table):
+def get_primary_key(table_schema, target_schema, original_table, new_table):
     pk_statement = 'alter table %s.%s add primary key (' % (target_schema,new_table)
     has_pks = False
     
     # get the primary key columns
-    pk_cur = conn.cursor();
     statement = '''SELECT       
   att.attname
 FROM pg_index ind, pg_class cl, pg_attribute att, pg_namespace pgn
@@ -243,17 +260,14 @@ order by att.attnum;
 
     if debug:
         comment(statement)
-        
-    pk_cur.execute(statement)
-    pks = pk_cur.fetchall()
+            
+    pks = execute_query(statement)
     
     for pk in pks:
         has_pks = True
         pk_statement = pk_statement + pk[0] + ','
         
     pk_statement = pk_statement[:-1] + ');\n'
-
-    pk_cur.close()
     
     if has_pks:
         return pk_statement
@@ -261,9 +275,8 @@ order by att.attnum;
         return None
     
         
-def get_table_desc(conn,table_name):
+def get_table_desc(table_name):
     # get the table definition from the dictionary so that we can get relevant details for each column
-    desc_cur = conn.cursor();
     statement = '''select "column", type, encoding, distkey, sortkey, "notnull"
  from pg_table_def
  where schemaname = '%s'
@@ -273,37 +286,26 @@ def get_table_desc(conn,table_name):
     if debug:
         comment(statement)
         
-    desc_cur.execute(statement);
-    description = desc_cur.fetchall()
-    desc_cur.close()
+    description = execute_query(statement)
     
     return description
 
-def run_commands(conn,commands):
-    cur = conn.cursor()
-
+def run_commands(conn, commands):
     for c in commands:
         if c != None:
             comment('[%s] Running %s: \n' % (str(os.getpid()),c))
                 
             try:
-                cur.execute(c)            
-                comment(cur.statusmessage)
+                conn.query(c)        
             except Exception as e:
                 # cowardly bail on errors
-                conn.rollback()
+                rollback()
                 write(e.message)
-                return False
-        
-    cur.close()
+                return False        
     
     return True
         
-def analyze(tables):
-    # get a connection from the connection pool
-    local_conn = get_conn()
-    analyze_cur = local_conn.cursor();
-        
+def analyze(tables):     
     table_name = tables[0]
         
     statement = 'analyze compression %s' % (table_name,)
@@ -323,18 +325,16 @@ def analyze(tables):
         last_exception = None
         while attempt_count < analyze_retry and output == None:
             try:
-                analyze_cur.execute(statement)
-                output = analyze_cur.fetchall()
-                analyze_cur.close()
+                output = execute_query(statement)
             except KeyboardInterrupt:
                 # To handle Ctrl-C from user
-                analyze_cur.close()
                 cleanup()
                 sys.exit(TERMINATED_BY_USER)
             except Exception as e:
+                write(e)
                 attempt_count += 1
                 last_exception = e
-                local_conn.rollback
+                rollback()
                 
                 # Exponential Backoff
                 time.sleep(2**attempt_count * RETRY_TIMEOUT)
@@ -351,7 +351,7 @@ def analyze(tables):
         create_table = '-- creating migration table for %s\nbegin;\n\ncreate table %s.%s(' % (table_name,target_schema,target_table,)
         
         # query the table column definition
-        descr = get_table_desc(local_conn,table_name)
+        descr = get_table_desc(table_name)
         found_non_raw = False
         encode_columns = []
         statements = []
@@ -372,7 +372,7 @@ def analyze(tables):
             
             # is this the dist key?
             distkey = get_table_attribute(descr,col,3)
-            if distkey or str(distkey).upper()=='TRUE':
+            if str(distkey).upper() == 'T':
                 distkey='DISTKEY'
             else:
                 distkey = ''
@@ -395,7 +395,7 @@ def analyze(tables):
             # extract null/not null setting
             col_null = get_table_attribute(descr,col,5)
             
-            if col_null:
+            if str(col_null).upper() == 'T':
                 col_null = 'NOT NULL'
             else:
                 col_null = ''
@@ -429,7 +429,7 @@ def analyze(tables):
             statements.extend([create_table])         
             
             # get the primary key statement
-            statements.extend([get_primary_key(local_conn,analyze_schema,target_schema,table_name,target_table)]);
+            statements.extend([get_primary_key(analyze_schema,target_schema,table_name,target_table)]);
             
             # insert the old data into the new table
             insert = '-- migrating data to new structure\ninsert into %s.%s select * from %s.%s;\n' % (target_schema,target_table,analyze_schema,tables[0])
@@ -453,12 +453,12 @@ def analyze(tables):
                 statements.extend([rename])
             
             # add foreign keys
-            fks = get_foreign_keys(local_conn,analyze_schema,target_schema,table_name)
+            fks = get_foreign_keys(analyze_schema,target_schema,table_name)
             
             statements.extend(['commit;\n'])
             
             if do_execute:
-                if not run_commands(local_conn,statements):
+                if not run_commands(statements):
                     if not ignore_errors:
                         return ERROR     
             
@@ -466,8 +466,6 @@ def analyze(tables):
         write('Exception %s during analysis of %s' % (e.message,table_name))
         write(e)
         return ERROR
-        
-    analyze_cur.close()
     
     print_statements(statements)
     
@@ -627,7 +625,7 @@ def main(argv):
     output_file_handle = open(output_file,'w')
     
     # get a connection for the controlling processes
-    master_conn = get_conn()
+    master_conn = get_pg_conn()
     
     if master_conn == None:
         sys.exit(NO_CONNECTION)
@@ -650,18 +648,17 @@ def main(argv):
 
         write("-- Recommended encoding changes will be applied automatically...\n")
     else:
-        write("\n")
-    
-    cur = master_conn.cursor()    
+        write("\n")    
     
     if analyze_table != None:        
         statement = '''select trim(a.name) as table, b.mbytes, a.rows
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
+join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-and pgc.relname = '%s'        
-        ''' % (analyze_table,)        
+and pgn.nspname = '%s' and pgc.relname = '%s'        
+        ''' % (analyze_schema,analyze_table)        
     else:
         # query for all tables in the schema ordered by size descending
         write("-- Extracting Candidate Table List...\n")
@@ -680,10 +677,8 @@ order by 2
     
     if debug:
         comment(statement)
-        
-    cur.execute(statement)
-    analyze_tables = cur.fetchall()
-    cur.close()
+    
+    analyze_tables = execute_query(statement)
     
     write("-- Analyzing %s table(s)" % (len(analyze_tables)))
 

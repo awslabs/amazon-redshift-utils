@@ -18,7 +18,7 @@ The script generated will take advantage of one of two data migration options. T
 
 ## Running the Column Encoding Utility
 
-This utility was built and tested on Python 2.7x, but may work with other versions of Python. After cloning this Github project, you must ensure that you have installed the PsycoPG2 driver for Postgres (http://initd.org/psycopg). You can then run the column encoding utility by typing ```python analyze-schema-compression.py``` or ```./analyze-schema-compression.py```. This will generate the following Usage instructions:
+This utility was built and tested on Python 2.7x, but may work with other versions of Python. After cloning this Github project, you must ensure that you have installed the PyGresQL driver for Postgres (see http://www.pygresql.org or ```pip install pygresql```). You can then run the column encoding utility by typing ```python analyze-schema-compression.py``` or ```./analyze-schema-compression.py```. This will generate the following Usage instructions:
 
 ```
 Usage: analyze-schema-compression.py
