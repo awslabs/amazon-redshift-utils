@@ -2,7 +2,6 @@
 
 '''
 analyze-schema-compression.py
-v .9.1.3.1
 
 * Copyright 2014, Amazon.com, Inc. or its affiliates. All Rights Reserved.
 *
@@ -44,7 +43,7 @@ import re
 import getpass
 import time
 
-__version__ = ".9.1.3.1"
+__version__ = ".9.1.3.2"
 
 OK = 0
 ERROR = 1
@@ -128,7 +127,7 @@ def write(s):
     # write output to all the places we want it
     print(s)
     if output_file_handle != None:
-        output_file_handle.write(s)
+        output_file_handle.write(str(s))
         output_file_handle.flush()
         
 def get_pg_conn():
@@ -149,12 +148,15 @@ def get_pg_conn():
             comment('Connect [%s] %s:%s:%s:%s' % (pid,db_host,db_port,db,db_user))
             
         try:
-            conn = pg.connect(dbname=db, user=db_user, host=db_host, passwd=db_pwd, port=int(db_port))
+            options = 'keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=5'
+            connection_string = "host=%s port=%s dbname=%s user=%s password=%s %s" % (db_host, db_port, db, db_user, db_pwd, options)
+
+            conn = pg.connect(dbname=connection_string)
         except Exception as e:
             write(e)
             write('Unable to connect to Cluster Endpoint')
-            
-            return None        
+            cleanup()
+            sys.exit(ERROR)      
         
         # set default search path        
         search_path = 'set search_path = \'$user\',public,%s' % (analyze_schema)
