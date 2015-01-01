@@ -460,7 +460,7 @@ def analyze(tables):
             statements.extend(['commit;\n'])
             
             if do_execute:
-                if not run_commands(statements):
+                if not run_commands(get_pg_conn(), statements):
                     if not ignore_errors:
                         return ERROR     
             
@@ -712,9 +712,13 @@ order by 2
     p.terminate()
     
     # return any non-zero worker output statuses
-    for ret in result:        
-        return_code = ret[0]
-        fk_commands = ret[1];        
+    for ret in result:
+        if isinstance(ret, (list, tuple)):
+            return_code = ret[0]
+            fk_commands = ret[1]
+        else:
+            return_code = ret
+            fk_commands = None
         
         if fk_commands != None and len(fk_commands) > 0:
             print_statements(fk_commands)
