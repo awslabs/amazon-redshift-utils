@@ -42,6 +42,7 @@ import os
 import re
 import getpass
 import time
+import traceback
 
 __version__ = ".9.1.3.2"
 
@@ -127,7 +128,7 @@ def write(s):
     # write output to all the places we want it
     print(s)
     if output_file_handle != None:
-        output_file_handle.write(str(s))
+        output_file_handle.write(str(s) + "\n")
         output_file_handle.flush()
         
 def get_pg_conn():
@@ -319,7 +320,7 @@ def analyze(tables):
         if debug:
             comment(statement)
             
-        write("-- Analysing Table '%s'\n" % (table_name,))
+        comment("Analyzing Table '%s'" % (table_name,))
     
         output = None
         analyze_retry = 10
@@ -342,7 +343,7 @@ def analyze(tables):
                 time.sleep(2**attempt_count * RETRY_TIMEOUT)
 
         if output == None:
-            print "Unable to Analyze %s due to Exception %s" % (table_name,last_exception.message)
+            write("Unable to analyze %s due to Exception %s" % (table_name,last_exception.message))
             return ERROR
         
         if target_schema == analyze_schema:
@@ -350,7 +351,8 @@ def analyze(tables):
         else:
             target_table = table_name
         
-        create_table = '-- creating migration table for %s\nbegin;\n\ncreate table %s.%s(' % (table_name,target_schema,target_table,)
+        comment('creating migration table for %s' % (table_name,))
+        create_table = 'begin;\n\ncreate table %s.%s(' % (target_schema,target_table,)
         
         # query the table column definition
         descr = get_table_desc(table_name)
@@ -404,7 +406,8 @@ def analyze(tables):
                 
             # add the formatted column specification
             encode_columns.extend(['%s %s %s encode %s %s' % (col, col_type, col_null, compression, distkey)])            
-                        
+        
+        fks = None 
         if found_non_raw or force:
             # add all the column encoding statements on to the create table statement, suppressing the leading comma on the first one
             for i, s in enumerate(encode_columns):
@@ -434,7 +437,8 @@ def analyze(tables):
             statements.extend([get_primary_key(analyze_schema,target_schema,table_name,target_table)]);
             
             # insert the old data into the new table
-            insert = '-- migrating data to new structure\ninsert into %s.%s select * from %s.%s;\n' % (target_schema,target_table,analyze_schema,tables[0])
+            comment('migrating data to new structure for table %s' % (table_name,))
+            insert = 'insert into %s.%s select * from %s.%s;\n' % (target_schema,target_table,analyze_schema,tables[0])
             statements.extend([insert])
                     
             # analyze the new table
@@ -462,7 +466,9 @@ def analyze(tables):
             if do_execute:
                 if not run_commands(get_pg_conn(), statements):
                     if not ignore_errors:
-                        return ERROR     
+                        if debug:
+                            write("Error running statements: %s" % (str(statements),))
+                        return ERROR
             
     except Exception as e:
         write('Exception %s during analysis of %s' % (e.message,table_name))
@@ -632,13 +638,13 @@ def main(argv):
     if master_conn == None:
         sys.exit(NO_CONNECTION)
     
-    write("-- Connected to %s:%s:%s as %s\n" % (db_host, db_port, db, db_user))
+    comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
     if analyze_table != None:
         snippet = "Table '%s'" % analyze_table        
     else:
         snippet = "Schema '%s'" % analyze_schema
         
-    write("-- Analyzing %s for Columnar Encoding Optimisations with %s Threads...\n" % (snippet,threads))
+    comment("Analyzing %s for Columnar Encoding Optimisations with %s Threads..." % (snippet,threads))
     
     if do_execute:
         if drop_old_data:
@@ -648,9 +654,9 @@ def main(argv):
                 write("Terminating on User Request")
                 sys.exit(TERMINATED_BY_USER)
 
-        write("-- Recommended encoding changes will be applied automatically...\n")
+        comment("Recommended encoding changes will be applied automatically...")
     else:
-        write("\n")    
+        pass
     
     if analyze_table != None:        
         statement = '''select trim(a.name) as table, b.mbytes, a.rows
@@ -663,7 +669,7 @@ and pgn.nspname = '%s' and pgc.relname = '%s'
         ''' % (analyze_schema,analyze_table)        
     else:
         # query for all tables in the schema ordered by size descending
-        write("-- Extracting Candidate Table List...\n")
+        comment("Extracting Candidate Table List...")
         
         statement = '''select trim(a.name) as table, b.mbytes, a.rows
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
@@ -682,15 +688,18 @@ order by 2
     
     analyze_tables = execute_query(statement)
     
-    write("-- Analyzing %s table(s)" % (len(analyze_tables)))
+    comment("Analyzing %s table(s)" % (len(analyze_tables)))
 
     # setup executor pool
     p = Pool(threads)
     
+    if debug:
+        comment(str(analyze_tables))
+    
     if analyze_tables != None:
         try:
             # run all concurrent steps and block on completion
-            result = p.map(analyze,analyze_tables)                    
+            result = p.map(analyze, analyze_tables)
         except KeyboardInterrupt:
             # To handle Ctrl-C from user
             p.close()
@@ -698,16 +707,17 @@ order by 2
             cleanup()
             sys.exit(TERMINATED_BY_USER)
         except:
+            write(traceback.format_exc())
             p.close()
             p.terminate()
             cleanup()
             sys.exit(ERROR)
     else:
-        comment("No Tables Found to Analyze")            
+        comment("No Tables Found to Analyze")
         
     # do a final vacuum if needed
     if drop_old_data:
-        write("vacuum delete only;\n")
+        write("vacuum delete only;")
 
     p.terminate()
     
@@ -726,9 +736,11 @@ order by 2
             if do_execute:
                 if not run_commands(master_conn,fk_commands):
                     if not ignore_errors:
+                        write("Error running commands %s" % (fk_commands,))
                         sys.exit(ERROR)
             
         if return_code != OK:
+            write("Error in worker thread: return code %d. Exiting." % (return_code,))
             sys.exit(return_code)
     
     if (do_execute):
