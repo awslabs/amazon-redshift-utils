@@ -78,19 +78,21 @@ comprows = None
     
 def execute_query(str):
     conn = get_pg_conn()
+    result = None
+    query_result = conn.query(str)
     
-    result = conn.query(str).getresult()
+    if query_result is not None:
+        result = query_result.getresult()
+        if debug:
+            comment('Query Execution returned %s Results' % (len(result)))
     
-    if debug:
-        comment('Query Execution returned %s Results' % (len(result)))
-        
     return result
 
 def commit():
     execute_query('commit')
     
 def rollback():
-    execute_query('rollback')    
+    execute_query('rollback')
     
 def close_conn(conn):
     try:
@@ -229,7 +231,7 @@ def get_foreign_keys(analyze_schema,target_schema,table_name):
     for fk in foreign_keys:
         has_fks = True
         references_clause = fk[1].replace('REFERENCES ','REFERENCES %s.' % (target_schema))      
-        fk_statements.append('alter table %s.%s add constraint %s %s;\n' % (target_schema,table_name,fk[0],references_clause))    
+        fk_statements.append('alter table %s.%s add constraint %s %s;' % (target_schema,table_name,fk[0],references_clause))    
     
     if has_fks:
         return fk_statements
@@ -270,7 +272,7 @@ order by att.attnum;
         has_pks = True
         pk_statement = pk_statement + pk[0] + ','
         
-    pk_statement = pk_statement[:-1] + ');\n'
+    pk_statement = pk_statement[:-1] + ');'
     
     if has_pks:
         return pk_statement
@@ -296,15 +298,15 @@ def get_table_desc(table_name):
 def run_commands(conn, commands):
     for c in commands:
         if c != None:
-            comment('[%s] Running %s: \n' % (str(os.getpid()),c))
-                
+            comment('[%s] Running %s' % (str(os.getpid()),c))
             try:
-                conn.query(c)        
+                conn.query(c)
+                comment('Success.')
             except Exception as e:
                 # cowardly bail on errors
                 rollback()
-                write(e.message)
-                return False        
+                write(traceback.format_exc())
+                return False
     
     return True
         
@@ -352,7 +354,7 @@ def analyze(tables):
             target_table = table_name
         
         comment('creating migration table for %s' % (table_name,))
-        create_table = 'begin;\n\ncreate table %s.%s(' % (target_schema,target_table,)
+        create_table = 'begin;\ncreate table %s.%s(' % (target_schema,target_table,)
         
         # query the table column definition
         descr = get_table_desc(table_name)
@@ -428,7 +430,7 @@ def analyze(tables):
                        sortkey = sortkey + ')\n'
                 create_table = create_table + (' %s ' % sortkey)                
             
-            create_table = create_table + ';\n'
+            create_table = create_table + ';'
             
             # run the create table statement
             statements.extend([create_table])         
@@ -438,30 +440,30 @@ def analyze(tables):
             
             # insert the old data into the new table
             comment('migrating data to new structure for table %s' % (table_name,))
-            insert = 'insert into %s.%s select * from %s.%s;\n' % (target_schema,target_table,analyze_schema,tables[0])
+            insert = 'insert into %s.%s select * from %s.%s;' % (target_schema,target_table,analyze_schema,tables[0])
             statements.extend([insert])
                     
             # analyze the new table
-            analyze = 'analyze %s.%s;\n' % (target_schema,target_table)
+            analyze = 'analyze %s.%s;' % (target_schema,target_table)
             statements.extend([analyze])
                     
             if (target_schema == analyze_schema):
                 # rename the old table to _$old or drop
                 if drop_old_data:
-                    drop = 'drop table %s.%s;\n' % (target_schema,table_name)
+                    drop = 'drop table %s.%s cascade;' % (target_schema,table_name)
                 else:
-                    drop = 'alter table %s.%s rename to %s;\n' % (target_schema,table_name,table_name + "_$old")                
+                    drop = 'alter table %s.%s rename to %s;' % (target_schema,table_name,table_name + "_$old")
                 
                 statements.extend([drop])
                         
                 # rename the migrate table to the old table name
-                rename = 'alter table %s.%s rename to %s;\n' % (target_schema,target_table,table_name)
+                rename = 'alter table %s.%s rename to %s;' % (target_schema,target_table,table_name)
                 statements.extend([rename])
             
             # add foreign keys
             fks = get_foreign_keys(analyze_schema,target_schema,table_name)
             
-            statements.extend(['commit;\n'])
+            statements.extend(['commit;'])
             
             if do_execute:
                 if not run_commands(get_pg_conn(), statements):
@@ -472,7 +474,7 @@ def analyze(tables):
             
     except Exception as e:
         write('Exception %s during analysis of %s' % (e.message,table_name))
-        write(e)
+        write(traceback.format_exc())
         return ERROR
     
     print_statements(statements)
@@ -734,7 +736,7 @@ order by 2
             print_statements(fk_commands)
             
             if do_execute:
-                if not run_commands(master_conn,fk_commands):
+                if not run_commands(master_conn, fk_commands):
                     if not ignore_errors:
                         write("Error running commands %s" % (fk_commands,))
                         sys.exit(ERROR)
@@ -744,7 +746,7 @@ order by 2
             sys.exit(return_code)
     
     if (do_execute):
-        if not run_commands(master_conn,['commit']):
+        if not commit():
             sys.exit(ERROR)
     
     comment('Processing Complete')
