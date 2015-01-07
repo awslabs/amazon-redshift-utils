@@ -312,7 +312,8 @@ def run_commands(conn, commands):
         
 def analyze(tables):     
     table_name = tables[0]
-        
+    dist_style = tables[3]
+    
     statement = 'analyze compression %s' % (table_name,)
     
     if comprows != None:
@@ -415,11 +416,15 @@ def analyze(tables):
             for i, s in enumerate(encode_columns):
                 create_table += '\n%s%s' % ('' if i == 0 else ',',s)
     
-            create_table = create_table + '\n)'
+            create_table = create_table + '\n)\n'
             
+            # add diststyle all if needed
+            if dist_style == 'ALL':
+                create_table = create_table + 'diststyle all\n'
+                
             # add sort key as a table block to accommodate multiple columns
             if len(sortkeys) > 0:
-                sortkey = '\n%sSORTKEY(' % ('INTERLEAVED ' if has_zindex_sortkeys else '')    
+                sortkey = '%sSORTKEY(' % ('INTERLEAVED ' if has_zindex_sortkeys else '')    
                 
                 for i in range(1, len(sortkeys)+1):
                     sortkey = sortkey + sortkeys[i]
@@ -661,7 +666,7 @@ def main(argv):
         pass
     
     if analyze_table != None:        
-        statement = '''select trim(a.name) as table, b.mbytes, a.rows
+        statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
 join pg_namespace as pgn on pgn.oid = pgc.relnamespace
@@ -673,7 +678,7 @@ and pgn.nspname = '%s' and pgc.relname = '%s'
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Table List...")
         
-        statement = '''select trim(a.name) as table, b.mbytes, a.rows
+        statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
 join pg_namespace as pgn on pgn.oid = pgc.relnamespace
