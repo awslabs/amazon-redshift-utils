@@ -75,6 +75,7 @@ ignore_errors = False
 force = False
 drop_old_data = False
 comprows = None
+query_group = None
     
 def execute_query(str):
     conn = get_pg_conn()
@@ -177,6 +178,14 @@ def get_pg_conn():
             else:
                 write(e.message)
             return None
+
+        if query_group is not None:
+            set_query_group = 'set query_group to %s' % (query_group)
+
+            if debug:
+                comment(set_query_group)
+
+            conn.query(set_query_group)
         
         if query_slot_count != 1:
             set_slot_count = 'set wlm_query_slot_count = %s' % (query_slot_count)
@@ -185,7 +194,7 @@ def get_pg_conn():
                 comment(set_slot_count)
                 
             conn.query(set_slot_count)
-            
+
         # set a long statement timeout
         set_timeout = "set statement_timeout = '1200000'"
         if debug:
@@ -509,11 +518,12 @@ def usage(with_message):
     write('           --force          - Force table migration even if the table already has Column Encoding applied')
     write('           --drop-old-data  - Drop the old version of the data table, rather than renaming')
     write('           --comprows       - Set the number of rows to use for Compression Encoding Analysis')
+    write('           --query_group    - Set the query_group for all queries')
     sys.exit(INVALID_ARGS)
 
 
 def main(argv):
-    supported_args = """db= db-user= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows="""
+    supported_args = """db= db-user= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group="""
     
     # extract the command line arguments
     try:
@@ -541,6 +551,7 @@ def main(argv):
     global force
     global drop_old_data
     global comprows
+    global query_group
     
     output_file = None
 
@@ -610,6 +621,9 @@ def main(argv):
             query_slot_count = int(value)
         elif arg == "--comprows":
             comprows = int(value)
+        elif arg == "--query_group":
+            if value != '' and value != None:
+                query_group = value
         else:
             assert False, "Unsupported Argument " + arg
             usage()
