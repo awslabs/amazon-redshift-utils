@@ -215,6 +215,21 @@ def get_table_attribute(description_list,column_name,index):
         if item[0] == column_name:
             return item[index]
 
+
+def get_identity(adsrc):
+    # checks if a column defined by adsrc (column from pg_attrdef) is
+    # an identity, since both identities and defaults end up in this table
+    # if is identity returns (seed, step); if not returns None
+    # TODO there ought be a better way than using a regex, especially since in theory
+    # someone could set a column to have a string that matches this regex as a default
+    id_re = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
+    m = id_re.match(adsrc)
+    if m:
+        return m.group('seed'), m.group('step')
+    else:
+        return None
+
+
 def get_foreign_keys(analyze_schema,target_schema,table_name):
     has_fks = False
     
@@ -291,11 +306,13 @@ order by att.attnum;
         
 def get_table_desc(table_name):
     # get the table definition from the dictionary so that we can get relevant details for each column
-    statement = '''select "column", type, encoding, distkey, sortkey, "notnull"
- from pg_table_def
- where schemaname = '%s'
- and tablename = '%s'
-''' % (analyze_schema,table_name)
+    statement = '''select "column", type, encoding, distkey, sortkey, "notnull", ad.adsrc
+ from pg_table_def de, pg_attribute at LEFT JOIN pg_attrdef ad ON (at.attrelid, at.attnum) = (ad.adrelid, ad.adnum)
+ where de.schemaname = '%s'
+ and de.tablename = '%s'
+ and at.attrelid = '%s.%s'::regclass
+ and de.column = at.attname
+''' % (analyze_schema,table_name,analyze_schema,table_name)
 
     if debug:
         comment(statement)
@@ -373,6 +390,8 @@ def analyze(tables):
         statements = []
         sortkeys = {}
         has_zindex_sortkeys = False
+        has_identity = False
+        non_identity_columns = []
         
         # process each item given back by the analyze request
         for row in output:
@@ -415,10 +434,25 @@ def analyze(tables):
                 col_null = 'NOT NULL'
             else:
                 col_null = ''
-                
+
+            # get default or identity syntax for this column
+            default_or_identity = get_table_attribute(descr, col, 6)
+            if default_or_identity:
+                ident_data = get_identity(default_or_identity)
+                if ident_data is None:
+                    default_value = 'default %s' % default_or_identity
+                    non_identity_columns.append(col)
+                else:
+                    default_value = 'identity (%s, %s)' % ident_data
+                    has_identity = True
+            else:
+                default_value = ''
+                non_identity_columns.append(col)
+
             # add the formatted column specification
-            encode_columns.extend(['%s %s %s encode %s %s' % (col, col_type, col_null, compression, distkey)])            
-        
+            encode_columns.extend(['%s %s %s %s encode %s %s'
+                                   % (col, col_type, default_value, col_null, compression, distkey)])
+
         fks = None 
         if found_non_raw or force:
             # add all the column encoding statements on to the create table statement, suppressing the leading comma on the first one
@@ -451,10 +485,24 @@ def analyze(tables):
             
             # get the primary key statement
             statements.extend([get_primary_key(analyze_schema,target_schema,table_name,target_table)]);
-            
+
             # insert the old data into the new table
             comment('migrating data to new structure for table %s' % (table_name,))
-            insert = 'insert into %s.%s select * from %s.%s;' % (target_schema,target_table,analyze_schema,tables[0])
+
+            # if we have identity column(s), we can't insert data from them so do selective insert
+            if has_identity:
+                source_columns = ', '.join(non_identity_columns)
+                mig_columns = '(' + source_columns + ')'
+            else:
+                source_columns = '*'
+                mig_columns = ''
+
+            insert = 'insert into %s.%s %s select %s from %s.%s;' % (target_schema,
+                                                                     target_table,
+                                                                     mig_columns,
+                                                                     source_columns,
+                                                                     analyze_schema,
+                                                                     tables[0])
             statements.extend([insert])
                     
             # analyze the new table
