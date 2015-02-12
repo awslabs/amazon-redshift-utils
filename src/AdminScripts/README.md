@@ -5,6 +5,7 @@ If you are using psql, you can use \i <script>.sql to initiate it
 Scripts:
 
 top_queries.sql		Return the top 50 most time consuming statements in the last 7 days
-perf_alerts.sql		Return top occurencies of alerts, join with table scans 
+perf_alerts.sql		Return top occurrences of alerts, join with table scans 
 filter_used.sql		Return filter applied to tables on scans. To aid on choosing sortkey
+commit_stats.sql  Shows information on consumption of cluster resources through COMMIT statements
 
