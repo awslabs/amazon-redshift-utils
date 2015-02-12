@@ -63,4 +63,5 @@ AS dist_ratio ON a.id = dist_ratio.tbl JOIN (SELECT SUM(capacity) AS total
                                              FROM stv_partitions
                                              WHERE part_begin = 0)
 AS part ON 1 = 1 WHERE mbytes IS NOT NULL
--- and pgn.nspname = ‘myschema' -- and a.name like '%user_event%' order by  mbytes desc
+-- and pgn.nspname = ‘myschema' -- and a.name like '%user_event%' 
+order by  mbytes desc
