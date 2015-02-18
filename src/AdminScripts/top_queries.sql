@@ -1,6 +1,22 @@
 /**********************************************************************************************
 Purpose: Return the top 50 time consuming statements aggregated by it's text.
+
+Columns:
+DB:		Database where the query ran
+n_qry:		Number of Queries with same SQL text
+qrytext:	First 80 Characters of the query SQL
+min/max/avg:	Min/Max/Avg Execution time
+total:		Total execution time of all occurences
+max_query_id:	Largest query id of the query occurence
+last_run:	Last day the query dan
+-- Label:	Query Group the query ran. Currently not showing in the SQL
+alerts:		Number of alerts related to the query
+aborted:	0 if query ran to completion, 1 if it was canceled.
  
+Notes:
+There is a comented filter of the query to filter for only Select statements (otherwise it includes all statements like insert, update, COPY)
+There is a comented filter to narrow the query to a given database
+
 History:
 2015-02-09 ericfe created
 **********************************************************************************************/
