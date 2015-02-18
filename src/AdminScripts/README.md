@@ -8,3 +8,6 @@ If you are using psql, you can use \i &lt;script.sql&gt; to run.
 | perf_alerts.sql | Return top occurrences of alerts, join with table scans |
 | filter_used.sql | Return filter applied to tables on scans. To aid on choosing sortkey |
 | commit_stats.sql | Shows information on consumption of cluster resources through COMMIT statements |
+| current_session_info.sql | Query showing information about sessions with currently running queries |
+| missing_table_stats.sql | Query show explain plans which flagged missing statistics on underlying tables |
+| queuing_queries.sql | Query showing queries which are waiting on a WLM Query Slot |
