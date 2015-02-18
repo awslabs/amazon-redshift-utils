@@ -11,3 +11,4 @@ If you are using psql, you can use \i &lt;script.sql&gt; to run.
 | current_session_info.sql | Query showing information about sessions with currently running queries |
 | missing_table_stats.sql | Query show explain plans which flagged missing statistics on underlying tables |
 | queuing_queries.sql | Query showing queries which are waiting on a WLM Query Slot |
+| table_info.sql | Return Table storage information (size, skew, etc) |
