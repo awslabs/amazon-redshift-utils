@@ -10,7 +10,4 @@ If you are using psql, you can use \i &lt;script.sql&gt; to run.
 | commit_stats.sql | Shows information on consumption of cluster resources through COMMIT statements |
 | current_session_info.sql | Query showing information about sessions with currently running queries |
 | missing_table_stats.sql | Query show explain plans which flagged missing statistics on underlying tables |
-| explain_plan_alerts.sql | Query showing explain plans that triggered entries into STL_ALERT_EVENT_LOG |
-| query_runtimes.sql | Query showing longest running queryes by runtime |
 | queuing_queries.sql | Query showing queries which are waiting on a WLM Query Slot |
-| db_size_rows.sql | Query showing the current schema and size of objects in the current database |
