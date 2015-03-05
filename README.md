@@ -14,7 +14,12 @@ that will assist you in getting the best performance possible from Amazon Redshi
 # Admin Scripts
 
 In the AdminScripts directory, you will find a collection of utilities for running
-diagnostics on your Cluster, generating Schema DDL, and ...
+diagnostics on your Cluster
+
+# Admin Views
+
+In the AdminViews directory, you will find a collection of utilities for managing
+your Cluster, generating Schema DDL, and ...
 
 # Column Encoding Utility
 
