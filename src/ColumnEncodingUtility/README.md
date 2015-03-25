@@ -66,3 +66,13 @@ By default, the ANALYZE COMPRESSION command will attempt to analyze 100,000 rows
 ### Do Execute
 
 This option will cause the encoding utility to run the generated script as it goes. Changes will be made to your database LIVE and cannot be undone. It is not recommended that you use this option on Production systems. Furthermore, if the ```--drop-old-data true``` option is included with ```--do-execute true```, then you will be required to confirm that you wish to run this operation before the utility will proceed.
+
+## Install Notes
+
+To install PyGreSQL (Python PostgreSQL Driver) on Amazon Linux, please ensure that you follow the below steps as the ec2-user:
+
+```
+sudo easy_install pip
+sudo yum install postgresql postgresql-devel gcc python-devel
+sudo pip install PyGreSQL
+```
