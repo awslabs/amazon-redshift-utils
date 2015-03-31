@@ -5,7 +5,7 @@ Purpose: View to get the DDL for a table.  This will contain the distkey, sortke
 History:
 2014-02-10 jjschmit Created
 **********************************************************************************************/
-CREATE OR REPLACE VIEW v_generate_tbl_ddl
+CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
 SELECT 
  schemaname
