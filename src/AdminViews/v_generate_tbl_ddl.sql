@@ -4,6 +4,8 @@ Purpose: View to get the DDL for a table.  This will contain the distkey, sortke
 	not null, defaults, etc.
 History:
 2014-02-10 jjschmit Created
+2015-04-02 erezesk  Fixed an error, when a field is named after a reserved word the ddl would
+  fail to execute
 **********************************************************************************************/
 CREATE OR REPLACE VIEW v_generate_tbl_ddl
 AS
@@ -58,7 +60,7 @@ FROM
    schemaname
    ,tablename
    ,seq
-   ,'\t' + col_delim + col_name + ' ' + col_datatype + ' ' + col_nullable + ' ' + col_default + ' ' + col_encoding AS ddl
+   ,'\t' + col_delim + '"' + col_name + '"' + ' ' + col_datatype + ' ' + col_nullable + ' ' + col_default + ' ' + col_encoding AS ddl
   FROM
    (
    SELECT
