@@ -1,4 +1,4 @@
-/* Query shows explain plans which flagged "missing statistics" on underlying tables */
+/* Query shows EXPLAIN plans which flagged "missing statistics" on the underlying tables */
 SELECT substring(trim(plannode),1,100) AS plannode
        ,COUNT(*)
 FROM stl_explain
