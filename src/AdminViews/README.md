@@ -19,4 +19,4 @@ All views assume you have a schema called admin.
 | v_get_view_priv_by_user.sql |   View to get the views that a user has access to | 
 | v_object_dependency.sql |   A view to merge the different dependency views together | 
 | v_space_used_per_tbl.sql |   View to get pull space used per table | 
-| v_view_dependency.sql |   View to get the the names of the views that are dependent other tables/views |
+| v_view_dependency.sql |   View to get the names of the views that are dependent other tables/views |
