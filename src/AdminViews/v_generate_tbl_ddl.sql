@@ -6,7 +6,7 @@ History:
 2014-02-10 jjschmit Created
 2015-05-18 ericfe Added support for Interleaved sortkey
 **********************************************************************************************/
-CREATE OR REPLACE VIEW v_generate_tbl_ddl
+CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
 SELECT 
  schemaname
