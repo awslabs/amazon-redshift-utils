@@ -44,7 +44,7 @@ import getpass
 import time
 import traceback
 
-__version__ = ".9.1.3.3"
+__version__ = ".9.1.4"
 
 OK = 0
 ERROR = 1
@@ -54,7 +54,7 @@ TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
 # timeout for retries - 100ms
-RETRY_TIMEOUT = 100/1000
+RETRY_TIMEOUT = 100 / 1000
     
 master_conn = None
 db_connections = {}
@@ -116,10 +116,10 @@ def cleanup():
 
 def comment(string):
     if (string != None):
-        if re.match('.*\\n.*',string) != None:
-            write('/* [%s]\n%s\n*/\n' % (str(os.getpid()),string))
+        if re.match('.*\\n.*', string) != None:
+            write('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string))
         else:
-            write('-- [%s] %s' % (str(os.getpid()),string))
+            write('-- [%s] %s' % (str(os.getpid()), string))
 
 def print_statements(statements):
     if statements != None:
@@ -149,7 +149,7 @@ def get_pg_conn():
     if conn == None:
         # connect to the database
         if debug:
-            comment('Connect [%s] %s:%s:%s:%s' % (pid,db_host,db_port,db,db_user))
+            comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
             
         try:
             options = 'keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=5'
@@ -173,7 +173,7 @@ def get_pg_conn():
         try:
             conn.query(search_path)
         except pg.ProgrammingError as e:
-            if re.match('schema "%s" does not exist' % (analyze_schema,),e.message) != None:
+            if re.match('schema "%s" does not exist' % (analyze_schema,), e.message) != None:
                 write('Schema %s does not exist' % (analyze_schema,))
             else:
                 write(e.message)
@@ -208,7 +208,7 @@ def get_pg_conn():
     return conn
 
 
-def get_table_attribute(description_list,column_name,index):
+def get_table_attribute(description_list, column_name, index):
     # get a specific value requested from the table description structure based on the index and column name
     # runs against output from get_table_desc()
     for item in description_list:
@@ -230,7 +230,7 @@ def get_identity(adsrc):
         return None
 
 
-def get_foreign_keys(analyze_schema,target_schema,table_name):
+def get_foreign_keys(analyze_schema, target_schema, table_name):
     has_fks = False
     
     fk_statement = '''SELECT conname,
@@ -244,7 +244,7 @@ def get_foreign_keys(analyze_schema,target_schema,table_name):
  and pgc.oid = '%s'::regclass
  AND cons.contype = 'f'
  ORDER BY 1
-''' % (analyze_schema,table_name)
+''' % (analyze_schema, table_name)
 
     if (debug):
         comment(fk_statement)
@@ -254,8 +254,8 @@ def get_foreign_keys(analyze_schema,target_schema,table_name):
     
     for fk in foreign_keys:
         has_fks = True
-        references_clause = fk[1].replace('REFERENCES ','REFERENCES %s.' % (target_schema))      
-        fk_statements.append('alter table %s.%s add constraint %s %s;' % (target_schema,table_name,fk[0],references_clause))    
+        references_clause = fk[1].replace('REFERENCES ', 'REFERENCES %s.' % (target_schema))      
+        fk_statements.append('alter table %s.%s add constraint %s %s;' % (target_schema, table_name, fk[0], references_clause))    
     
     if has_fks:
         return fk_statements
@@ -263,7 +263,7 @@ def get_foreign_keys(analyze_schema,target_schema,table_name):
         return None
             
 def get_primary_key(table_schema, target_schema, original_table, new_table):
-    pk_statement = 'alter table %s.%s add primary key (' % (target_schema,new_table)
+    pk_statement = 'alter table %s.%s add primary key (' % (target_schema, new_table)
     has_pks = False
     
     # get the primary key columns
@@ -312,7 +312,7 @@ def get_table_desc(table_name):
  and de.tablename = '%s'
  and at.attrelid = '%s.%s'::regclass
  and de.column = at.attname
-''' % (analyze_schema,table_name,analyze_schema,table_name)
+''' % (analyze_schema, table_name, analyze_schema, table_name)
 
     if debug:
         comment(statement)
@@ -324,7 +324,7 @@ def get_table_desc(table_name):
 def run_commands(conn, commands):
     for c in commands:
         if c != None:
-            comment('[%s] Running %s' % (str(os.getpid()),c))
+            comment('[%s] Running %s' % (str(os.getpid()), c))
             try:
                 conn.query(c)
                 comment('Success.')
@@ -340,7 +340,7 @@ def analyze(tables):
     table_name = tables[0]
     dist_style = tables[3]
     
-    statement = 'analyze compression %s' % (table_name,)
+    statement = 'analyze compression %s.%s' % (analyze_schema, table_name,)
     
     if comprows != None:
         statement = statement + (" comprows %s" % (comprows,))
@@ -369,10 +369,10 @@ def analyze(tables):
                 rollback()
                 
                 # Exponential Backoff
-                time.sleep(2**attempt_count * RETRY_TIMEOUT)
+                time.sleep(2 ** attempt_count * RETRY_TIMEOUT)
 
         if output == None:
-            write("Unable to analyze %s due to Exception %s" % (table_name,last_exception.message))
+            write("Unable to analyze %s due to Exception %s" % (table_name, last_exception.message))
             return ERROR
         
         if target_schema == analyze_schema:
@@ -381,7 +381,7 @@ def analyze(tables):
             target_table = table_name
         
         comment('creating migration table for %s' % (table_name,))
-        create_table = 'begin;\ncreate table %s.%s(' % (target_schema,target_table,)
+        create_table = 'begin;\nlock table %s.%s;\ncreate table %s.%s(' % (analyze_schema, table_name, target_schema, target_table,)
         
         # query the table column definition
         descr = get_table_desc(table_name)
@@ -401,19 +401,19 @@ def analyze(tables):
             if row[2] != 'raw':
                 found_non_raw = True
             
-            col_type = get_table_attribute(descr,col,1)
+            col_type = get_table_attribute(descr, col, 1)
             # fix datatypes
-            col_type = col_type.replace('character varying','varchar').replace('without time zone','')
+            col_type = col_type.replace('character varying', 'varchar').replace('without time zone', '')
             
             # is this the dist key?
-            distkey = get_table_attribute(descr,col,3)
+            distkey = get_table_attribute(descr, col, 3)
             if str(distkey).upper() == 'T':
-                distkey='DISTKEY'
+                distkey = 'DISTKEY'
             else:
                 distkey = ''
                 
             # is this the sort key?
-            sortkey = get_table_attribute(descr,col,4)
+            sortkey = get_table_attribute(descr, col, 4)
             if sortkey != 0:
                 # add the absolute ordering of the sortkey to the list of all sortkeys
                 sortkeys[abs(sortkey)] = col
@@ -428,7 +428,7 @@ def analyze(tables):
                 compression = row[2]
                 
             # extract null/not null setting
-            col_null = get_table_attribute(descr,col,5)
+            col_null = get_table_attribute(descr, col, 5)
             
             if str(col_null).upper() == 'T':
                 col_null = 'NOT NULL'
@@ -457,7 +457,7 @@ def analyze(tables):
         if found_non_raw or force:
             # add all the column encoding statements on to the create table statement, suppressing the leading comma on the first one
             for i, s in enumerate(encode_columns):
-                create_table += '\n%s%s' % ('' if i == 0 else ',',s)
+                create_table += '\n%s%s' % ('' if i == 0 else ',', s)
     
             create_table = create_table + '\n)\n'
             
@@ -469,7 +469,7 @@ def analyze(tables):
             if len(sortkeys) > 0:
                 sortkey = '%sSORTKEY(' % ('INTERLEAVED ' if has_zindex_sortkeys else '')    
                 
-                for i in range(1, len(sortkeys)+1):
+                for i in range(1, len(sortkeys) + 1):
                     sortkey = sortkey + sortkeys[i]
                    
                     if i != len(sortkeys):
@@ -484,7 +484,7 @@ def analyze(tables):
             statements.extend([create_table])         
             
             # get the primary key statement
-            statements.extend([get_primary_key(analyze_schema,target_schema,table_name,target_table)]);
+            statements.extend([get_primary_key(analyze_schema, target_schema, table_name, target_table)]);
 
             # insert the old data into the new table
             comment('migrating data to new structure for table %s' % (table_name,))
@@ -506,24 +506,24 @@ def analyze(tables):
             statements.extend([insert])
                     
             # analyze the new table
-            analyze = 'analyze %s.%s;' % (target_schema,target_table)
+            analyze = 'analyze %s.%s;' % (target_schema, target_table)
             statements.extend([analyze])
                     
             if (target_schema == analyze_schema):
                 # rename the old table to _$old or drop
                 if drop_old_data:
-                    drop = 'drop table %s.%s cascade;' % (target_schema,table_name)
+                    drop = 'drop table %s.%s cascade;' % (target_schema, table_name)
                 else:
-                    drop = 'alter table %s.%s rename to %s;' % (target_schema,table_name,table_name + "_$old")
+                    drop = 'alter table %s.%s rename to %s;' % (target_schema, table_name, table_name + "_$old")
                 
                 statements.extend([drop])
                         
                 # rename the migrate table to the old table name
-                rename = 'alter table %s.%s rename to %s;' % (target_schema,target_table,table_name)
+                rename = 'alter table %s.%s rename to %s;' % (target_schema, target_table, table_name)
                 statements.extend([rename])
             
             # add foreign keys
-            fks = get_foreign_keys(analyze_schema,target_schema,table_name)
+            fks = get_foreign_keys(analyze_schema, target_schema, table_name)
             
             statements.extend(['commit;'])
             
@@ -535,13 +535,13 @@ def analyze(tables):
                         return ERROR
             
     except Exception as e:
-        write('Exception %s during analysis of %s' % (e.message,table_name))
+        write('Exception %s during analysis of %s' % (e.message, table_name))
         write(traceback.format_exc())
         return ERROR
     
     print_statements(statements)
     
-    return (OK,fks)
+    return (OK, fks)
 
 def usage(with_message):
     write('Usage: analyze-schema-compression.py')
@@ -569,6 +569,9 @@ def usage(with_message):
     write('           --query_group    - Set the query_group for all queries')
     sys.exit(INVALID_ARGS)
 
+
+def get_env_var(name):
+    return os.environ[name] if name in os.environ else None
 
 def main(argv):
     supported_args = """db= db-user= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group="""
@@ -678,13 +681,21 @@ def main(argv):
     
     # Validate that we've got all the args needed
     if db == None:
-        usage("Missing Parameter 'db'")
+        db = get_env_var('PGDATABASE')
+        if db == None:        
+            usage("Missing Parameter 'db'")
     if db_user == None:
-        usage("Missing Parameter 'db-user'")
+        db_user = get_env_var('PGUSER')
+        if db_user == None:
+            usage("Missing Parameter 'db-user'")
     if db_host == None:
-        usage("Missing Parameter 'db-host'")
+        db_host = get_env_var('PGHOST')
+        if db_host == None:        
+            usage("Missing Parameter 'db-host'")
     if db_port == None:
-        usage("Missing Parameter 'db-port'")
+        db_port = get_env_var('PGPORT')
+        if db_port == None:        
+            usage("Missing Parameter 'db-port'")
     if output_file == None:
         usage("Missing Parameter 'output-file'")
     
@@ -699,7 +710,7 @@ def main(argv):
     db_pwd = getpass.getpass("Password <%s>: " % db_user)
     
     # open the output file
-    output_file_handle = open(output_file,'w')
+    output_file_handle = open(output_file, 'w')
     
     # get a connection for the controlling processes
     master_conn = get_pg_conn()
@@ -713,7 +724,7 @@ def main(argv):
     else:
         snippet = "Schema '%s'" % analyze_schema
         
-    comment("Analyzing %s for Columnar Encoding Optimisations with %s Threads..." % (snippet,threads))
+    comment("Analyzing %s for Columnar Encoding Optimisations with %s Threads..." % (snippet, threads))
     
     if do_execute:
         if drop_old_data:
@@ -735,7 +746,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
 and pgn.nspname = '%s' and pgc.relname = '%s'        
-        ''' % (analyze_schema,analyze_table)        
+        ''' % (analyze_schema, analyze_table)        
     else:
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Table List...")
