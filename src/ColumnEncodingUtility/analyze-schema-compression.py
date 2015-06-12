@@ -44,7 +44,7 @@ import getpass
 import time
 import traceback
 
-__version__ = ".9.1.3.4"
+__version__ = ".9.1.4"
 
 OK = 0
 ERROR = 1
@@ -570,6 +570,9 @@ def usage(with_message):
     sys.exit(INVALID_ARGS)
 
 
+def get_env_var(name):
+    return os.environ[name] if name in os.environ else None
+
 def main(argv):
     supported_args = """db= db-user= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group="""
     
@@ -678,13 +681,21 @@ def main(argv):
     
     # Validate that we've got all the args needed
     if db == None:
-        usage("Missing Parameter 'db'")
+        db = get_env_var('PGDATABASE')
+        if db == None:        
+            usage("Missing Parameter 'db'")
     if db_user == None:
-        usage("Missing Parameter 'db-user'")
+        db_user = get_env_var('PGUSER')
+        if db_user == None:
+            usage("Missing Parameter 'db-user'")
     if db_host == None:
-        usage("Missing Parameter 'db-host'")
+        db_host = get_env_var('PGHOST')
+        if db_host == None:        
+            usage("Missing Parameter 'db-host'")
     if db_port == None:
-        usage("Missing Parameter 'db-port'")
+        db_port = get_env_var('PGPORT')
+        if db_port == None:        
+            usage("Missing Parameter 'db-port'")
     if output_file == None:
         usage("Missing Parameter 'output-file'")
     
