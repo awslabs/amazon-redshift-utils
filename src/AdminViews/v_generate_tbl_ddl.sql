@@ -113,7 +113,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,400000000 + a.attnum AS seq
-   ,'DISTKEY (' + a.attname + ')' AS ddl
+   ,'DISTKEY ("' + a.attname + '")' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   INNER JOIN pg_attribute AS a ON c.oid = a.attrelid
@@ -139,8 +139,8 @@ from (SELECT
    ,c.relname AS tablename
    ,500000000 + abs(a.attsortkeyord) AS seq
    ,CASE WHEN abs(a.attsortkeyord) = 1 
-    THEN '\t' + a.attname 
-    ELSE '\t,' + a.attname 
+    THEN '\t"' + a.attname + '"' 
+    ELSE '\t, "' + a.attname + '"'
     END AS ddl
   FROM  pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
