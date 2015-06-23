@@ -4,11 +4,9 @@ Purpose: View to get the DDL for a table.  This will contain the distkey, sortke
 	not null, defaults, etc.
 History:
 2014-02-10 jjschmit Created
-2015-04-02 erezesk  Fixed an error, when a field is named after a reserved word the ddl would
-  fail to execute
 2015-05-18 ericfe Added support for Interleaved sortkey
 **********************************************************************************************/
-CREATE OR REPLACE VIEW v_generate_tbl_ddl
+CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
 SELECT 
  schemaname
@@ -52,7 +50,7 @@ FROM
    schemaname
    ,tablename
    ,seq
-   ,'\t' + col_delim + '"' + col_name + '"' + ' ' + col_datatype + ' ' + col_nullable + ' ' + col_default + ' ' + col_encoding AS ddl
+   ,'\t' + col_delim + col_name + ' ' + col_datatype + ' ' + col_nullable + ' ' + col_default + ' ' + col_encoding AS ddl
   FROM
    (
    SELECT
@@ -115,7 +113,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,400000000 + a.attnum AS seq
-   ,'DISTKEY (' + a.attname + ')' AS ddl
+   ,'DISTKEY ("' + a.attname + '")' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   INNER JOIN pg_attribute AS a ON c.oid = a.attrelid
@@ -141,8 +139,8 @@ from (SELECT
    ,c.relname AS tablename
    ,500000000 + abs(a.attsortkeyord) AS seq
    ,CASE WHEN abs(a.attsortkeyord) = 1 
-    THEN '\t' + a.attname 
-    ELSE '\t,' + a.attname 
+    THEN '\t"' + a.attname + '"' 
+    ELSE '\t, "' + a.attname + '"'
     END AS ddl
   FROM  pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
