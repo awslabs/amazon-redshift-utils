@@ -6,7 +6,7 @@ History:
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_schema_ddl
 AS
-SELECT nspname AS schemaname, 'CREATE SCHEMA ' + nspname + ';' AS ddl FROM pg_catalog.pg_namespace WHERE nspowner >= 100 ORDER BY nspname
+SELECT nspname AS schemaname, 'CREATE SCHEMA "' + nspname + '";' AS ddl FROM pg_catalog.pg_namespace WHERE nspowner >= 100 ORDER BY nspname
 ;
 
 
