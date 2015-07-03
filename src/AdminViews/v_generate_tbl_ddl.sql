@@ -27,7 +27,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,1 AS seq
-   ,'--DROP TABLE ' + n.nspname + '.' + c.relname + ';' AS ddl 
+   ,'--DROP TABLE "' + n.nspname + '"."' + c.relname + '";' AS ddl 
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
@@ -36,7 +36,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,2 AS seq
-   ,'CREATE TABLE ' + n.nspname + '.' + c.relname AS ddl
+   ,'CREATE TABLE "' + n.nspname + '"."' + c.relname + '"' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
@@ -58,7 +58,7 @@ FROM
     ,c.relname AS tablename
     ,100000000 + a.attnum AS seq
     ,CASE WHEN a.attnum > 1 THEN ',' ELSE '' END AS col_delim
-    ,a.attname AS col_name
+    ,'"' + a.attname + '"' AS col_name
     ,CASE WHEN STRPOS(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER VARYING') > 0
       THEN REPLACE(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER VARYING', 'VARCHAR')
      WHEN STRPOS(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER') > 0
