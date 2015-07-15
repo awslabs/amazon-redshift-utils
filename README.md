@@ -38,6 +38,9 @@ an entire schema or individual tables. The ANALYZE COMPRESSION (http://docs.aws.
 command is used to determine if any of the columns in the table require updating, 
 and if so a script is generated to convert to the optimal structure.
 
+# Presentation
+We included a presentation which describes main features of the Amazon Redshift Utils including some examples, tipps and best practices: Redshift_DBA_Commands.pptx
+
 ----
 Copyright 2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
