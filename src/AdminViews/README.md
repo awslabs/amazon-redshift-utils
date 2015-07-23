@@ -20,3 +20,10 @@ All views assume you have a schema called admin.
 | v_object_dependency.sql |   A view to merge the different dependency views together | 
 | v_space_used_per_tbl.sql |   View to get pull space used per table | 
 | v_view_dependency.sql |   View to get the names of the views that are dependent other tables/views |
+| v_check_transaction_locks.sql | View to get information about the locks held by open transactions |
+| v_check_wlm_query_time.sql | View to get  WLM Queue Wait Time , Execution Time and Total Time by Query for the past 7 Days |
+| v_check_wlm_query_trend_daily.sql | View to get  WLM Query Count, Queue Wait Time , Execution Time and Total Time by Day  |
+| v_check_wlm_query_trend_hourly.sql | View to get  WLM Query Count, Queue Wait Time , Execution Time and Total Time by Hour |
+| v_generate_cancel_query.sql | View to get cancel query |
+| v_get_cluster_restart_ts.sql | View to get the datetime of when Redshift cluster was recently restarted |
+| v_get_vacuum_details.sql | View to get vacuum details like table name, Schema Name, Deleted Rows , processing time |
