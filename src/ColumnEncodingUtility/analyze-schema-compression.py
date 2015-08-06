@@ -54,7 +54,7 @@ TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
 # timeout for retries - 100ms
-RETRY_TIMEOUT = 100 / 1000
+RETRY_TIMEOUT = 100. / 1000
     
 master_conn = None
 db_connections = {}
