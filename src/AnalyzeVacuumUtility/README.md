@@ -163,30 +163,30 @@ If table has a stats_off_pct > 10 %, then the script runs ALALYZE command to upd
 ## Summary of Parameters:
 
 ```
-Sl.No	Parameter	Mandatory	Default Value
+Sl.No	Parameter				Mandatory	Default Value
 1.		--db                 	Yes	
 2.		--db-user            	Yes	
 3.		--db-pwd             	Yes	
 4.		--db-host            	Yes	
-5.		--db-port            	No	5439
-6.		--schema-name    	No	Public
-7.		--table-name         	No	Schema
+5.		--db-port            	No			5439
+6.		--schema-name    		No			Public
+7.		--table-name         	No			Schema
 8.		--output-file        	Yes	
-9.		--debug              	No	False
-10.		--slot-count         	No	1
-11.		--ignore-errors      	No	False
-12.		--query_group        	No	None
-13.		--analyze-flag	No	True
-14.		--vacuum-flag	No	True
-15.		--vacuum-parameter	No	FULL
-16.		--min-unsorted-pct	No	05%
-17.		--max-unsorted-pct	No	50%
-18.		--deleted-pct	No	05%
-19.		--stats-off-pct	No	10%
-20.		--max-table-size-mb	No	700*1024 MB
+9.		--debug              	No			False
+10.		--slot-count         	No			1
+11.		--ignore-errors      	No			False
+12.		--query_group        	No			None
+13.		--analyze-flag			No			True
+14.		--vacuum-flag			No			True
+15.		--vacuum-parameter		No			FULL
+16.		--min-unsorted-pct		No			05%
+17.		--max-unsorted-pct		No			50%
+18.		--deleted-pct			No			05%
+19.		--stats-off-pct			No			10%
+20.		--max-table-size-mb		No			700*1024 MB
 ```
 
-The above parameter values depends on the cluster type, table size, available system resources and available ‘Time window’ etc. The default values provided here are based on ds2.8xlarge  , 8 node cluster. You need to play around with these parameters to come up with correct parameter values to vacuum and analyze your table(s). If table size is greater than certain size (max_table_size_mb) and has a large unsorted region (deleted_pct  or max_unsorted_pct), consider deep copy. In this case a deep copy would be much faster than a vacuum.
+The above parameter values depends on the cluster type, table size, available system resources and available ‘Time window’ etc. The default values provided here are based on ds2.8xlarge, 8 node cluster. It may take some trial and error to come up with correct parameter values to vacuum and analyze your table(s). If table size is greater than certain size (max_table_size_mb) and has a large unsorted region (deleted_pct  or max_unsorted_pct), consider deep copy, which would be much faster than a vacuum.
 
 As VACUUM & ANALYZE operations are resource intensive, you should ensure that this will not adversely impact other database operations running on your cluster. AWS has thoroughly tested this software on a variety of systems, but cannot be responsible for the impact of running the utility against your database.
 
