@@ -42,8 +42,8 @@ group by tbl, name ) as dist_ratio on a.id = dist_ratio.tbl
 join ( select sum(capacity) as  total
   from stv_partitions where part_begin=0 ) as part on 1=1
 where mbytes is not null 
--- and pgn.nspname = 'mpevzner' -- schemaname
--- and a.name like 'eric%' -- tablename
+-- and pgn.nspname = 'schema' -- schemaname
+-- and a.name like 'table%' -- tablename
 -- and det.max_enc = 0 -- non-compressed tables
 order by  mbytes desc;
 

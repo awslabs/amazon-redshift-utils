@@ -4,11 +4,9 @@ Purpose: View to get the DDL for a table.  This will contain the distkey, sortke
 	not null, defaults, etc.
 History:
 2014-02-10 jjschmit Created
-2015-04-02 erezesk  Fixed an error, when a field is named after a reserved word the ddl would
-  fail to execute
 2015-05-18 ericfe Added support for Interleaved sortkey
 **********************************************************************************************/
-CREATE OR REPLACE VIEW v_generate_tbl_ddl
+CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
 SELECT 
  schemaname
@@ -29,7 +27,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,1 AS seq
-   ,'--DROP TABLE ' + n.nspname + '.' + c.relname + ';' AS ddl 
+   ,'--DROP TABLE "' + n.nspname + '"."' + c.relname + '";' AS ddl 
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
@@ -38,7 +36,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,2 AS seq
-   ,'CREATE TABLE ' + n.nspname + '.' + c.relname AS ddl
+   ,'CREATE TABLE "' + n.nspname + '"."' + c.relname + '"' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
@@ -52,7 +50,7 @@ FROM
    schemaname
    ,tablename
    ,seq
-   ,'\t' + col_delim + '"' + col_name + '"' + ' ' + col_datatype + ' ' + col_nullable + ' ' + col_default + ' ' + col_encoding AS ddl
+   ,'\t' + col_delim + col_name + ' ' + col_datatype + ' ' + col_nullable + ' ' + col_default + ' ' + col_encoding AS ddl
   FROM
    (
    SELECT
@@ -60,7 +58,7 @@ FROM
     ,c.relname AS tablename
     ,100000000 + a.attnum AS seq
     ,CASE WHEN a.attnum > 1 THEN ',' ELSE '' END AS col_delim
-    ,a.attname AS col_name
+    ,'"' + a.attname + '"' AS col_name
     ,CASE WHEN STRPOS(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER VARYING') > 0
       THEN REPLACE(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER VARYING', 'VARCHAR')
      WHEN STRPOS(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER') > 0
@@ -115,7 +113,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,400000000 + a.attnum AS seq
-   ,'DISTKEY (' + a.attname + ')' AS ddl
+   ,'DISTKEY ("' + a.attname + '")' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   INNER JOIN pg_attribute AS a ON c.oid = a.attrelid
@@ -141,8 +139,8 @@ from (SELECT
    ,c.relname AS tablename
    ,500000000 + abs(a.attsortkeyord) AS seq
    ,CASE WHEN abs(a.attsortkeyord) = 1 
-    THEN '\t' + a.attname 
-    ELSE '\t,' + a.attname 
+    THEN '\t"' + a.attname + '"' 
+    ELSE '\t, "' + a.attname + '"'
     END AS ddl
   FROM  pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace

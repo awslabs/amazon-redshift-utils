@@ -13,7 +13,7 @@ SELECT
 	,id AS tbl_oid
 	,name AS tablename
 	,rows AS rowcount_on_slice
-	,SUM(rows) OVER (PARTITION BY name) AS total_rowcount
+	,SUM(rows) OVER (PARTITION BY name, id) AS total_rowcount
 	,CASE
 		WHEN rows IS NULL OR rows = 0 THEN 0
 		ELSE ROUND(CAST(rows AS FLOAT) / CAST((SUM(rows) OVER (PARTITION BY id)) AS FLOAT) * 100, 3) 
