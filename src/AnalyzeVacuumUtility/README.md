@@ -259,8 +259,8 @@ sudo pip install PyGreSQL
 
 ## Limitations
 
-1)	Script runs all VACUUM commands sequentially. Currently in Redshift multiple concurrent vacuum operations are not supported. 
-2)	 Script runs all ANALYZE commands sequentially not concurrently.
-3)	Does not support column level ANALYZE. 
-4)	Multiple schemas are not supported.
-5)	Skew factor is not considered. 
+1. Script runs all VACUUM commands sequentially. Currently in Redshift multiple concurrent vacuum operations are not supported. 
+2. Script runs all ANALYZE commands sequentially not concurrently.
+3. Does not support column level ANALYZE. 
+4. Multiple schemas are not supported.
+5. Skew factor is not considered.
