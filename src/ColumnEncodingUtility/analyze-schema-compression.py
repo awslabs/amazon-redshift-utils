@@ -44,7 +44,7 @@ import getpass
 import time
 import traceback
 
-__version__ = ".9.1.4"
+__version__ = ".9.1.5"
 
 OK = 0
 ERROR = 1
@@ -58,11 +58,11 @@ RETRY_TIMEOUT = 100 / 1000
     
 master_conn = None
 db_connections = {}
-db = None
-db_user = None
+db = os.environ('PGDATABASE',None)
+db_user = os.environ('PGUSER',None)
 db_pwd = None
-db_host = None
-db_port = 5439
+db_host = os.environ('PGHOST',None)
+db_port = os.environ('PGPORT',5439)
 analyze_schema = 'public'
 target_schema = None
 analyze_table = None
@@ -568,10 +568,7 @@ def usage(with_message):
     write('           --comprows       - Set the number of rows to use for Compression Encoding Analysis')
     write('           --query_group    - Set the query_group for all queries')
     sys.exit(INVALID_ARGS)
-
-
-def get_env_var(name):
-    return os.environ[name] if name in os.environ else None
+    
 
 def main(argv):
     supported_args = """db= db-user= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group="""
@@ -681,21 +678,13 @@ def main(argv):
     
     # Validate that we've got all the args needed
     if db == None:
-        db = get_env_var('PGDATABASE')
-        if db == None:        
-            usage("Missing Parameter 'db'")
+        usage("Missing Parameter 'db'")
     if db_user == None:
-        db_user = get_env_var('PGUSER')
-        if db_user == None:
-            usage("Missing Parameter 'db-user'")
-    if db_host == None:
-        db_host = get_env_var('PGHOST')
-        if db_host == None:        
-            usage("Missing Parameter 'db-host'")
-    if db_port == None:
-        db_port = get_env_var('PGPORT')
-        if db_port == None:        
-            usage("Missing Parameter 'db-port'")
+        usage("Missing Parameter 'db-user'")
+    if db_host == None:        
+        usage("Missing Parameter 'db-host'")
+    if db_port == None:        
+        usage("Missing Parameter 'db-port'")
     if output_file == None:
         usage("Missing Parameter 'output-file'")
     

@@ -29,10 +29,10 @@ This utility was built and tested on Python 2.7x, but may work with other versio
 Usage: analyze-schema-compression.py
        Generates a script to optimise Redshift column encodings on all tables in a schema
 
-Arguments: --db             - The Database to Use
-           --db-user        - The Database User to connect to
-           --db-host        - The Cluster endpoint
-           --db-port        - The Cluster endpoint port (default 5439)
+Arguments: --db             - The Database to Use (or $PGDATABASE)
+           --db-user        - The Database User to connect to (or $PGUSER)
+           --db-host        - The Cluster endpoint (or $PGHOST)
+           --db-port        - The Cluster endpoint port (default 5439 or $PGPORT)
            --analyze-schema - The Schema to be Analyzed (default public)
            --analyze-table  - A specific table to be Analyzed, if --analyze-schema is not desired
            --target-schema  - Name of a Schema into which the newly optimised tables and data should be created, rather than in place
