@@ -56,6 +56,9 @@ NO_CONNECTION = 5
 # timeout for retries - 100ms
 RETRY_TIMEOUT = 100. / 1000
     
+# compiled regular expressions
+IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
+
 master_conn = None
 db_connections = {}
 db = os.environ('PGDATABASE',None)
@@ -220,10 +223,8 @@ def get_identity(adsrc):
     # checks if a column defined by adsrc (column from pg_attrdef) is
     # an identity, since both identities and defaults end up in this table
     # if is identity returns (seed, step); if not returns None
-    # TODO there ought be a better way than using a regex, especially since in theory
-    # someone could set a column to have a string that matches this regex as a default
-    id_re = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
-    m = id_re.match(adsrc)
+    # TODO there ought be a better way than using a regex
+    m = IDENTITY_RE.match(adsrc)
     if m:
         return m.group('seed'), m.group('step')
     else:
