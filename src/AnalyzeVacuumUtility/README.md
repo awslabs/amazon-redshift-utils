@@ -59,12 +59,8 @@ WHERE  anlyz_tbl.qry_rnk < $( query_rank )
 
 Variables and default values (which can be changed):
 
-```#set vacuum analyze variables 
-
-goback_no_of_days: To control number days to look back from CURRENT_DATE,  Default value = 1 
-
-query_rank : To get the top N rank tables based on the stl_alert_event_log alerts, Default value = 25
-```
+* goback_no_of_days: To control number days to look back from CURRENT_DATE,  Default value = 1 
+* query_rank : To get the top N rank tables based on the stl_alert_event_log alerts, Default value = 25
 
 ### Phase 2: 
 
@@ -117,9 +113,6 @@ SELECT DISTINCT 'analyze ' + feedback_tbl.schema_name + '.' + feedback_tbl.table
                                      LEFT JOIN pg_class c ON c.relname = TRIM (miss_tbl.table_name) 
                                      LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace 
                                    WHERE miss_tbl.qry_rnk <= 25) 
-                                    
-
-                                    
                                    UNION 
                                    SELECT schema_name, 
                                           table_name 
