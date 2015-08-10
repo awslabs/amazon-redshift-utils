@@ -208,7 +208,7 @@ def get_pg_conn():
             conn.query(set_slot_count)
 
         # set a long statement timeout
-        set_timeout = "set statement_timeout = '1200000'"
+        set_timeout = "set statement_timeout = '36000000'"
         if debug:
             comment(set_timeout)
             
