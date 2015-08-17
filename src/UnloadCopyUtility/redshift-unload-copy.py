@@ -209,6 +209,7 @@ def main(args):
               dest_schema, dest_table)
 
     src_conn.close()
+    dest_conn.close()
     
     if deleteOnSuccess:
         s3Delete(dataStagingPath)
