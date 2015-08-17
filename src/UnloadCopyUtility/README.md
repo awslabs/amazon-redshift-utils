@@ -23,7 +23,7 @@ Data is exported to S3 to the configuration location, plus a date string which a
 
 ## Configuration
 
-The utility is configured using a json configuration file, which can be stored on the local filesystem or on Amazon S3. To use Amazon S3, prefix the file location parameter with 's3://'. An example configuration to help you get started can be found in the [example configuration file](example/config.json').
+The utility is configured using a json configuration file, which can be stored on the local filesystem or on Amazon S3. To use Amazon S3, prefix the file location parameter with 's3://'. An example configuration to help you get started can be found in the [example configuration file](example/config.json).
 
 All passwords and access keys for reading and writing from Amazon S3 are encrypted using the Customer Master Key for the utility. Prior to creating the configuration file, you must run ```createKmsKey.sh```, and then use the ```encryptValue.sh``` script to generate the base64 encoded encrypted configuration values. For example, to encrypt the value 'myPassword' with a customer master key stored in Dublin:
 
