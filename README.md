@@ -38,6 +38,23 @@ an entire schema or individual tables. The ANALYZE COMPRESSION (http://docs.aws.
 command is used to determine if any of the columns in the table require updating, 
 and if so a script is generated to convert to the optimal structure.
 
+# Analyze & Vacuum Utility
+
+The Redshift Analyze Vacuum Utility gives you the ability to automate VACUUM and ANALYZE operations. 
+When run, it will analyze or vacuum an entire schema or individual tables. This Utility Analyzes 
+and Vacuums table(s) in a Redshift Database schema, based on certain parameters like unsorted, 
+stats off and size of the table and system alerts from stl_explain & stl_alert_event_log. 
+By turning on/off '--analyze-flag' and  '--vacuum-flag' parameters, you can run it as  'vacuum-only' 
+or  'analyze-only' utility. This script can be scheduled to run VACUUM and ANALYZE as part of 
+regular maintenance/housekeeping activities, when there are less database activities (quiet period).
+
+# Unload/Copy Utility
+
+The Amazon Redshift Unload/Copy Utility helps you to migrate data between Redshift Clusters or Databases. It exports data from a source cluster to a location on S3, and all data is encrypted with Amazon Key Management Service. It then automatically imports the data into the configured Redshift Cluster, and will cleanup S3 if required. This utility is intended to be used as part of an ongoing scheduled activity, for instance run as part of a Data Pipeline Shell Activity (http://docs.aws.amazon.com/datapipeline/latest/DeveloperGuide/dp-object-shellcommandactivity.html).
+
+# Presentation
+We included a presentation which describes main features of the Amazon-Redshift-Utils including some examples, tips and best practices: Redshift_DBA_Commands.pptx
+
 ----
 Copyright 2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
