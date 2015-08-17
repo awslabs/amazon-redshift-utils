@@ -1,0 +1,34 @@
+// example unload/copy utility config file. please remove all comments '//' as they are invalid json
+{
+  // the source database from which we'll export data
+  "unloadSource": {
+    "clusterEndpoint": "my-cluster.d7bdmd4addft.eu-west-1.redshift.amazonaws.com",
+    "clusterPort": 5439,
+    // base 64 encoded password for the user to UNLOAD data as. Use the encryptValue.sh utility to generate this string
+    "connectPwd": "my base 64 encoded password",
+    "connectUser": "master",
+    "db": "mydb",
+    "schemaName": "public",
+    "tableName": "export_table"
+  },
+  // location and credentials for S3, which are used to store migrated data while in flight
+  "s3Staging": {
+    // base 64 encoded AWS Access Key used to access S3. Use the encryptValue.sh utility to generate this string
+    "aws_access_key_id": "my base 64 encoded access key",
+    // base 64 encoded AWS Secret Access Key used to access S3. Use the encryptValue.sh utility to generate this string
+    "aws_secret_access_key": "my base 64 encoded secret key",
+    // path on S3 to use for storing in-flight data. The current date and time is appended to the prefix
+    "path": "s3://my-bucket/prefix/"
+  },
+  // the destination database into which we will copy data
+  "copyTarget": {
+    "clusterEndpoint": "my-other-cluster.d7bdmd4addft.eu-west-1.redshift.amazonaws.com",
+    "clusterPort": 5439,
+    // base 64 encoded password for the user to UNLOAD data as. Use the encryptValue.sh utility to generate this string
+    "connectPwd": "my base 64 encoded password",
+    "connectUser": "master",
+    "db": "mydb",
+    "schemaName": "public",
+    "tableName": "import_table"
+  }
+}
