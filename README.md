@@ -13,12 +13,12 @@ that will assist you in getting the best performance possible from Amazon Redshi
 
 # Admin Scripts
 
-In the AdminScripts directory, you will find a collection of utilities for running
+In the AdminScripts directory, you will find a [collection of utilities](src/AdminScripts) for running
 diagnostics on your Cluster
 
 # Admin Views
 
-In the AdminViews directory, you will find a collection of utilities for managing
+In the AdminViews directory, you will find a [collection of views](src/AdminViews) for managing
 your Cluster, generating Schema DDL, and ...
 
 # Column Encoding Utility
@@ -32,7 +32,7 @@ is used to load data into a table, column encoding will be analyzed and applied 
 Other tables may be loaded via Extract/Load/Transform/Load (ELT) processes, and 
 these tables may require having the column encoding updated at some point.
 
-The Redshift Column Encoding Utility gives you the ability to apply optimal Column 
+The [Redshift Column Encoding Utility](src/ColumnEncodingUtility) gives you the ability to apply optimal Column 
 Encoding to an established Schema with data already loaded. When run, it will analyze 
 an entire schema or individual tables. The ANALYZE COMPRESSION (http://docs.aws.amazon.com/redshift/latest/dg/r_ANALYZE_COMPRESSION.html) 
 command is used to determine if any of the columns in the table require updating, 
@@ -40,7 +40,7 @@ and if so a script is generated to convert to the optimal structure.
 
 # Analyze & Vacuum Utility
 
-The Redshift Analyze Vacuum Utility gives you the ability to automate VACUUM and ANALYZE operations. 
+The [Redshift Analyze Vacuum Utility](src/AnalyzeVacuumUtility) gives you the ability to automate VACUUM and ANALYZE operations. 
 When run, it will analyze or vacuum an entire schema or individual tables. This Utility Analyzes 
 and Vacuums table(s) in a Redshift Database schema, based on certain parameters like unsorted, 
 stats off and size of the table and system alerts from stl_explain & stl_alert_event_log. 
@@ -50,7 +50,7 @@ regular maintenance/housekeeping activities, when there are less database activi
 
 # Unload/Copy Utility
 
-The Amazon Redshift Unload/Copy Utility helps you to migrate data between Redshift Clusters or Databases. It exports data from a source cluster to a location on S3, and all data is encrypted with Amazon Key Management Service. It then automatically imports the data into the configured Redshift Cluster, and will cleanup S3 if required. This utility is intended to be used as part of an ongoing scheduled activity, for instance run as part of a Data Pipeline Shell Activity (http://docs.aws.amazon.com/datapipeline/latest/DeveloperGuide/dp-object-shellcommandactivity.html).
+The [Redshift Unload/Copy Utility](src/UnloadCopyUtility) helps you to migrate data between Redshift Clusters or Databases. It exports data from a source cluster to a location on S3, and all data is encrypted with Amazon Key Management Service. It then automatically imports the data into the configured Redshift Cluster, and will cleanup S3 if required. This utility is intended to be used as part of an ongoing scheduled activity, for instance run as part of a Data Pipeline Shell Activity (http://docs.aws.amazon.com/datapipeline/latest/DeveloperGuide/dp-object-shellcommandactivity.html).
 
 # Presentation
 We included a presentation which describes main features of the Amazon-Redshift-Utils including some examples, tips and best practices: Redshift_DBA_Commands.pptx
