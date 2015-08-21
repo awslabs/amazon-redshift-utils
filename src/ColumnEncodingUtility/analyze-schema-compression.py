@@ -59,13 +59,16 @@ RETRY_TIMEOUT = 100. / 1000
 # compiled regular expressions
 IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
 
+def get_env_var(name, defaultVal):
+    return os.environ[name] if name in os.environ else defaultVal
+
 master_conn = None
 db_connections = {}
-db = os.environ('PGDATABASE',None)
-db_user = os.environ('PGUSER',None)
+db = get_env_var('PGDATABASE', None)
+db_user = get_env_var('PGUSER', None)
 db_pwd = None
-db_host = os.environ('PGHOST',None)
-db_port = os.environ('PGPORT',5439)
+db_host = get_env_var('PGHOST', None)
+db_port = get_env_var('PGPORT', 5439)
 analyze_schema = 'public'
 target_schema = None
 analyze_table = None
@@ -79,7 +82,7 @@ force = False
 drop_old_data = False
 comprows = None
 query_group = None
-    
+
 def execute_query(str):
     conn = get_pg_conn()
     result = None
