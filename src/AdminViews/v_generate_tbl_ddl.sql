@@ -87,8 +87,8 @@ FROM
    ,'\t,' + pg_get_constraintdef(con.oid) AS ddl
   FROM pg_constraint AS con
   INNER JOIN pg_class AS c ON c.relnamespace = con.connamespace AND c.relfilenode = con.conrelid
-  INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace 
-  WHERE c.relkind = 'r'
+  INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
+  WHERE c.relkind = 'r' AND pg_get_constraintdef(con.oid) NOT LIKE 'FOREIGN KEY%'
   ORDER BY seq)
   --CLOSE PAREN COLUMN LIST
   UNION SELECT n.nspname AS schemaname, c.relname AS tablename, 299999999 AS seq, ')' AS ddl
@@ -164,7 +164,20 @@ from (SELECT
   UNION SELECT n.nspname AS schemaname, c.relname AS tablename, 600000000 AS seq, ';' AS ddl
   FROM  pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
-  WHERE c.relkind = 'r'
+  WHERE c.relkind = 'r' )
+  UNION (
+    SELECT n.nspname AS schemaname,
+       'zzzzzzzz' AS tablename,
+       700000000 + CAST(con.oid AS INT) AS seq,
+       'ALTER TABLE ' + c.relname + ' ' + pg_get_constraintdef(con.oid) + ';' AS ddl
+    FROM pg_constraint AS con
+      INNER JOIN pg_class AS c
+              ON c.relnamespace = con.connamespace
+             AND c.relfilenode = con.conrelid
+      INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
+    WHERE c.relkind = 'r'
+    AND   pg_get_constraintdef (con.oid) LIKE 'FOREIGN KEY%'
+    ORDER BY seq
   )
  ORDER BY schemaname, tablename, seq
  )
