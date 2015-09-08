@@ -12,3 +12,4 @@ If you are using psql, you can use \i &lt;script.sql&gt; to run.
 | missing_table_stats.sql | Query shows EXPLAIN plans which flagged "missing statistics" on the underlying tables |
 | queuing_queries.sql | Query showing queries which are waiting on a WLM Query Slot |
 | table_info.sql | Return Table storage information (size, skew, etc) |
+| wlm_apex.sql | Returns high water-mark for concurrency per service_class |
