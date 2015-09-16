@@ -36,7 +36,7 @@ WITH
         GROUP BY iq.dt, iq.service_class, iq.num_query_tasks),
         maxes as (SELECT apex.service_class, trunc(apex.dt) as d, date_part(h,apex.dt) as dt_h, max(service_class_slots) max_service_class_slots
                         from apex group by apex.service_class, apex.dt, date_part(h,apex.dt))
-SELECT apex.service_class, apex.num_query_tasks as max_wlm_concurrency, maxes.d as day, maxes.dt_h || ':00 - ' || maxes.dt_h+1 || ':59' as hour, MAX(apex.service_class_slots) as max_service_class_slots
+SELECT apex.service_class, apex.num_query_tasks as max_wlm_concurrency, maxes.d as day, maxes.dt_h || ':00 - ' || maxes.dt_h || ':59' as hour, MAX(apex.service_class_slots) as max_service_class_slots
 FROM apex
 JOIN maxes ON (apex.service_class = maxes.service_class AND apex.service_class_slots = maxes.max_service_class_slots)
 GROUP BY  apex.service_class, apex.num_query_tasks, maxes.d, maxes.dt_h
