@@ -12,4 +12,6 @@ If you are using psql, you can use \i &lt;script.sql&gt; to run.
 | missing_table_stats.sql | Query shows EXPLAIN plans which flagged "missing statistics" on the underlying tables |
 | queuing_queries.sql | Query showing queries which are waiting on a WLM Query Slot |
 | table_info.sql | Return Table storage information (size, skew, etc) |
-| wlm_apex.sql |  Returns the high-water mark for WLM query queues and time queuing was last encountered. |
+| wlm_apex.sql | Returns overall high water-mark for WLM query queues and time queuing last occurred |
+| wlm_apex_hourly.sql | Returns hourly high water-mark for WLM query queues |
+
