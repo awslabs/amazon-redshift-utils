@@ -1,5 +1,5 @@
 /**********************************************************************************************
-Purpose: Returns the per-hour high-water mark for WLM query queues. These results can be used 
+Purpose: Returns the per-hour high water-mark for WLM query queues. These results can be used 
     to fine tune WLM queues which contain too many or too few slots, resulting in WLM queuing 
     or unutilized cluster memory. With hourly aggregates you can leverage dynamic WLM changes
     to ensure your cluster is correctly configured for workloads with a predictable pattern.
