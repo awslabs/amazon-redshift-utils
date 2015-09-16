@@ -24,7 +24,8 @@ History:
 **********************************************************************************************/
 
 WITH
-        generate_dt_series AS (select sysdate - (n * interval '1 second') as dt from (select row_number() over () as n from stl_scan a join stl_scan b using (query) limit 604800)),
+        -- Replace STL_SCAN in generate_dt_series with another table which has > 604800 rows if STL_SCAN does not
+        generate_dt_series AS (select sysdate - (n * interval '1 second') as dt from (select row_number() over () as n from stl_scan limit 604800)),
         apex AS (SELECT iq.dt, iq.service_class, iq.num_query_tasks, count(iq.slot_count) as service_class_queries, sum(iq.slot_count) as service_class_slots
                 FROM
                 (select gds.dt, wq.service_class, wscc.num_query_tasks, wq.slot_count
