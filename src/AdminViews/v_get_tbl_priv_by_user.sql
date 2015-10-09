@@ -5,24 +5,23 @@ History:
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_get_tbl_priv_by_user
 AS
-SELECT
-	* 
-FROM 
-	(
-	SELECT 
-		schemaname
-		,tablename
-		,usename
-		,HAS_TABLE_PRIVILEGE(usrs.usename, obj, 'select') AS sel
-		,HAS_TABLE_PRIVILEGE(usrs.usename, obj, 'insert') AS ins
-		,HAS_TABLE_PRIVILEGE(usrs.usename, obj, 'update') AS upd
-		,HAS_TABLE_PRIVILEGE(usrs.usename, obj, 'delete') AS del
-		,HAS_TABLE_PRIVILEGE(usrs.usename, obj, 'references') AS ref
-	FROM
-		(SELECT schemaname, tablename, schemaname + '.' + tablename AS obj FROM pg_tables) AS objs
-		,(SELECT * FROM pg_user) AS usrs
-	ORDER BY obj
-	)
-WHERE sel = true or ins = true or upd = true or del = true or ref = true
-;
-
+SELECT *
+FROM (SELECT schemaname,
+             tablename,
+             usename,
+             HAS_TABLE_PRIVILEGE(usrs.usename,obj,'select') AS sel,
+             HAS_TABLE_PRIVILEGE(usrs.usename,obj,'insert') AS ins,
+             HAS_TABLE_PRIVILEGE(usrs.usename,obj,'update') AS upd,
+             HAS_TABLE_PRIVILEGE(usrs.usename,obj,'delete') AS del,
+             HAS_TABLE_PRIVILEGE(usrs.usename,obj,'references') AS ref
+      FROM (SELECT schemaname,
+                   tablename,
+                   schemaname + '.' + tablename AS obj
+            FROM pg_tables) AS objs,
+           (SELECT * FROM pg_user) AS usrs
+      ORDER BY obj)
+WHERE sel = TRUE
+OR    ins = TRUE
+OR    upd = TRUE
+OR    del = TRUE
+OR    ref = TRUE

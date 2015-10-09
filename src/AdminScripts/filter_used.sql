@@ -15,12 +15,28 @@ Use the perm_table_name fileter to narrow the results
 History:
 2015-02-09 ericfe created
 **********************************************************************************************/
-select trim(s.perm_Table_name) as table , substring(trim(info),1,180) as filter, sum(datediff(seconds,starttime,endtime)) as secs, count(*) as num, max(i.query) as query  
-from stl_explain  p
-join stl_plan_info i on ( i.userid=p.userid  and i.query=p.query and i.nodeid=p.nodeid  ) 
-join stl_scan s on (s.userid=i.userid and s.query=i.query and  s.segment=i.segment and  s.step=i.step) 
-where  s.starttime > dateadd(day, -7, current_Date)
-  and   s.perm_table_name not like 'Internal Worktable%'
-  and p.info <> ''
-  and s.perm_table_name like '%' -- chose table(s) to look for
-group by 1,2 order by 1, 4 desc , 3 desc;
+SELECT TRIM(s.perm_Table_name) AS TABLE,
+       SUBSTRING(TRIM(info),1,180) AS FILTER,
+       SUM(datediff (seconds,starttime,endtime)) AS secs,
+       COUNT(*) AS num,
+       MAX(i.query) AS query
+FROM stl_explain p
+  JOIN stl_plan_info i
+    ON (i.userid = p.userid
+   AND i.query = p.query
+   AND i.nodeid = p.nodeid)
+  JOIN stl_scan s
+    ON (s.userid = i.userid
+   AND s.query = i.query
+   AND s.segment = i.segment
+   AND s.step = i.step)
+WHERE s.starttime > dateadd (day,-7,CURRENT_DATE)
+AND   s.perm_table_name NOT LIKE 'Internal Worktable%'
+AND   p.info <> ''
+AND   s.perm_table_name LIKE '%' -- chose table(s) to look for
+GROUP BY 1,
+         2
+ORDER BY 1,
+         4 DESC,
+         3 DESC
+

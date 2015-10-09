@@ -21,17 +21,50 @@ History:
 2015-04-17 ericfe Added event name and event time filter
 **********************************************************************************************/
 -- query runtimes
-select trim(database) as DB, count(query) as n_qry, max(substring (qrytext,1,80)) as qrytext, min(run_minutes) as "min" , max(run_minutes) as "max", avg(run_minutes) as "avg", sum(run_minutes) as total,  max(query) as max_query_id, 
-max(starttime)::date as last_run, aborted, event
-from (
-select userid, label, stl_query.query, trim(database) as database, trim(querytxt) as qrytext, md5(trim(querytxt)) as qry_md5, starttime, endtime, datediff(seconds, starttime,endtime)::numeric(12,2) as run_minutes, 
-       aborted, decode(alrt.event,'Very selective query filter','Filter','Scanned a large number of deleted rows','Deleted','Nested Loop Join in the query plan','Nested Loop','Distributed a large number of rows across the network','Distributed','Broadcasted a large number of rows across the network','Broadcast','Missing query planner statistics','Stats',alrt.event) as event
-from stl_query 
-left outer join ( select query, trim(split_part(event,':',1)) as event from STL_ALERT_EVENT_LOG where event_time >=  dateadd(day, -7, current_Date)  group by query, trim(split_part(event,':',1)) ) as alrt on alrt.query = stl_query.query
-where userid <> 1 
--- and (querytxt like 'SELECT%' or querytxt like 'select%' ) 
--- and database = ''
-and starttime >=  dateadd(day, -7, current_Date)
- ) 
-group by database, label, qry_md5, aborted, event
-order by total desc limit 50;
+SELECT TRIM(DATABASE) AS DB,
+       COUNT(query) AS n_qry,
+       MAX(SUBSTRING(qrytext,1,80)) AS qrytext,
+       MIN(run_minutes) AS "min",
+       MAX(run_minutes) AS "max",
+       AVG(run_minutes) AS "avg",
+       SUM(run_minutes) AS total,
+       MAX(query) AS max_query_id,
+       MAX(starttime)::DATE AS last_run,
+       aborted,
+       event
+FROM (SELECT userid,
+             label,
+             stl_query.query,
+             TRIM(DATABASE) AS DATABASE,
+             TRIM(querytxt) AS qrytext,
+             MD5(TRIM(querytxt)) AS qry_md5,
+             starttime,
+             endtime,
+             datediff(seconds,starttime,endtime)::NUMERIC(12,2) AS run_minutes,
+             aborted,
+             DECODE(alrt.event,
+                   'Very selective query filter','Filter',
+                   'Scanned a large number of deleted rows','Deleted',
+                   'Nested Loop Join in the query plan','Nested Loop',
+                   'Distributed a large number of rows across the network','Distributed',
+                   'Broadcasted a large number of rows across the network','Broadcast',
+                   'Missing query planner statistics','Stats',
+                   alrt.event
+             ) AS event
+      FROM stl_query
+        LEFT OUTER JOIN (SELECT query,
+                                TRIM(SPLIT_PART(event,':',1)) AS event
+                         FROM STL_ALERT_EVENT_LOG
+                         WHERE event_time >= dateadd (DAY,-7,CURRENT_DATE)
+                         GROUP BY query,
+                                  TRIM(SPLIT_PART(event,':',1))) AS alrt ON alrt.query = stl_query.query
+      WHERE userid <> 1
+      -- and (querytxt like 'SELECT%' or querytxt like 'select%' ) 
+      -- and database = ''
+      AND   starttime >= dateadd (DAY,-7,CURRENT_DATE))
+GROUP BY DATABASE,
+         label,
+         qry_md5,
+         aborted,
+         event
+ORDER BY total DESC LIMIT 50

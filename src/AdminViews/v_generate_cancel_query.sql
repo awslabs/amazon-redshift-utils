@@ -16,5 +16,4 @@ SELECT pid,
        'CANCEL  ' + pid::VARCHAR(20) + ';' AS cancel_query
 FROM stv_recents
 WHERE status = 'Running'
-ORDER BY starttime DESC;
-
+ORDER BY starttime DESC
