@@ -22,28 +22,56 @@ Notes:
 History:
 2015-02-16 ericfe created
 **********************************************************************************************/
-select trim(pgn.nspname) as Schema, trim(a.name) as Table, id as TableId, decode(pgc.reldiststyle,0, 'EVEN',1,det.distkey ,8,'ALL') as DistKey, decode(pgc.reldiststyle,8,null,dist_ratio.ratio::decimal(10,4)) as Skew, 
-det.head_sort as "SortKey", det.n_sortkeys as "#SKs",  a.rows, b.mbytes,  decode(det.max_enc,0,'N','Y')  as Enc, 
-decode(b.mbytes,0,0,((b.mbytes/part.total::decimal)*100)::decimal(5,2)) as pct_of_total, 
- (case when a.rows = 0 then NULL else ((a.rows - pgc.reltuples)::decimal(19,3)/a.rows::decimal(19,3)*100)::decimal(5,2) end) as pct_stats_off,  
-decode( det.n_sortkeys, 0, null , decode( a.rows,0,0, (a.unsorted_rows::decimal(32)/a.rows)*100) )::decimal(5,2) as pct_unsorted 
-from ( select db_id, id, name, sum(rows) as rows, 
-sum(rows)-sum(sorted_rows) as unsorted_rows from stv_tbl_perm a group by db_id, id, name ) as a 
-join pg_class as pgc on pgc.oid = a.id
-join pg_namespace as pgn on pgn.oid = pgc.relnamespace
-left outer join (select tbl, count(*) as mbytes 
-from stv_blocklist group by tbl) b on a.id=b.tbl
-inner join ( SELECT   attrelid, min(case attisdistkey when  't' then attname else null end)  as "distkey",min(case attsortkeyord when 1 then attname  else null end ) as head_sort , max(attsortkeyord) as n_sortkeys, max(attencodingtype) as max_enc   FROM  pg_attribute group by 1) as det 
-on det.attrelid = a.id
-inner join ( select tbl, max(Mbytes)::decimal(32)/min(Mbytes) as ratio from
-(select tbl, trim(name) as name, slice, count(*) as Mbytes
-from svv_diskusage group by tbl, name, slice ) 
-group by tbl, name ) as dist_ratio on a.id = dist_ratio.tbl
-join ( select sum(capacity) as  total
-  from stv_partitions where part_begin=0 ) as part on 1=1
-where mbytes is not null 
+SELECT TRIM(pgn.nspname) AS SCHEMA,
+       TRIM(a.name) AS TABLE,
+       id AS TableId,
+       DECODE(pgc.reldiststyle,0,'EVEN',1,det.distkey,8,'ALL') AS DistKey,
+       DECODE(pgc.reldiststyle,8,NULL,dist_ratio.ratio::decimal(10,4)) AS Skew,
+       det.head_sort AS "SortKey",
+       det.n_sortkeys AS "#SKs",
+       a.rows,
+       b.mbytes,
+       DECODE(det.max_enc,0,'N','Y') AS Enc,
+       DECODE(b.mbytes,0,0,((b.mbytes/part.total::decimal)*100)::decimal(5,2)) AS pct_of_total,
+       (CASE WHEN a.rows = 0 THEN NULL ELSE ((a.rows - pgc.reltuples)::decimal(19,3) / a.rows::decimal(19,3)*100)::decimal(5,2) END) AS pct_stats_off,
+       DECODE( det.n_sortkeys,0, NULL,DECODE(a.rows,0,0,(a.unsorted_rows::decimal(32)/a.rows)*100)) ::decimal(5,2) AS pct_unsorted
+FROM (SELECT db_id,
+             id,
+             name,
+             SUM(ROWS) AS ROWS,
+             SUM(ROWS) - SUM(sorted_rows) AS unsorted_rows
+      FROM stv_tbl_perm a
+      GROUP BY db_id,
+               id,
+               name) AS a
+  JOIN pg_class AS pgc ON pgc.oid = a.id
+  JOIN pg_namespace AS pgn ON pgn.oid = pgc.relnamespace
+  LEFT OUTER JOIN (SELECT tbl, COUNT(*) AS mbytes FROM stv_blocklist GROUP BY tbl) b ON a.id = b.tbl
+  INNER JOIN (SELECT attrelid,
+                     MIN(CASE attisdistkey WHEN 't' THEN attname ELSE NULL END) AS "distkey",
+                     MIN(CASE attsortkeyord WHEN 1 THEN attname ELSE NULL END) AS head_sort,
+                     MAX(attsortkeyord) AS n_sortkeys,
+                     MAX(attencodingtype) AS max_enc
+              FROM pg_attribute
+              GROUP BY 1) AS det ON det.attrelid = a.id
+  INNER JOIN (SELECT tbl,
+                     MAX(Mbytes)::DECIMAL(32) /MIN(Mbytes) AS ratio
+              FROM (SELECT tbl,
+                           TRIM(name) AS name,
+                           slice,
+                           COUNT(*) AS Mbytes
+                    FROM svv_diskusage
+                    GROUP BY tbl,
+                             name,
+                             slice)
+              GROUP BY tbl,
+                       name) AS dist_ratio ON a.id = dist_ratio.tbl
+  JOIN (SELECT SUM(capacity) AS total
+        FROM stv_partitions
+        WHERE part_begin = 0) AS part ON 1 = 1
+WHERE mbytes IS NOT NULL
 -- and pgn.nspname = 'schema' -- schemaname
 -- and a.name like 'table%' -- tablename
 -- and det.max_enc = 0 -- non-compressed tables
-order by  mbytes desc;
+ORDER BY mbytes DESC
 

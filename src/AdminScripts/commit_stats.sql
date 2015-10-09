@@ -13,7 +13,12 @@ Notes:
 History:
 2015-02-09 ericfe created
 **********************************************************************************************/
-select startqueue,node, datediff(ms,startqueue,startwork) as queue_time, datediff(ms, startwork, endtime) as commit_time, queuelen 
-from stl_commit_stats 
-where startqueue >=  dateadd(day, -2, current_Date)
-order by queuelen desc , queue_time desc;
+SELECT startqueue,
+       node,
+       datediff(ms,startqueue,startwork) AS queue_time,
+       datediff(ms,startwork,endtime) AS commit_time,
+       queuelen
+FROM stl_commit_stats
+WHERE startqueue >= dateadd (day,-2,CURRENT_DATE)
+ORDER BY queuelen DESC,
+         queue_time DESC

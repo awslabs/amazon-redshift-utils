@@ -1,12 +1,12 @@
 /* Query showing information about sessions with currently running queries */
-SELECT s.process AS pid
-       ,date_Trunc ('second',s.starttime) AS S_START
-       ,datediff(minutes,s.starttime,getdate ()) AS conn_mins
-       ,trim(s.user_name) AS USER
-       ,trim(s.db_name) AS DB
-       ,date_trunc ('second',i.starttime) AS Q_START
-       ,i.query
-       ,trim(i.query) AS sql
+SELECT s.process AS pid,
+       DATE_TRUNC('second',s.starttime) AS S_START,
+       datediff(minutes,s.starttime,getdate ()) AS conn_mins,
+       TRIM(s.user_name) AS USER,
+       TRIM(s.db_name) AS DB,
+       DATE_TRUNC('second',i.starttime) AS Q_START,
+       i.query,
+       TRIM(i.query) AS sql
 FROM stv_sessions s
   LEFT JOIN stv_recents i
          ON s.process = i.pid

@@ -10,28 +10,21 @@ History:
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_unload_copy_cmd
 AS
-SELECT
-	schemaname
-	,tablename
-	,cmd_type
-	,dml
-FROM
-	(
-	SELECT 
-		schemaname
-		,tablename
-		,'unload' AS cmd_type
-		,'UNLOAD (''SELECT * FROM ' + schemaname + '.' + tablename + ' --WHERE audit_id > ___auditid___'') TO ''s3://__bucketname__/' + TO_CHAR(GETDATE(), 'YYYYMMDD_HH24MISSMS')  + '/'  + schemaname + '.' + tablename + '-'' CREDENTIALS ''__creds_here__'' GZIP DELIMITER ''\\t'';' AS dml
-	FROM 
-		pg_tables 
-	UNION ALL
-	SELECT 
-		schemaname
-		,tablename
-		,'copy' AS cmd_type
-		,'COPY ' + schemaname + '.' + tablename + ' FROM ''s3://__bucketname__/' + TO_CHAR(GETDATE(), 'YYYYMMDD_HH24MISSMS')  + '/'  + schemaname + '.' + tablename + '-'' CREDENTIALS ''__creds_here__'' GZIP DELIMITER ''\\t'';' AS copy_dml
-	FROM 
-		pg_tables 
-	)
-ORDER BY 3 DESC,1,2
-;
+SELECT schemaname,
+       tablename,
+       cmd_type,
+       dml
+FROM (SELECT schemaname,
+             tablename,
+             'unload' AS cmd_type,
+             'UNLOAD (''SELECT * FROM ' + schemaname + '.' + tablename + ' --WHERE audit_id > ___auditid___'') TO ''s3://__bucketname__/' + TO_CHAR(GETDATE (),'YYYYMMDD_HH24MISSMS') + '/' + schemaname + '.' + tablename + '-'' CREDENTIALS ''__creds_here__'' GZIP DELIMITER ''\\t'';' AS dml
+      FROM pg_tables
+      UNION ALL
+      SELECT schemaname,
+             tablename,
+             'copy' AS cmd_type,
+             'COPY ' + schemaname + '.' + tablename + ' FROM ''s3://__bucketname__/' + TO_CHAR(GETDATE (),'YYYYMMDD_HH24MISSMS') + '/' + schemaname + '.' + tablename + '-'' CREDENTIALS ''__creds_here__'' GZIP DELIMITER ''\\t'';' AS copy_dml
+      FROM pg_tables)
+ORDER BY 3 DESC,
+         1,
+         2

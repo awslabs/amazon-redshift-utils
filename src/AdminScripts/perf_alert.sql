@@ -16,12 +16,30 @@ History:
 2015-02-09 ericfe created
 2015-04-17 ericfe Added detail information on distributions and broadcasts. Added rows column
 **********************************************************************************************/
-select trim(s.perm_table_name) as table , (sum(abs(datediff(seconds, coalesce(b.starttime,d.starttime,s.starttime), coalesce(b.endtime,d.endtime,s.endtime))))/60)::numeric(24,0) as minutes,
-       sum(coalesce(b.rows,d.rows,s.rows)) as rows, trim(split_part(l.event,':',1)) as event,  substring(trim(l.solution),1,60) as solution , max(l.query) as sample_query, count(*)
-from stl_alert_event_log as l
-left join stl_scan as s on s.query = l.query and s.slice = l.slice and s.segment = l.segment
-left join stl_dist as d on d.query = l.query and d.slice = l.slice and d.segment = l.segment
-left join stl_bcast as b on b.query = l.query and b.slice = l.slice and b.segment = l.segment
-where l.userid >1
-and  l.event_time >=  dateadd(day, -7, current_Date)
-group by 1,4,5 order by 2 desc,6 desc;
+SELECT TRIM(s.perm_table_name) AS TABLE,
+       (SUM(ABS(datediff (seconds,COALESCE(b.starttime,d.starttime,s.starttime),COALESCE(b.endtime,d.endtime,s.endtime)))) / 60)::numeric(24,0) AS minutes,
+       SUM(COALESCE(b.rows,d.rows,s.rows)) AS ROWS,
+       TRIM(SPLIT_PART(l.event,':',1)) AS event,
+       SUBSTRING(TRIM(l.solution),1,60) AS solution,
+       MAX(l.query) AS sample_query,
+       COUNT(*)
+FROM stl_alert_event_log AS l
+  LEFT JOIN stl_scan AS s
+         ON s.query = l.query
+        AND s.slice = l.slice
+        AND s.segment = l.segment
+  LEFT JOIN stl_dist AS d
+         ON d.query = l.query
+        AND d.slice = l.slice
+        AND d.segment = l.segment
+  LEFT JOIN stl_bcast AS b
+         ON b.query = l.query
+        AND b.slice = l.slice
+        AND b.segment = l.segment
+WHERE l.userid > 1
+AND   l.event_time >= dateadd (day,-7,CURRENT_DATE)
+GROUP BY 1,
+         4,
+         5
+ORDER BY 2 DESC,
+         6 DESC
