@@ -11,6 +11,9 @@ The query takes into account the free space that is not being used.
 
 You should modify the number of the cost and size in the query to suit your use case.
 
+The view depands on the admin.v_space_used_per_tbl view
+(https://github.com/awslabs/amazon-redshift-utils/blob/master/src/AdminViews/v_space_used_per_tbl.sql).
+
 History:
 2015-09-25 kerbelp Created
 **********************************************************************************************/
@@ -25,7 +28,7 @@ CREATE OR REPLACE VIEW admin.v_cost_per_schema
 )
 AS
  SELECT t.dbase_name, t.schemaname, sum(t.megabytes) AS usage_megabytes, sum(t.totalsum_actual_usage_percentage) AS usage_percentage_with_free_space, sum(t.monthly_actual_usage_cost) AS monthly_usage_cost
-   FROM ( SELECT t.dbase_name, t.schemanaame, t.tablename, t.megabytes, sum(t.megabytes)
+   FROM ( SELECT t.dbase_name, t.schemaname, t.tablename, t.megabytes, sum(t.megabytes)
           OVER(
           PARTITION BY t.dbase_name
           ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS totalsum, t.megabytes::double precision / (sum(t.megabytes)
