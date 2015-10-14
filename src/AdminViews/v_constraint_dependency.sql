@@ -7,7 +7,7 @@ History:
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_constraint_dependency
 AS
-SELECT DISTINCT 
+SELECT DISTINCT
     srcobj.oid AS src_oid
     ,srcnsp.nspname AS src_schemaname
     ,srcobj.relname AS src_objectname
@@ -29,5 +29,4 @@ INNER JOIN
 INNER JOIN
     pg_catalog.pg_namespace AS tgtnsp
         ON tgtobj.relnamespace = tgtnsp.oid
-WHERE srcnsp.nspname in ('public', 'golden')
 ;
