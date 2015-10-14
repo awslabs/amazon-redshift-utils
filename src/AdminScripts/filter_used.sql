@@ -15,6 +15,7 @@ Use the perm_table_name fileter to narrow the results
 History:
 2015-02-09 ericfe created
 **********************************************************************************************/
+
 select trim(s.perm_Table_name) as table , substring(trim(info),1,180) as filter, sum(datediff(seconds,starttime,case when starttime > endtime then starttime else endtime end)) as secs, count(distinct i.query) as num, max(i.query) as query
 from stl_explain p
 join stl_plan_info i on ( i.userid=p.userid and i.query=p.query and i.nodeid=p.nodeid )
