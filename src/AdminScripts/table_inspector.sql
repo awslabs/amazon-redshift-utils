@@ -10,9 +10,9 @@ History:
 2015-11-26 meyersi created
 
 */
-DROP TABLE temp_staging_tables_1;
-DROP TABLE temp_staging_tables_2;
-DROP TABLE temp_tables_report;
+DROP TABLE IF EXISTS temp_staging_tables_1;
+DROP TABLE IF EXISTS temp_staging_tables_2;
+DROP TABLE IF EXISTS temp_tables_report;
 
 CREATE TEMP TABLE temp_staging_tables_1
                  (schemaname TEXT,
