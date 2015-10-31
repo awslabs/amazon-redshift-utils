@@ -169,7 +169,7 @@ from (SELECT
     SELECT n.nspname AS schemaname,
        'zzzzzzzz' AS tablename,
        700000000 + CAST(con.oid AS INT) AS seq,
-       'ALTER TABLE ' + c.relname + ' ' + pg_get_constraintdef(con.oid) + ';' AS ddl
+       'ALTER TABLE ' + c.relname + ' ADD ' + pg_get_constraintdef(con.oid) + ';' AS ddl
     FROM pg_constraint AS con
       INNER JOIN pg_class AS c
               ON c.relnamespace = con.connamespace
