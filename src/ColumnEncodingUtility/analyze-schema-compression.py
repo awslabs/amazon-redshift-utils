@@ -454,7 +454,7 @@ def analyze(tables):
                 non_identity_columns.append(col)
 
             # add the formatted column specification
-            encode_columns.extend(['%s %s %s %s encode %s %s'
+            encode_columns.extend(['"%s" %s %s %s encode %s %s'
                                    % (col, col_type, default_value, col_null, compression, distkey)])
 
         fks = None 
