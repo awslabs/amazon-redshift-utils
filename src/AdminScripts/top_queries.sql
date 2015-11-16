@@ -13,8 +13,8 @@ aborted:	0 if query ran to completion, 1 if it was canceled.
 alert:      Alert event related to the query
  
 Notes:
-There is a comented filter of the query to filter for only Select statements (otherwise it includes all statements like insert, update, COPY)
-There is a comented filter to narrow the query to a given database
+There is a commented filter of the query to filter for only Select statements (otherwise it includes all statements like insert, update, COPY)
+There is a commented filter to narrow the query to a given database
 
 History:
 2015-02-09 ericfe created
