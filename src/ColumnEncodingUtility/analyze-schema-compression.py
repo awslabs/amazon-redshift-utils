@@ -43,9 +43,9 @@ import re
 import getpass
 import time
 import traceback
-from functools import partial
+import platform
 
-__version__ = ".9.1.5"
+__version__ = ".9.1.6"
 
 OK = 0
 ERROR = 1
@@ -63,109 +63,154 @@ IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \'(?P<seed
 def get_env_var(name, defaultVal):
     return os.environ[name] if name in os.environ else defaultVal
 
-def execute_query(conn, str):
+master_conn = None
+db_connections = {}
+db = get_env_var('PGDATABASE', None)
+db_user = get_env_var('PGUSER', None)
+db_pwd = None
+db_host = get_env_var('PGHOST', None)
+db_port = get_env_var('PGPORT', 5439)
+analyze_schema = 'public'
+target_schema = None
+analyze_table = None
+debug = False
+threads = 2
+output_file_handle = None
+do_execute = False
+query_slot_count = 1
+ignore_errors = False
+force = False
+drop_old_data = False
+comprows = None
+query_group = None
+
+def execute_query(str):
+    conn = get_pg_conn()
     result = None
     query_result = conn.query(str)
     
     if query_result is not None:
         result = query_result.getresult()
+        if debug:
+            comment('Query Execution returned %s Results' % (len(result)))
     
     return result
 
-def commit(conn):
-    execute_query(conn, 'commit')
+def commit():
+    execute_query('commit')
     
-def rollback(conn):
-    execute_query(conn, 'rollback')
+def rollback():
+    execute_query('rollback')
     
 def close_conn(conn):
     try:
         conn.close()
     except Exception as e:
-        print(e)
+        if debug:
+            print(e)
+            
+def cleanup():
+    # close all connections and close the output file
+    if master_conn != None:
+        close_conn(master_conn)
+    
+    for key in db_connections:
+        if db_connections[key] != None:            
+            close_conn(db_connections[key]) 
+    
+    if output_file_handle != None:
+        output_file_handle.close()
 
-def comment(string, output_file_handle=None):
+def comment(string):
     if (string != None):
         if re.match('.*\\n.*', string) != None:
-            write('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string), output_file_handle)
+            write('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string))
         else:
-            write('-- [%s] %s' % (str(os.getpid()), string), output_file_handle)
+            write('-- [%s] %s' % (str(os.getpid()), string))
 
-def print_statements(statements, output_file_handle=None):
+def print_statements(statements):
     if statements != None:
         for s in statements:
             if s != None:
-                write(s, output_file_handle)
-    
-def write(s, output_file_handle=None):
+                write(s)
+        
+def write(s):
     # write output to all the places we want it
     print(s)
     if output_file_handle != None:
         output_file_handle.write(str(s) + "\n")
         output_file_handle.flush()
         
-def get_pg_conn(config):    
-    conn = None
+def get_pg_conn():
+    global db_connections
     pid = str(os.getpid())
     
-    analyze_schema = config['analyze_schema']
-    debug = config['debug']
+    conn = None
     
-    # connect to the database
-    if debug:
-        comment('Connect [%s] %s:%s:%s:%s' % (pid, config['db_host'], config['db_port'], config['db'], config['db_user']))
-        
+    # get the database connection for this PID
     try:
-        options = 'keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=5'
-        connection_string = "host=%s port=%s dbname=%s user=%s password=%s %s" % (config['db_host'], config['db_port'], config['db'], config['db_user'], config['db_pwd'], options)
-
-        conn = pg.connect(dbname=connection_string)
-    except Exception as e:
-        write(e)
-        write('Unable to connect to Cluster Endpoint')
-        sys.exit(ERROR)      
-    
-    # set default search path        
-    search_path = 'set search_path = \'$user\',public,%s' % (analyze_schema)
-    if config['target_schema'] != None and config['target_schema'] != analyze_schema:
-        search_path = search_path + ', %s' % (config['target_schema'])
+        conn = db_connections[pid]
+    except KeyError:
+        pass
         
-    if debug:
-        comment(search_path)
-    
-    try:
-        conn.query(search_path)
-    except pg.ProgrammingError as e:
-        if re.match('schema "%s" does not exist' % (analyze_schema,), e.message) != None:
-            write('Schema %s does not exist' % (analyze_schema,))
-        else:
-            write(e.message)
-        return None
-
-    query_group = config['query_group']
-    if query_group is not None:
-        set_query_group = 'set query_group to %s' % (query_group)
-
+    if conn == None:
+        # connect to the database
         if debug:
-            comment(set_query_group)
-
-        conn.query(set_query_group)
-    
-    query_slot_count = config['query_slot_count']
-    if query_slot_count != 1:
-        set_slot_count = 'set wlm_query_slot_count = %s' % (query_slot_count)
-        
-        if debug:
-            comment(set_slot_count)
+            comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
             
-        conn.query(set_slot_count)
+        try:
+            options = 'keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=5'
+            connection_string = "host=%s port=%s dbname=%s user=%s password=%s %s" % (db_host, db_port, db, db_user, db_pwd, options)
 
-    # set a long statement timeout
-    set_timeout = "set statement_timeout = '1200000'"
-    if debug:
-        comment(set_timeout)
+            conn = pg.connect(dbname=connection_string)
+        except Exception as e:
+            write(e)
+            write('Unable to connect to Cluster Endpoint')
+            cleanup()
+            sys.exit(ERROR)      
         
-    conn.query(set_timeout)
+        # set default search path        
+        search_path = 'set search_path = \'$user\',public,%s' % (analyze_schema)
+        if target_schema != None and target_schema != analyze_schema:
+            search_path = search_path + ', %s' % (target_schema)
+            
+        if debug:
+            comment(search_path)
+        
+        try:
+            conn.query(search_path)
+        except pg.ProgrammingError as e:
+            if re.match('schema "%s" does not exist' % (analyze_schema,), e.message) != None:
+                write('Schema %s does not exist' % (analyze_schema,))
+            else:
+                write(e.message)
+            return None
+
+        if query_group is not None:
+            set_query_group = 'set query_group to %s' % (query_group)
+
+            if debug:
+                comment(set_query_group)
+
+            conn.query(set_query_group)
+        
+        if query_slot_count != 1:
+            set_slot_count = 'set wlm_query_slot_count = %s' % (query_slot_count)
+            
+            if debug:
+                comment(set_slot_count)
+                
+            conn.query(set_slot_count)
+
+        # set a long statement timeout
+        set_timeout = "set statement_timeout = '1200000'"
+        if debug:
+            comment(set_timeout)
+            
+        conn.query(set_timeout)
+        
+        # cache the connection
+        db_connections[pid] = conn
         
     return conn
 
@@ -190,7 +235,7 @@ def get_identity(adsrc):
         return None
 
 
-def get_foreign_keys(conn, analyze_schema, target_schema, table_name):
+def get_foreign_keys(analyze_schema, target_schema, table_name):
     has_fks = False
     
     fk_statement = '''SELECT conname,
@@ -206,7 +251,10 @@ def get_foreign_keys(conn, analyze_schema, target_schema, table_name):
  ORDER BY 1
 ''' % (analyze_schema, table_name)
 
-    foreign_keys = execute_query(conn, fk_statement)
+    if (debug):
+        comment(fk_statement)
+    
+    foreign_keys = execute_query(fk_statement)
     fk_statements = []
     
     for fk in foreign_keys:
@@ -219,7 +267,7 @@ def get_foreign_keys(conn, analyze_schema, target_schema, table_name):
     else:
         return None
             
-def get_primary_key(conn, table_schema, target_schema, original_table, new_table):
+def get_primary_key(table_schema, target_schema, original_table, new_table):
     pk_statement = 'alter table %s.%s add primary key (' % (target_schema, new_table)
     has_pks = False
     
@@ -243,8 +291,11 @@ WHERE
   AND ind.indisprimary
 order by att.attnum;
 ''' % (original_table, table_schema)
+
+    if debug:
+        comment(statement)
             
-    pks = execute_query(conn, statement)
+    pks = execute_query(statement)
     
     for pk in pks:
         has_pks = True
@@ -258,7 +309,7 @@ order by att.attnum;
         return None
     
         
-def get_table_desc(conn, schema, table_name):
+def get_table_desc(table_name):
     # get the table definition from the dictionary so that we can get relevant details for each column
     statement = '''select "column", type, encoding, distkey, sortkey, "notnull", ad.adsrc
  from pg_table_def de, pg_attribute at LEFT JOIN pg_attrdef ad ON (at.attrelid, at.attnum) = (ad.adrelid, ad.adnum)
@@ -266,9 +317,12 @@ def get_table_desc(conn, schema, table_name):
  and de.tablename = '%s'
  and at.attrelid = '%s.%s'::regclass
  and de.column = at.attname
-''' % (schema, table_name, schema, table_name)
+''' % (analyze_schema, table_name, analyze_schema, table_name)
+
+    if debug:
+        comment(statement)
         
-    description = execute_query(conn, statement)
+    description = execute_query(statement)
     
     return description
 
@@ -287,21 +341,14 @@ def run_commands(conn, commands):
     
     return True
         
-def analyze(table_info, config):
+def analyze(table_info):     
     table_name = table_info[0]
     dist_style = table_info[3]
-    write_to = partial(write, output_file_handle=config['output_file_handle'])
-    
-    db_conn = get_pg_conn(config)
-        
-    debug = config['debug']
-    analyze_schema = config['analyze_schema']
-    target_schema = config['target_schema']
     
     statement = 'analyze compression %s.%s' % (analyze_schema, table_name)
     
-    if config['comprows'] != None:
-        statement = statement + (" comprows %s" % (config['comprows'],))
+    if comprows != None:
+        statement = statement + (" comprows %s" % (comprows,))
         
     try:
         if debug:
@@ -315,21 +362,22 @@ def analyze(table_info, config):
         last_exception = None
         while attempt_count < analyze_retry and output == None:
             try:
-                output = execute_query(db_conn, statement)
+                output = execute_query(statement)
             except KeyboardInterrupt:
                 # To handle Ctrl-C from user
+                cleanup()
                 sys.exit(TERMINATED_BY_USER)
             except Exception as e:
-                write_to(e)
+                write(e)
                 attempt_count += 1
                 last_exception = e
-                rollback(db_conn)
+                rollback()
                 
                 # Exponential Backoff
                 time.sleep(2 ** attempt_count * RETRY_TIMEOUT)
 
         if output == None:
-            write_to("Unable to analyze %s due to Exception %s" % (table_name, last_exception.message))
+            write("Unable to analyze %s due to Exception %s" % (table_name, last_exception.message))
             return ERROR
         
         if target_schema == analyze_schema:
@@ -340,7 +388,7 @@ def analyze(table_info, config):
         create_table = 'begin;\nlock table %s.%s;\ncreate table %s.%s(' % (analyze_schema, table_name, target_schema, target_table,)
         
         # query the table column definition
-        descr = get_table_desc(db_conn, analyze_schema, table_name)
+        descr = get_table_desc(table_name)
         found_non_raw = False
         encode_columns = []
         statements = []
@@ -410,7 +458,7 @@ def analyze(table_info, config):
                                    % (col, col_type, default_value, col_null, compression, distkey)])
 
         fks = None 
-        if found_non_raw or config['force']:
+        if found_non_raw or force:
             comment("Column Encoding will be modified for %s.%s" % (analyze_schema, table_name))
             
             # add all the column encoding statements on to the create table statement, suppressing the leading comma on the first one
@@ -442,7 +490,7 @@ def analyze(table_info, config):
             statements.extend([create_table])         
             
             # get the primary key statement
-            statements.extend([get_primary_key(db_conn, analyze_schema, target_schema, table_name, target_table)]);
+            statements.extend([get_primary_key(analyze_schema, target_schema, table_name, target_table)]);
 
             # insert the old data into the new table
             # if we have identity column(s), we can't insert data from them, so do selective insert
@@ -467,7 +515,7 @@ def analyze(table_info, config):
                     
             if (target_schema == analyze_schema):
                 # rename the old table to _$old or drop
-                if config['drop_old_data']:
+                if drop_old_data:
                     drop = 'drop table %s.%s cascade;' % (target_schema, table_name)
                 else:
                     drop = 'alter table %s.%s rename to %s;' % (target_schema, table_name, table_name + "_$old")
@@ -479,24 +527,24 @@ def analyze(table_info, config):
                 statements.extend([rename])
             
             # add foreign keys
-            fks = get_foreign_keys(db_conn, analyze_schema, target_schema, table_name)
+            fks = get_foreign_keys(analyze_schema, target_schema, table_name)
             
             statements.extend(['commit;'])
             
-            if config['do_execute']:
-                if not run_commands(db_conn, statements):
+            if do_execute:
+                if not run_commands(get_pg_conn(), statements):
                     if not ignore_errors:
                         if debug:
-                            write_to("Error running statements: %s" % (str(statements),))
+                            write("Error running statements: %s" % (str(statements),))
                         return ERROR
         else:
             comment("No encoding modifications required for %s.%s" % (analyze_schema, table_name))    
     except Exception as e:
-        write_to('Exception %s during analysis of %s' % (e.message, table_name))
-        write_to(traceback.format_exc())
+        write('Exception %s during analysis of %s' % (e.message, table_name))
+        write(traceback.format_exc())
         return ERROR
     
-    print_statements(statements, config['output_file_handle'])
+    print_statements(statements)
     
     return (OK, fks)
 
@@ -526,26 +574,8 @@ def usage(with_message):
     write('           --query_group    - Set the query_group for all queries')
     sys.exit(INVALID_ARGS)
     
-def get_config():
-    config = dict(db=None,
-                db_user=None,
-                db_pwd=None,
-                db_host=None,
-                db_port=None,
-                analyze_schema='public',
-                target_schema=None,
-                analyze_table=None,
-                debug=False,
-                threads=2,
-                output_file=None,
-                do_execute=False,
-                query_slot_count=1,
-                ignore_errors=False,
-                force=False,
-                drop_old_data=False,
-                comprows=None,
-                query_group=None)
-    
+
+def main(argv):
     supported_args = """db= db-user= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group="""
     
     # extract the command line arguments
@@ -555,141 +585,142 @@ def get_config():
         print str(err)
         usage(None)
     
+    # setup globals
+    global master_conn
+    global db
+    global db_user
+    global db_pwd
+    global db_host
+    global db_port
+    global threads
+    global analyze_schema
+    global analyze_table
+    global target_schema
+    global debug
+    global output_file_handle
+    global do_execute
+    global query_slot_count
+    global ignore_errors
+    global force
+    global drop_old_data
+    global comprows
+    global query_group
+    
+    output_file = None
+
     # parse command line arguments
     for arg, value in optlist:
         if arg == "--db":
             if value == '' or value == None:
                 usage()
             else:
-                config['db'] = value
+                db = value
         elif arg == "--db-user":
             if value == '' or value == None:
                 usage()
             else:
-                config['db_user'] = value
+                db_user = value
         elif arg == "--db-host":
             if value == '' or value == None:
                 usage()
             else:
-                config['db_host'] = value
+                db_host = value
         elif arg == "--db-port":
             if value != '' and value != None:
-                config['db_port'] = value
+                db_port = value
         elif arg == "--analyze-schema":
             if value != '' and value != None:
-                config['analyze_schema'] = value
+                analyze_schema = value
         elif arg == "--analyze-table":
             if value != '' and value != None:
-                config['analyze_table'] = value
+                analyze_table = value
         elif arg == "--target-schema":
             if value != '' and value != None:
-                config['target_schema'] = value
+                target_schema = value
         elif arg == "--threads":
             if value != '' and value != None:
-                config['threads'] = int(value)
+                threads = int(value)
         elif arg == "--debug":
             if value == 'true' or value == 'True':
-                config['debug'] = True
+                debug = True
             else:
-                config['debug'] = False
+                debug = False
         elif arg == "--output-file":
             if value == '' or value == None:
                 usage()
             else:
-                config['output_file'] = value
+                output_file = value
         elif arg == "--ignore-errors":
             if value == 'true' or value == 'True':
-                config['ignore_errors'] = True
+                ignore_errors = True
             else:
-                config['ignore_errors'] = False
+                ignore_errors = False
         elif arg == "--force":
             if value == 'true' or value == 'True':
-                config['force'] = True
+                force = True
             else:
-                config['force'] = False
+                force = False
         elif arg == "--drop-old-data":
             if value == 'true' or value == 'True':
-                config['drop_old_data'] = True
+                drop_old_data = True
             else:
-                config['drop_old_data'] = False
+                drop_old_data = False
         elif arg == "--do-execute":
             if value == 'true' or value == 'True':
-                config['do_execute'] = True
+                do_execute = True
             else:
-                config['do_execute'] = False
+                do_execute = False
         elif arg == "--slot-count":
-            config['query_slot_count'] = int(value)
+            query_slot_count = int(value)
         elif arg == "--comprows":
-            config['comprows'] = int(value)
+            comprows = int(value)
         elif arg == "--query_group":
             if value != '' and value != None:
-                config['query_group'] = value
+                query_group = value
         else:
             assert False, "Unsupported Argument " + arg
             usage()
-
-    # assign arguments to environment variables if they were not previously set
-    if config['db'] == None:
-        config['db'] = get_env_var('PGDATABASE', None)
-    if config['db_user'] == None: 
-       config['db_user'] = get_env_var('PGUSER', None)
-    if config['db_host'] == None:
-       config['db_host'] = get_env_var('PGHOST', None)
-    if config['db_port'] == None:
-      config['db_port'] = get_env_var('PGPORT', 5439)
-    
     
     # Validate that we've got all the args needed
-    if config['db'] == None:
+    if db == None:
         usage("Missing Parameter 'db'")
-    if config['db_user'] == None:
+    if db_user == None:
         usage("Missing Parameter 'db-user'")
-    if config['db_host'] == None:        
+    if db_host == None:        
         usage("Missing Parameter 'db-host'")
-    if config['db_port'] == None:        
+    if db_port == None:        
         usage("Missing Parameter 'db-port'")
-    if config['output_file'] == None:
+    if output_file == None:
         usage("Missing Parameter 'output-file'")
     
-    if config['target_schema'] == None:
-        config['target_schema'] = config['analyze_schema']
+    if target_schema == None:
+        target_schema = analyze_schema
         
     # Reduce to 1 thread if we're analyzing a single table
-    if config['analyze_table'] != None:
+    if analyze_table != None:
         threads = 1
         
     # get the database password
-    config['db_pwd'] = getpass.getpass("Password <%s>: " % config['db_user'])
-    
-    return config
-
-def main(argv):
-    config = get_config()
-    debug = config['debug']
+    db_pwd = getpass.getpass("Password <%s>: " % db_user)
     
     # open the output file
-    output_file_handle = open(config['output_file'], 'w')
-    config['output_file_handle'] = output_file_handle
+    output_file_handle = open(output_file, 'w')
     
     # get a connection for the controlling processes
-    master_conn = get_pg_conn(config)
+    master_conn = get_pg_conn()
     
     if master_conn == None:
         sys.exit(NO_CONNECTION)
     
-    analyze_table = config['analyze_table']
-    analyze_schema = config['analyze_schema']
-    threads = config['threads']
-    
-    comment("Connected to %s:%s:%s as %s" % (config['db_host'], config['db_port'], config['db'], config['db_user']))
-    if config['analyze_table'] != None:
-        snippet = "Table '%s'" % analyze_table     
+    comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
+    if analyze_table != None:
+        snippet = "Table '%s'" % analyze_table        
     else:
         snippet = "Schema '%s'" % analyze_schema
         
     comment("Analyzing %s for Columnar Encoding Optimisations with %s Threads..." % (snippet, threads))
     
-    if config['do_execute']:
+    if do_execute:
         if drop_old_data:
             really_go = getpass.getpass("This will make irreversible changes to your database, and cannot be undone. Type 'Yes' to continue: ")
             
@@ -729,7 +760,7 @@ order by 2
     if debug:
         comment(statement)
     
-    analyze_tables = execute_query(master_conn, statement)
+    analyze_tables = execute_query(statement)
     
     comment("Analyzing %s table(s)" % (len(analyze_tables)))
 
@@ -741,31 +772,36 @@ order by 2
     
     if analyze_tables != None:
         try:
-            # create a partial with the configuration details bound
-            run_analyze = partial(analyze, config=config)
-            
-            # run all concurrent steps and block on completion
-            #result = p.map(run_analyze, analyze_tables)
-            result = []
-            for t in analyze_tables:
-                result.append(run_analyze(t))
+            if platform.system() == 'Linux' or platform.system() == 'Darwin':
+                if debug:
+                    print "Performing parallel analysis - platform.system == %s" % platform.system()
+                # run all concurrent steps and block on completion
+                result = p.map(analyze, analyze_tables)
+            else:
+                if debug:
+                    print "Performing serial analysis - platform.system == %s" % platform.system()
+                    
+                # process all tables serially on non-linux platforms due to use of os.spawn conflicting with python global variables
+                result = []
+                for table in analyze_tables:
+                    result.append(analyze(table));
         except KeyboardInterrupt:
             # To handle Ctrl-C from user
             p.close()
             p.terminate()
-            close_conn(master_conn) 
+            cleanup()
             sys.exit(TERMINATED_BY_USER)
         except:
             write(traceback.format_exc())
             p.close()
             p.terminate()
-            close_conn(master_conn) 
+            cleanup()
             sys.exit(ERROR)
     else:
         comment("No Tables Found to Analyze")
         
     # do a final vacuum if needed
-    if config['drop_old_data']:
+    if drop_old_data:
         write("vacuum delete only;")
 
     p.terminate()
@@ -780,7 +816,7 @@ order by 2
             fk_commands = None
         
         if fk_commands != None and len(fk_commands) > 0:
-            print_statements(fk_commands, config['output_file_handle'])
+            print_statements(fk_commands)
             
             if do_execute:
                 if not run_commands(master_conn, fk_commands):
@@ -792,18 +828,12 @@ order by 2
             write("Error in worker thread: return code %d. Exiting." % (return_code,))
             sys.exit(return_code)
     
-    if (config['do_execute']):
+    if (do_execute):
         if not commit():
             sys.exit(ERROR)
     
     comment('Processing Complete')
-    
-    if master_conn != None:
-        close_conn(master_conn) 
-    
-    if config['output_file_handle'] != None:
-        config['output_file_handle'].close()
-        
+    cleanup()    
     sys.exit(OK)
 
 if __name__ == "__main__":
