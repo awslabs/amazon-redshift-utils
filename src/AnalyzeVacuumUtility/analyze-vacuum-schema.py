@@ -27,13 +27,17 @@ This script will:
 
    1) Analyze a single table or tables in a schema based on, 
         a) Alerts from stl_explain & stl_alert_event_log.  
-        b) 'stats off' metrics from SVV_TABLE_INFO.   
-
+        b) 'stats off' metrics from SVV_TABLE_INFO.
+        
    2) Vacuum a single table or tables in a schema based on,
         a) The alerts from stl_alert_event_log. 
         b) The 'unsorted' and 'size' metrics from SVV_TABLE_INFO. 
+        c) Vacuum reindex to analyze the interleaved sort keys
 
-srinivasan Krishnasamy Amazon Web Services (2015)
+Srinikri Amazon Web Services (2015)
+
+11/21/2015 : Added support for vacuum reindex to analyze the interleaved sort keys.
+
 '''
 
 import sys
@@ -56,7 +60,7 @@ TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
 # timeout for retries - 100ms
-RETRY_TIMEOUT = 100 / 1000
+RETRY_TIMEOUT = 100/1000
 
 
 master_conn = None
@@ -75,18 +79,18 @@ query_slot_count = 1
 ignore_errors = False
 query_group = None
 
-# set default values to vacuum, analyze variables 
+#set default values to vacuum, analyze variables 
 
-analyze_flag = True
-vacuum_flag = True
-vacuum_parameter = 'FULL'
-min_unsorted_pct = 05
-max_unsorted_pct = 50
-deleted_pct = 05
-stats_off_pct = 10
-max_table_size_mb = (700 * 1024)
-goback_no_of_days = 1
-query_rank = 25
+analyze_flag       = True
+vacuum_flag        = True
+vacuum_parameter   = 'FULL'
+min_unsorted_pct   = 05
+max_unsorted_pct   = 50
+deleted_pct        = 05
+stats_off_pct      = 10
+max_table_size_mb  = (700*1024)
+goback_no_of_days  = 1
+query_rank         = 25
     
 def execute_query(str):
     conn = get_pg_conn()
@@ -130,10 +134,10 @@ def cleanup():
 def comment(string):
     datetime_str = str(datetime.datetime.now())
     if (string != None):
-        if re.match('.*\\n.*', string) != None:
-            write('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string))
+        if re.match('.*\\n.*',string) != None:
+            write('/* [%s]\n%s\n*/\n' % (str(os.getpid()),string))
         else:
-            write('-- %s [%s] %s' % (datetime_str, str(os.getpid()), string))
+            write('-- %s [%s] %s' % (datetime_str,str(os.getpid()),string))
 
 def print_statements(statements):
     if statements != None:
@@ -145,7 +149,7 @@ def write(s):
     # write output to all the places we want it
     print(s)
     if output_file_handle != None:
-        output_file_handle.write(str(s) + "\n")
+        output_file_handle.write( str(s) + "\n")
         output_file_handle.flush()
         
 def get_pg_conn():
@@ -163,7 +167,7 @@ def get_pg_conn():
     if conn == None:
         # connect to the database
         if debug:
-            comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
+            comment('Connect [%s] %s:%s:%s:%s' % (pid,db_host,db_port,db,db_user))
             
         try:
             options = 'keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=5'
@@ -185,7 +189,7 @@ def get_pg_conn():
         try:
             conn.query(search_path)
         except pg.ProgrammingError as e:
-            if re.match('schema "%s" does not exist' % (schema_name,), e.message) != None:
+            if re.match('schema "%s" does not exist' % (schema_name,),e.message) != None:
                 write('Schema %s does not exist' % (schema_name,))
             else:
                 write(e.message)
@@ -221,10 +225,10 @@ def get_pg_conn():
 
 
 def run_commands(conn, commands):
-    for idx, c in enumerate(commands, start=1):
+    for idx,c in enumerate(commands,start=1):
         if c != None:
             
-            comment('[%s] Running %s out of %s commands: %s' % (str(os.getpid()), idx, len(commands), c))
+            comment('[%s] Running %s out of %s commands: %s' % (str(os.getpid()),idx,len(commands),c))
             try:
                 conn.query(c)
                 comment('Success.')
@@ -237,22 +241,26 @@ def run_commands(conn, commands):
     return True
         
 def run_vacuum(conn):
-    statements = []  
+    
+    statements =[]  
     
     if table_name != None:
+        
         get_vacuum_statement = '''SELECT DISTINCT 'vacuum %s ' + "schema" + '.' + "table" + ' ; '
-                                           + '/* '+ ' Table Name : ' + "schema" + '.' + "table" 
-                                           + ',  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + CAST("unsorted" AS VARCHAR(10))
-                                           + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;'
+                                                   + '/* '+ ' Table Name : ' + "schema" + '.' + "table" 
+                                                   + ',  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + CAST("unsorted" AS VARCHAR(10))
+                                                   + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;'
 
-                                FROM svv_table_info
-                                WHERE (unsorted > %s OR empty > %s)
-                                    AND   size < %s
-                                    AND  "schema" = '%s'
-                                    AND  "table" = '%s';
-                                ''' % (vacuum_parameter, min_unsorted_pct, deleted_pct, max_table_size_mb, schema_name, table_name) 
+                                        FROM svv_table_info
+                                        WHERE (unsorted > %s OR empty > %s)
+                                            AND   size < %s
+                                            AND  "schema" = '%s'
+                                            AND  "table" = '%s';
+                                        ''' % (vacuum_parameter,min_unsorted_pct,deleted_pct,max_table_size_mb,schema_name,table_name) 
     else:
-        comment("Extracting Candidate Tables for vacuum based on Alerts...")
+        
+        # query for all tables in the schema ordered by size descending
+        comment("Extracting Candidate Tables for vacuum based on the alerts...")
         
         get_vacuum_statement = '''
                 SELECT DISTINCT 'vacuum %s ' + feedback_tbl.schema_name + '.' + feedback_tbl.table_name + ' ; '
@@ -288,8 +296,9 @@ def run_vacuum(conn):
                     WHERE /*(info_tbl.unsorted > %s OR info_tbl.empty > %s) AND */  
                         info_tbl.size < %s
                         AND   TRIM(info_tbl.schema) = '%s'
+                        AND   (sortkey1 not ilike  'INTERLEAVED%%' OR sortkey1 IS NULL)
                     ORDER BY info_tbl.size ASC, info_tbl.skew_rows ASC;
-                            ''' % (vacuum_parameter, goback_no_of_days, query_rank, min_unsorted_pct, deleted_pct, max_table_size_mb, schema_name,) 
+                            ''' %(vacuum_parameter,goback_no_of_days,query_rank,min_unsorted_pct,deleted_pct,max_table_size_mb,schema_name,) 
                             
     if debug:
         comment(get_vacuum_statement)
@@ -305,8 +314,10 @@ def run_vacuum(conn):
                             write("Error running statements: %s" % (str(statements),))
                         return ERROR
                     
-    statements = []  
+    statements =[]  
     if table_name == None:
+        
+        # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Tables for vacuum ...")
         get_vacuum_statement = '''SELECT DISTINCT 'vacuum %s ' + "schema" + '.' + "table" + ' ; '
                                                    + '/* '+ ' Table Name : ' + "schema" + '.' + "table" 
@@ -325,10 +336,11 @@ def run_vacuum(conn):
                                                 --This is to avoid big table with large unsorted_pct
                                                      ((size > %s) AND (unsorted > %s AND unsorted < %s ))
                                                  )
+                                                AND (sortkey1 not ilike  'INTERLEAVED%%' OR sortkey1 IS NULL)
                                         ORDER BY "size" ASC ,skew_rows ASC;
 
-                                        ''' % (vacuum_parameter, schema_name, max_table_size_mb, min_unsorted_pct,
-                                              deleted_pct, max_table_size_mb, min_unsorted_pct, max_unsorted_pct) 
+                                        ''' %(vacuum_parameter,schema_name,max_table_size_mb,min_unsorted_pct,
+                                              deleted_pct,max_table_size_mb,min_unsorted_pct,max_unsorted_pct) 
             
         if debug:
             comment(get_vacuum_statement)
@@ -344,13 +356,59 @@ def run_vacuum(conn):
                     write("Error running statements: %s" % (str(statements),))
                 return ERROR
             
+    statements =[]  
+    if table_name == None:
+        
+        # query for all tables in the schema for vacuum reindex
+        
+        comment("Extracting Candidate Tables for vacuum reindex ...")
+        get_vacuum_statement = ''' SELECT DISTINCT 'vacuum REINDEX ' + schema_name + '.' + table_name + ' ; ' + '/* ' + ' Table Name : ' 
+                                    + schema_name + '.' + table_name + ',  Rows : ' + CAST("rows" AS VARCHAR(10)) 
+                                    + ',  Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10)) 
+                                    + ' ,  Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;'
+                                    
+                                FROM (SELECT TRIM(n.nspname) schema_name, t.relname table_name,
+                                                 MAX(v.interleaved_skew) max_skew, MAX(c.count) AS rows, 
+                                                 CASE
+                                                   WHEN (MAX(v.interleaved_skew) > 5 AND MAX(c.count) > 10240) THEN 'Yes'
+                                                   ELSE 'No'
+                                                 END AS reindex_flag
+                                            FROM svv_interleaved_columns v
+                                            JOIN (SELECT tbl,col,SUM(count) AS count
+                                                  FROM stv_interleaved_counts
+                                                  GROUP BY tbl,col) c
+                                            ON (v.tbl = c.tbl AND v.col = c.col)
+                                            JOIN pg_class t ON t.oid = c.tbl
+                                            JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
+                                            GROUP BY 1, 2)
+                                WHERE reindex_flag = 'Yes'
+                                    AND schema_name = '%s'
+                                        ''' %(schema_name) 
+            
+        if debug:
+            comment(get_vacuum_statement)
+        
+        vacuum_statements = execute_query(get_vacuum_statement)
+    
+        for vs in vacuum_statements:
+            statements.append(vs[0])     
+
+        if not run_commands(conn, statements):
+            if not ignore_errors:
+                if debug:
+                    write("Error running statements: %s" % (str(statements),))
+                return ERROR
+                   
     return True
 
 def run_analyze(conn):
-    statements = []  
+    
+    statements =[]  
     
     if table_name != None:
+        
         # If it is one table , just check if this needs to be analyzed and prepare analyze statements 
+        
         get_analyze_statement_feedback = '''SELECT DISTINCT 'analyze ' + "schema" + '.' + "table" + ' ; '
                                                    + '/* '+ ' Table Name : ' + "schema" + '.' + "table" 
                                                    + ',  stats_off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;' 
@@ -358,8 +416,10 @@ def run_analyze(conn):
                                                 WHERE   stats_off::DECIMAL (32,4) > %s ::DECIMAL (32,4)
                                                 AND  trim("schema") = '%s'
                                                 AND  trim("table") = '%s';
-                                                ''' % (stats_off_pct, schema_name, table_name,) 
+                                                ''' % (stats_off_pct,schema_name,table_name,) 
     else:
+        
+        # query for all tables in the schema 
         comment("Extracting Candidate Tables for analyze based on Query Optimizer Alerts(Feedbacks) ...")
         
         get_analyze_statement_feedback = '''
@@ -417,9 +477,9 @@ def run_analyze(conn):
                             WHERE info_tbl.stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
                             AND   TRIM(info_tbl.schema) = '%s'
                             ORDER BY info_tbl.size ASC  ; 
-                            ''' % (goback_no_of_days, query_rank, goback_no_of_days, query_rank, stats_off_pct, schema_name) 
+                            ''' % (goback_no_of_days,query_rank,goback_no_of_days,query_rank,stats_off_pct,schema_name) 
         
-        # print(get_analyze_statement_feedback)                  
+        #print(get_analyze_statement_feedback)                  
     if debug:
         comment(get_analyze_statement_feedback)
                 
@@ -445,14 +505,14 @@ def run_analyze(conn):
                                         WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
                                         AND  trim("schema") = '%s' 
                                         ORDER BY "size" ASC ;
-                                        ''' % (stats_off_pct, schema_name) 
+                                        ''' % (stats_off_pct,schema_name) 
         
         if debug:
             comment(get_analyze_statement)
                 
         analyze_statements = execute_query(get_analyze_statement)
     
-        statements = []
+        statements =[]
         for vs in analyze_statements:
             statements.append(vs[0])     
 
@@ -482,7 +542,7 @@ def usage(with_message):
     write('           --slot-count         - Modify the wlm_query_slot_count : Default = 1')
     write('           --ignore-errors      - Ignore errors raised when running and continue processing')
     write('           --query_group        - Set the query_group for all queries')
-    write('           --analyze-flag       - Flag to turn ON/OFF ANALYZE functionality (True or False) : Default = True ')
+    write('           --analyze-flag       - Flag to turn ON/OFF ANALYZE functionality (True or False) : Default = True ' )
     write('           --vacuum-flag        - Flag to turn ON/OFF VACUUM functionality (True or False) :  Default = True')
     write('           --vacuum-parameter   - Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL')
     write('           --min-unsorted-pct   - Minimum unsorted percentage(%) to consider a table for vacuum : Default = 05%')
@@ -585,7 +645,7 @@ def main(argv):
             if value.upper() == 'FALSE':
                 vacuum_flag = False
         elif arg == "--analyze-flag":
-            if value.upper() == 'FALSE':
+            if value.upper()  == 'FALSE':
                 analyze_flag = False
         elif arg == "--vacuum-parameter":
             if value.upper() == 'SORT ONLY' or value.upper() == 'DELETE ONLY' or value.upper() == 'REINDEX' :
@@ -617,20 +677,20 @@ def main(argv):
     if db_user == None:
         usage("Missing Parameter 'db-user'")
     if db_pwd == None:
-        # get the database password
-        db_pwd = getpass.getpass("Password <%s>: " % db_user)
-        
-        if db_pwd == None:
-            usage("Missing Parameter 'db-pwd'")
+        usage("Missing Parameter 'db-pwd'")
     if db_host == None:
         usage("Missing Parameter 'db-host'")
     if db_port == None:
         usage("Missing Parameter 'db-port'")
     if output_file == None:
         usage("Missing Parameter 'output-file'")
+
+        
+    # get the database password
+    #db_pwd = getpass.getpass("Password <%s>: " % db_user)
     
     # open the output file
-    output_file_handle = open(output_file, 'w')
+    output_file_handle = open(output_file,'w')
     
     # get a connection for the controlling processes
     master_conn = get_pg_conn()
@@ -641,7 +701,7 @@ def main(argv):
     comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
     
     if vacuum_flag != False:
-        # Run vacuum based on the Unsorted ,Stats off and Size of the table  
+        # Run vacuum based on the Unsorted , Stats off and Size of the table  
         run_vacuum(master_conn)
     else:
         comment("vacuum flag arg is set as %s.Vacuum is not performed." % (vacuum_flag))
