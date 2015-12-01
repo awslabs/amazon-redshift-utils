@@ -16,12 +16,13 @@ History:
 2015-02-09 ericfe created
 2015-04-17 ericfe Added detail information on distributions and broadcasts. Added rows column
 **********************************************************************************************/
-select trim(s.perm_table_name) as table , (sum(abs(datediff(seconds, coalesce(b.starttime,d.starttime,s.starttime), coalesce(b.endtime,d.endtime,s.endtime))))/60)::numeric(24,0) as minutes,
-       sum(coalesce(b.rows,d.rows,s.rows)) as rows, trim(split_part(l.event,':',1)) as event,  substring(trim(l.solution),1,60) as solution , max(l.query) as sample_query, count(*)
+select trim(s.perm_table_name) as table , (sum(abs(datediff(seconds, coalesce(b.starttime,d.starttime,s.starttime), case when coalesce(b.endtime,d.endtime,s.endtime) > coalesce(b.starttime,d.starttime,s.starttime) THEN coalesce(b.endtime,d.endtime,s.endtime) ELSE coalesce(b.starttime,d.starttime,s.starttime) END )))/60)::numeric(24,0) as minutes,
+       sum(coalesce(b.rows,d.rows,s.rows)) as rows, trim(split_part(l.event,':',1)) as event,  substring(trim(l.solution),1,60) as solution , max(l.query) as sample_query, count(distinct l.query)
 from stl_alert_event_log as l
 left join stl_scan as s on s.query = l.query and s.slice = l.slice and s.segment = l.segment
 left join stl_dist as d on d.query = l.query and d.slice = l.slice and d.segment = l.segment
 left join stl_bcast as b on b.query = l.query and b.slice = l.slice and b.segment = l.segment
 where l.userid >1
 and  l.event_time >=  dateadd(day, -7, current_Date)
+-- and s.perm_table_name not like 'volt_tt%'
 group by 1,4,5 order by 2 desc,6 desc;
