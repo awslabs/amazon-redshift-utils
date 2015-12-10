@@ -27,3 +27,4 @@ All views assume you have a schema called admin.
 | v_generate_cancel_query.sql | View to get cancel query |
 | v_get_cluster_restart_ts.sql | View to get the datetime of when Redshift cluster was recently restarted |
 | v_get_vacuum_details.sql | View to get vacuum details like table name, Schema Name, Deleted Rows , processing time |
+| v_cost_per_schema.sql | View to get monthly cost of the Redshift cluster divided to every schema |
