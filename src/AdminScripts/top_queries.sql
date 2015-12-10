@@ -8,7 +8,7 @@ qrytext:	First 80 Characters of the query SQL
 min/max/avg:	Min/Max/Avg Execution time
 total:		Total execution time of all occurences
 max_query_id:	Largest query id of the query occurence
-last_run:	Last day the query dan
+last_run:	Last day the query ran
 aborted:	0 if query ran to completion, 1 if it was canceled.
 alert:      Alert event related to the query
  
