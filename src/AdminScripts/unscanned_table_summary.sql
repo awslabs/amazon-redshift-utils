@@ -11,7 +11,7 @@ Notes:
 erroroneously count a table as unscanned if table is only scanned sparingly and the log has 
 rotated from the system tables by the time this query is run. 
 - Leverage regular queries against the view defined in 
-amazon-redshift-utils/src/AdminViews/v_get_unscanned_tables.sql to determine if a table is
+amazon-redshift-utils/src/AdminViews/v_get_tbl_scan_frequency.sql to determine if a table is
 truely unscanned over longer periods of time. 
 
 History:
