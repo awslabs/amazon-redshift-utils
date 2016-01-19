@@ -340,11 +340,11 @@ def run_commands(conn, commands):
     
     return True
         
-def analyze(tables):     
-    table_name = tables[0]
-    dist_style = tables[3]
+def analyze(table_info):     
+    table_name = table_info[0]
+    dist_style = table_info[3]
     
-    statement = 'analyze compression %s.%s' % (analyze_schema, table_name,)
+    statement = 'analyze compression %s.%s' % (analyze_schema, table_name)
     
     if comprows != None:
         statement = statement + (" comprows %s" % (comprows,))
@@ -384,7 +384,6 @@ def analyze(tables):
         else:
             target_table = table_name
         
-        comment('creating migration table for %s' % (table_name,))
         create_table = 'begin;\nlock table %s.%s;\ncreate table %s.%s(' % (analyze_schema, table_name, target_schema, target_table,)
         
         # query the table column definition
@@ -454,11 +453,13 @@ def analyze(tables):
                 non_identity_columns.append(col)
 
             # add the formatted column specification
-            encode_columns.extend(['%s %s %s %s encode %s %s'
+            encode_columns.extend(['"%s" %s %s %s encode %s %s'
                                    % (col, col_type, default_value, col_null, compression, distkey)])
 
         fks = None 
         if found_non_raw or force:
+            comment("Column Encoding will be modified for %s.%s" % (analyze_schema, table_name))
+            
             # add all the column encoding statements on to the create table statement, suppressing the leading comma on the first one
             for i, s in enumerate(encode_columns):
                 create_table += '\n%s%s' % ('' if i == 0 else ',', s)
@@ -491,9 +492,7 @@ def analyze(tables):
             statements.extend([get_primary_key(analyze_schema, target_schema, table_name, target_table)]);
 
             # insert the old data into the new table
-            comment('migrating data to new structure for table %s' % (table_name,))
-
-            # if we have identity column(s), we can't insert data from them so do selective insert
+            # if we have identity column(s), we can't insert data from them, so do selective insert
             if has_identity:
                 source_columns = ', '.join(non_identity_columns)
                 mig_columns = '(' + source_columns + ')'
@@ -506,7 +505,7 @@ def analyze(tables):
                                                                      mig_columns,
                                                                      source_columns,
                                                                      analyze_schema,
-                                                                     tables[0])
+                                                                     table_name)
             statements.extend([insert])
                     
             # analyze the new table
@@ -537,7 +536,8 @@ def analyze(tables):
                         if debug:
                             write("Error running statements: %s" % (str(statements),))
                         return ERROR
-            
+        else:
+            comment("No encoding modifications required for %s.%s" % (analyze_schema, table_name))    
     except Exception as e:
         write('Exception %s during analysis of %s' % (e.message, table_name))
         write(traceback.format_exc())
