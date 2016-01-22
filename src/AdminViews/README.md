@@ -21,7 +21,7 @@ All views assume you have a schema called admin.
 | v_get_obj_priv_by_user.sql |   View to get the table/views that a user has access to | 
 | v_get_schema_priv_by_user.sql |   View to get the schema that a user has access to | 
 | v_get_tbl_priv_by_user.sql |   View to get the tables that a user has access to | 
-| v_get_unscanned_tables.sql |   View to get list of each permanent table's scan frequency | 
+| v_get_tbl_scan_frequency.sql |   View to get list of each permanent table's scan frequency | 
 | v_get_users_in_group.sql |   View to get all users in a group | 
 | v_get_vacuum_details.sql | View to get vacuum details like table name, Schema Name, Deleted Rows , processing time |
 | v_get_view_priv_by_user.sql |   View to get the views that a user has access to | 
