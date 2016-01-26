@@ -5,6 +5,7 @@ If you are using psql, you can use ``` psql [option] -f &lt;script.sql&gt;``` to
 | Script | Purpose |
 | ------------- | ------------- |
 | commit_stats.sql | Shows information on consumption of cluster resources through COMMIT statements |
+| copy_performance.sql | Shows longest running copy for past 7 days |
 | current_session_info.sql | Query showing information about sessions with currently running queries |
 | filter_used.sql | Return filter applied to tables on scans. To aid on choosing sortkey |
 | missing_table_stats.sql | Query shows EXPLAIN plans which flagged "missing statistics" on the underlying tables |
