@@ -559,7 +559,7 @@ def main(argv):
     
     # extract the command line arguments
     try:
-        optlist, remaining = getopt.getopt(sys.argv[1:], "", supported_args.split())
+        optlist, remaining = getopt.getopt(argv[1:], "", supported_args.split())
     except getopt.GetoptError as err:
         print str(err)
         usage(None)
