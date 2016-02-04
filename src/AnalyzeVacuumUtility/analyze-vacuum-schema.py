@@ -52,7 +52,6 @@ from string import uppercase
 
 __version__ = ".9.1.3.3"
 
-OK = 0
 ERROR = 1
 INVALID_ARGS = 2
 NO_WORK = 3
@@ -714,7 +713,6 @@ def main(argv):
        
     comment('Processing Complete')
     cleanup()    
-    sys.exit(OK)
 
 if __name__ == "__main__":
     main(sys.argv)
