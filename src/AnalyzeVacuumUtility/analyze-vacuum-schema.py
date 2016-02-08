@@ -50,7 +50,7 @@ import traceback
 import datetime
 from string import uppercase
 
-__version__ = ".9.1.3.3"
+__version__ = ".9.1.3.4"
 
 ERROR = 1
 INVALID_ARGS = 2
