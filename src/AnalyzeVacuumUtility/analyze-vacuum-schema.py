@@ -50,9 +50,8 @@ import traceback
 import datetime
 from string import uppercase
 
-__version__ = ".9.1.3.3"
+__version__ = ".9.1.3.4"
 
-OK = 0
 ERROR = 1
 INVALID_ARGS = 2
 NO_WORK = 3
@@ -559,7 +558,7 @@ def main(argv):
     
     # extract the command line arguments
     try:
-        optlist, remaining = getopt.getopt(sys.argv[1:], "", supported_args.split())
+        optlist, remaining = getopt.getopt(argv[1:], "", supported_args.split())
     except getopt.GetoptError as err:
         print str(err)
         usage(None)
@@ -714,7 +713,6 @@ def main(argv):
        
     comment('Processing Complete')
     cleanup()    
-    sys.exit(OK)
 
 if __name__ == "__main__":
     main(sys.argv)
