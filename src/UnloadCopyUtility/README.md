@@ -61,3 +61,5 @@ sudo easy_install pip
 sudo yum install postgresql postgresql-devel gcc python-devel
 sudo pip install PyGreSQL
 ```
+
+On other Linux distributions, make sure that you install the PostgreSQL client version 9.0 or higher.
