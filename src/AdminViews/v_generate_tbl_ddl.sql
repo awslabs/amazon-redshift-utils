@@ -37,7 +37,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,2 AS seq
-   ,'CREATE TABLE "' + n.nspname + '"."' + c.relname + '"' AS ddl
+   ,'CREATE TABLE IF NOT EXISTS "' + n.nspname + '"."' + c.relname + '"' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
