@@ -35,4 +35,5 @@ INNER JOIN
 	pg_namespace AS pgn 
 		ON pgn.oid = pgc.relnamespace
 WHERE slice < 3201
+AND pgc.relowner > 1
 ;
