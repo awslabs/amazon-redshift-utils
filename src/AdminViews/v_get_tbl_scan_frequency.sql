@@ -12,4 +12,5 @@ WHERE
    AND s.perm_table_name NOT IN ('Internal Worktable','S3')
 GROUP BY 
    tbl, perm_table_name) s ON s.tbl = t.table_id
+AND t."schema" NOT IN ('pg_internal')
 ORDER BY 7 desc;
