@@ -23,7 +23,8 @@ FROM
 		,'unload' AS cmd_type
 		,'UNLOAD (''SELECT * FROM ' + schemaname + '.' + tablename + ' --WHERE audit_id > ___auditid___'') TO ''s3://__bucketname__/' + TO_CHAR(GETDATE(), 'YYYYMMDD_HH24MISSMS')  + '/'  + schemaname + '.' + tablename + '-'' CREDENTIALS ''__creds_here__'' GZIP DELIMITER ''\\t'';' AS dml
 	FROM 
-		pg_tables 
+		pg_tables
+WHERE schemaname NOT IN ('pg_internal') 
 	UNION ALL
 	SELECT 
 		schemaname
@@ -33,5 +34,6 @@ FROM
 	FROM 
 		pg_tables 
 	)
+WHERE schemaname NOT IN ('pg_internal')
 ORDER BY 3 DESC,1,2
 ;
