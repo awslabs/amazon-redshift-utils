@@ -259,7 +259,7 @@ def get_foreign_keys(analyze_schema, target_schema, table_name):
     for fk in foreign_keys:
         has_fks = True
         references_clause = fk[1].replace('REFERENCES ', 'REFERENCES %s.' % (target_schema))      
-        fk_statements.append('alter table %s.%s add constraint %s %s;' % (target_schema, table_name, fk[0], references_clause))    
+        fk_statements.append('alter table %s."%s" add constraint %s %s;' % (target_schema, table_name, fk[0], references_clause))
     
     if has_fks:
         return fk_statements
@@ -267,7 +267,7 @@ def get_foreign_keys(analyze_schema, target_schema, table_name):
         return None
             
 def get_primary_key(table_schema, target_schema, original_table, new_table):
-    pk_statement = 'alter table %s.%s add primary key (' % (target_schema, new_table)
+    pk_statement = 'alter table %s."%s" add primary key (' % (target_schema, new_table)
     has_pks = False
     
     # get the primary key columns
@@ -344,7 +344,7 @@ def analyze(table_info):
     table_name = table_info[0]
     dist_style = table_info[3]
     
-    statement = 'analyze compression %s.%s' % (analyze_schema, table_name)
+    statement = 'analyze compression %s."%s"' % (analyze_schema, table_name)
     
     if comprows != None:
         statement = statement + (" comprows %s" % (comprows,))
@@ -384,7 +384,7 @@ def analyze(table_info):
         else:
             target_table = table_name
         
-        create_table = 'begin;\nlock table %s.%s;\ncreate table %s.%s(' % (analyze_schema, table_name, target_schema, target_table,)
+        create_table = 'begin;\nlock table %s."%s";\ncreate table %s."%s" (' % (analyze_schema, table_name, target_schema, target_table,)
         
         # query the table column definition
         descr = get_table_desc(table_name)
@@ -450,7 +450,7 @@ def analyze(table_info):
                     has_identity = True
             else:
                 default_value = ''
-                non_identity_columns.append(col)
+                non_identity_columns.append('"' + col + '"')
 
             # add the formatted column specification
             encode_columns.extend(['"%s" %s %s %s encode %s %s'
@@ -500,7 +500,7 @@ def analyze(table_info):
                 source_columns = '*'
                 mig_columns = ''
 
-            insert = 'insert into %s.%s %s select %s from %s.%s;' % (target_schema,
+            insert = 'insert into %s."%s" %s select %s from %s."%s";' % (target_schema,
                                                                      target_table,
                                                                      mig_columns,
                                                                      source_columns,
@@ -509,20 +509,20 @@ def analyze(table_info):
             statements.extend([insert])
                     
             # analyze the new table
-            analyze = 'analyze %s.%s;' % (target_schema, target_table)
+            analyze = 'analyze %s."%s";' % (target_schema, target_table)
             statements.extend([analyze])
                     
             if (target_schema == analyze_schema):
                 # rename the old table to _$old or drop
                 if drop_old_data:
-                    drop = 'drop table %s.%s cascade;' % (target_schema, table_name)
+                    drop = 'drop table %s."%s" cascade;' % (target_schema, table_name)
                 else:
-                    drop = 'alter table %s.%s rename to %s;' % (target_schema, table_name, table_name + "_$old")
+                    drop = 'alter table %s."%s" rename to "%s";' % (target_schema, table_name, table_name + "_$old")
                 
                 statements.extend([drop])
                         
                 # rename the migrate table to the old table name
-                rename = 'alter table %s.%s rename to %s;' % (target_schema, target_table, table_name)
+                rename = 'alter table %s."%s" rename to "%s";' % (target_schema, target_table, table_name)
                 statements.extend([rename])
             
             # add foreign keys
