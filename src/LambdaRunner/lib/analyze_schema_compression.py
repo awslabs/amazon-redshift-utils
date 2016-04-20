@@ -257,7 +257,7 @@ def get_foreign_keys(analyze_schema, target_schema, table_name):
     for fk in foreign_keys:
         has_fks = True
         references_clause = fk[1].replace('REFERENCES ', 'REFERENCES %s.' % (target_schema))      
-        fk_statements.append('alter table %s."%s" add constraint %s %s;' % (target_schema, table_name, fk[0], references_clause))
+        fk_statements.append('alter table %s.%s add constraint %s %s;' % (target_schema, table_name, fk[0], references_clause))    
     
     if has_fks:
         return fk_statements
@@ -266,7 +266,7 @@ def get_foreign_keys(analyze_schema, target_schema, table_name):
             
             
 def get_primary_key(table_schema, target_schema, original_table, new_table):
-    pk_statement = 'alter table %s."%s" add primary key (' % (target_schema, new_table)
+    pk_statement = 'alter table %s.%s add primary key (' % (target_schema, new_table)
     has_pks = False
     
     # get the primary key columns
@@ -627,6 +627,7 @@ def usage(with_message):
         
     write('Arguments: --db             - The Database to Use')
     write('           --db-user        - The Database User to connect to')
+    write('           --db-password    - The Database Password (optional - do not use on command line')
     write('           --db-host        - The Cluster endpoint')
     write('           --db-port        - The Cluster endpoint port (default 5439)')
     write('           --analyze-schema - The Schema to be Analyzed (default public)')

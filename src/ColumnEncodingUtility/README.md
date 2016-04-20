@@ -36,10 +36,10 @@ This utility was built and tested on Python 2.7x, but may work with other versio
 Usage: analyze-schema-compression.py
        Generates a script to optimise Redshift column encodings on all tables in a schema
 
-Arguments: --db             - The Database to Use
-           --db-user        - The Database User to connect to
-           --db-host        - The Cluster endpoint
-           --db-port        - The Cluster endpoint port (default 5439)
+Arguments: --db             - The Database to Use (or $PGDATABASE)
+           --db-user        - The Database User to connect to (or $PGUSER)
+           --db-host        - The Cluster endpoint (or $PGHOST)
+           --db-port        - The Cluster endpoint port (default 5439 or $PGPORT)
            --analyze-schema - The Schema to be Analyzed (default public)
            --analyze-table  - A specific table to be Analyzed, if --analyze-schema is not desired
            --target-schema  - Name of a Schema into which the newly optimised tables and data should be created, rather than in place
@@ -74,8 +74,20 @@ By default, the ANALYZE COMPRESSION command will attempt to analyze 100,000 rows
 
 This option will cause the encoding utility to run the generated script as it goes. Changes will be made to your database LIVE and cannot be undone. It is not recommended that you use this option on Production systems. Furthermore, if the ```--drop-old-data true``` option is included with ```--do-execute true```, then you will be required to confirm that you wish to run this operation before the utility will proceed.
 
+<<<<<<< HEAD
 # Version Notes
 
 ## .9.2.0
 
 This release was a major update to previous versions, in that it migrated away from the use of the PyGreSQL driver and to pg8000. It also fundamentally changed the runtime architecture so that the utility can be run as a [scheduled Lambda function](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/LambdaRunner).
+=======
+## Install Notes
+
+To install PyGreSQL (Python PostgreSQL Driver) on Amazon Linux, please ensure that you follow the below steps as the ec2-user:
+
+```
+sudo easy_install pip
+sudo yum install postgresql postgresql-devel gcc python-devel
+sudo pip install PyGreSQL
+```
+>>>>>>> awslabs/master

@@ -209,6 +209,10 @@ def main(args):
               dest_schema, dest_table)
 
     src_conn.close()
+<<<<<<< HEAD
+=======
+    dest_conn.close()
+>>>>>>> awslabs/master
     
     if deleteOnSuccess:
         s3Delete(dataStagingPath)

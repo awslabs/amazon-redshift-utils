@@ -5,6 +5,7 @@ History:
 2014-01-30 jjschmit Created
 2014-02-18 jjschmit Removed hardcoded where clause against 'public' schema
 2014-02-21 jjschmit Added pct_unsorted and recommendation fields
+2015-03-31 tinkerbotfoo Handled a special case to avoid divide by zero for pct_unsorted 
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_space_used_per_tbl
 AS
@@ -16,9 +17,13 @@ SELECT
 		,b.mbytes AS megabytes
 		,a.rows AS rowcount
 		,a.unsorted_rows AS unsorted_rowcount
-		,ROUND((a.unsorted_rows::FLOAT / a.rows::FLOAT) * 100, 5) AS pct_unsorted
-		,CASE WHEN (a.unsorted_rows::FLOAT / a.rows::FLOAT) * 100 >= 20 
-			THEN 'VACUUM recommended' ELSE 'n/a' END AS recommendation
+		,CASE WHEN a.rows = 0 then 0
+			ELSE ROUND((a.unsorted_rows::FLOAT / a.rows::FLOAT) * 100, 5)
+		END AS pct_unsorted
+		,CASE WHEN a.rows = 0 THEN 'n/a'
+			WHEN (a.unsorted_rows::FLOAT / a.rows::FLOAT) * 100 >= 20 THEN 'VACUUM recommended'
+			ELSE 'n/a'
+		END AS recommendation
 FROM
        (
        SELECT
@@ -48,5 +53,5 @@ LEFT OUTER JOIN
        GROUP BY tbl
        ) AS b 
               ON a.id=b.tbl
-ORDER BY 1,3,2
-;
+WHERE pgc.relowner > 1
+ORDER BY 1,3,2;
