@@ -74,20 +74,10 @@ By default, the ANALYZE COMPRESSION command will attempt to analyze 100,000 rows
 
 This option will cause the encoding utility to run the generated script as it goes. Changes will be made to your database LIVE and cannot be undone. It is not recommended that you use this option on Production systems. Furthermore, if the ```--drop-old-data true``` option is included with ```--do-execute true```, then you will be required to confirm that you wish to run this operation before the utility will proceed.
 
-<<<<<<< HEAD
 # Version Notes
 
 ## .9.2.0
 
 This release was a major update to previous versions, in that it migrated away from the use of the PyGreSQL driver and to pg8000. It also fundamentally changed the runtime architecture so that the utility can be run as a [scheduled Lambda function](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/LambdaRunner).
-=======
-## Install Notes
 
-To install PyGreSQL (Python PostgreSQL Driver) on Amazon Linux, please ensure that you follow the below steps as the ec2-user:
-
-```
-sudo easy_install pip
-sudo yum install postgresql postgresql-devel gcc python-devel
-sudo pip install PyGreSQL
-```
->>>>>>> awslabs/master
+Furthermore, this version significantly reduces the amount of work that the analyzer will attempt to do. It will only attempt to change encoding modification for those tables which contain data, as before, but now will also only attempt to analyze those tables which contain unencoded columns other than the first column of the sort key. It will also suppress modifications of any tables where the outcome of the analysis is the same as the table in place already - sounds obvious but previous versions would do a migration to an identical table structure :(
