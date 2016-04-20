@@ -10,7 +10,7 @@ Currently only the [Column Encoding Utility](src/ColumnEncodingUtility) is suppo
 
 Because these utilities need to access your Redshift cluster, they require a username and password for authentication. This function reads these values from a configuration file, and expects that the database password is a base64 encoded string that has been encrypted by AWS KMS (url). In order to authenticate when the utility is run by AWS Lambda, the IAM role granted to AWS Lambda must have rights to decrypt data using KMS, and must also include this application's internal encryption context (which you may change if you desire).
 
-To encrypt your password for use by this function, please run the [encrypt_password.py]() script, and type your password as the first argument:
+To encrypt your password for use by this function, please run the [encrypt_password.py](encrypt_password.py) script, and type your password as the first argument:
 
 ```
 > export AWS_REGION=my-aws-region
