@@ -1,0 +1,12 @@
+../shortuuid/__init__.py
+../shortuuid/main.py
+../shortuuid/tests.py
+../shortuuid/__init__.pyc
+../shortuuid/main.pyc
+../shortuuid/tests.pyc
+.
+dependency_links.txt
+pbr.json
+PKG-INFO
+SOURCES.txt
+top_level.txt

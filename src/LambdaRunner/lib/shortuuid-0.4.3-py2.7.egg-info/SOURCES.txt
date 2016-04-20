@@ -1,0 +1,13 @@
+COPYING
+MANIFEST.in
+README.rst
+setup.cfg
+setup.py
+shortuuid/__init__.py
+shortuuid/main.py
+shortuuid/tests.py
+shortuuid.egg-info/PKG-INFO
+shortuuid.egg-info/SOURCES.txt
+shortuuid.egg-info/dependency_links.txt
+shortuuid.egg-info/pbr.json
+shortuuid.egg-info/top_level.txt

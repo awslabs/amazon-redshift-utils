@@ -1,0 +1,20 @@
+{"utilities":["ColumnEncodingUtility"],
+"configuration":{
+  "analyzeTable": "",
+  "analyzeSchema": "public",
+  "comprows": -1,
+  "db": "master",
+  "dbHost": "energy-demo.c7bpmf3ajaft.eu-west-1.redshift.amazonaws.com",
+  "dbPassword": "CiChAYm4goRPj1CuMlY+VbyChti8kHVW4kxInA+keC7gPxKUAQEBAgB4oQGJuIKET49QrjJWPlW8gobYvJB1VuJMSJwPpHgu4D8AAABrMGkGCSqGSIb3DQEHBqBcMFoCAQAwVQYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAxZ4WELhf0qY29effgCARCAKHXN+wVFy3f0xn1v+VPSHKzRt2gFim4yQWtr7/iI6n5YMGLGlNZaLJg=",
+  "dbPort": 5439,
+  "dbUser": "master",
+  "dropOldData": false,
+  "ignoreErrors": false,
+  "queryGroup": "",
+  "querySlotCount": 2,
+  "targetSchema": "",
+  "force": false,
+  "outputFile":"/tmp/analyze-schema-compression.sql",
+  "debug":true
+  }
+}

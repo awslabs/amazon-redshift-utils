@@ -1,0 +1,13 @@
+pg8000/__init__.py,sha256=v9OeXIwhZe72VrvvU3muViWthj6ADod4U8gnLvDUeNM,6864
+pg8000/_version.py,sha256=BLxbLRSKAEzHmFJ-WTNtymSVrEWSN1uU8EyMKsa6HgY,472
+pg8000/core.py,sha256=BbgxUaz5ty74euryOe9w4NiQMjq2NUC3Xk7aQPY-5wc,89825
+pg8000-1.10.5.dist-info/DESCRIPTION.rst,sha256=Kkz9Kjcb04_VsGvp1q3PtP6uNlscdjsN9pBFkjiEvNk,510
+pg8000-1.10.5.dist-info/METADATA,sha256=HdH98ItuUcBju5SWV7kkKR_RDdKYQeV120F53VgERRw,1713
+pg8000-1.10.5.dist-info/RECORD,,
+pg8000-1.10.5.dist-info/WHEEL,sha256=o2k-Qa-RMNIJmUdIc7KU6VWR_ErNRbWNlxDIpl7lm34,110
+pg8000-1.10.5.dist-info/metadata.json,sha256=cVO2Kx6LUtLW7rUU77SWGDhOeCtPQdCM7LTK781SU0g,1299
+pg8000-1.10.5.dist-info/top_level.txt,sha256=R-X4475Cez2l7ZYcYUJzuffAxDS7xHCCA0JCjs8iKKE,7
+pg8000-1.10.5.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+pg8000/core.pyc,,
+pg8000/__init__.pyc,,
+pg8000/_version.pyc,,

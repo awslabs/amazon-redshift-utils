@@ -1,0 +1,18 @@
+Metadata-Version: 1.1
+Name: shortuuid
+Version: 0.4.3
+Summary: A generator library for concise, unambiguous and URL-safe UUIDs.
+Home-page: https://github.com/stochastic-technologies/shortuuid/
+Author: Stochastic Technologies
+Author-email: info@stochastictechnologies.com
+License: BSD
+Description: A library that generates short, pretty, unambiguous unique IDs by using an extensive, case-sensitive alphabet and omitting similar-looking letters and numbers.
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2.5
+Classifier: Programming Language :: Python :: 2.6
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3.2
+Classifier: Programming Language :: Python :: 3.3
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
