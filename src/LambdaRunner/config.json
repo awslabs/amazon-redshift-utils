@@ -1,0 +1,20 @@
+{"utilities":["ColumnEncodingUtility"],
+"configuration":{
+  "analyzeTable": "",
+  "analyzeSchema": "public",
+  "comprows": -1,
+  "db": "master",
+  "dbHost": "your cluster DNS name here",
+  "dbPassword": "your base64 encoded encrypted password here (generated with encrypt_password.py)",
+  "dbPort": 5439,
+  "dbUser": "master",
+  "dropOldData": false,
+  "ignoreErrors": false,
+  "queryGroup": "",
+  "querySlotCount": 2,
+  "targetSchema": "",
+  "force": false,
+  "outputFile":"/tmp/analyze-schema-compression.sql",
+  "debug":false
+  }
+}
