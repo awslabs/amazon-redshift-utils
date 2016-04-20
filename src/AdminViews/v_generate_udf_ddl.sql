@@ -24,7 +24,7 @@ SELECT
 FROM pg_proc p
 LEFT JOIN pg_namespace n on n.oid = p.pronamespace
 WHERE p.proowner != 1
-UNION 
+UNION ALL
 SELECT 
    n.nspname AS schemaname,
    p.proname AS udfname,
@@ -34,7 +34,7 @@ FROM pg_proc p
 LEFT JOIN pg_namespace n on n.oid = p.pronamespace
 LEFT JOIN arguments a on a.oid = p.oid
 WHERE p.proowner != 1
-UNION 
+UNION ALL
 SELECT 
    n.nspname AS schemaname,
    p.proname AS udfname,
@@ -43,7 +43,7 @@ SELECT
 FROM pg_proc p
 LEFT JOIN pg_namespace n on n.oid = p.pronamespace
 WHERE p.proowner != 1
-UNION
+UNION ALL
 SELECT 
    n.nspname AS schemaname,
    p.proname AS udfname,
@@ -52,7 +52,7 @@ SELECT
 FROM pg_proc p
 LEFT JOIN pg_namespace n on n.oid = p.pronamespace
 WHERE p.proowner != 1
-UNION
+UNION ALL
 SELECT 
    n.nspname AS schemaname,
    p.proname AS udfname,
@@ -61,7 +61,7 @@ SELECT
 FROM pg_proc p
 LEFT JOIN pg_namespace n on n.oid = p.pronamespace
 WHERE p.proowner != 1
-UNION
+UNION ALL
 SELECT 
    n.nspname AS schemaname,
    p.proname AS udfname,
@@ -70,7 +70,7 @@ SELECT
 FROM pg_proc p
 LEFT JOIN pg_namespace n on n.oid = p.pronamespace
 WHERE p.proowner != 1
-UNION
+UNION ALL
 SELECT 
    n.nspname AS schemaname,
    p.proname AS udfname,
@@ -79,7 +79,7 @@ SELECT
 FROM pg_proc p
 LEFT JOIN pg_namespace n on n.oid = p.pronamespace
 WHERE p.proowner != 1
-UNION
+UNION ALL
 SELECT 
    n.nspname AS schemaname,
    p.proname AS udfname,
