@@ -19,7 +19,7 @@ FROM
 		,HAS_TABLE_PRIVILEGE(usrs.usename, obj, 'delete') AS del
 		,HAS_TABLE_PRIVILEGE(usrs.usename, obj, 'references') AS ref
 	FROM
-		(SELECT schemaname, viewname, schemaname + '.' + viewname AS obj FROM pg_views) AS objs
+		(SELECT schemaname, viewname, ('"' + schemaname + '"."' + viewname + '"') AS obj FROM pg_views ) AS objs
 	INNER JOIN
 		(SELECT * FROM pg_user) AS usrs
 			ON 1 = 1

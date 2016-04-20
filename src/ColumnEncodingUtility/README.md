@@ -1,17 +1,17 @@
 # Amazon Redshift Column Encoding Utility
 
 In order to get the best performance from your Redshift Database, you must ensure 
-that database tables have the correct Column Encoding applied (http://docs.aws.amazon.com/redshift/latest/dg/t_Compressing_data_on_disk.html). 
+that database tables have the correct Column Encoding applied [http://docs.aws.amazon.com/redshift/latest/dg/t\_Compressing\_data\_on\_disk.html](http://docs.aws.amazon.com/redshift/latest/dg/t_Compressing_data_on_disk.html). 
 Column Encoding specifies which algorithm is used to compress data within a column, 
 and is chosen on the basis of the datatype, the unique number of discrete values 
-in the column, and so on. When the COPY command (http://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html) 
+in the column, and so on. When the COPY command [http://docs.aws.amazon.com/redshift/latest/dg/r\_COPY.html](http://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html)
 is used to load data into a table, column encoding will be analyzed and applied by default. 
 Other tables may be loaded via Extract/Load/Transform/Load (ELT) processes, and 
 these tables may require having the column encoding updated at some point.
 
 The Redshift Column Encoding Utility gives you the ability to apply optimal Column 
 Encoding to an established Schema with data already loaded. When run, it will analyze 
-an entire schema or individual tables. The ANALYZE COMPRESSION (http://docs.aws.amazon.com/redshift/latest/dg/r_ANALYZE_COMPRESSION.html) 
+an entire schema or individual tables. The ANALYZE COMPRESSION [http://docs.aws.amazon.com/redshift/latest/dg/r\_ANALYZE\_COMPRESSION.html](http://docs.aws.amazon.com/redshift/latest/dg/r_ANALYZE_COMPRESSION.html) 
 command is used to determine if any of the columns in the table require updating, 
 and if so a script is generated to convert to the optimal structure.
 
@@ -19,11 +19,18 @@ Because this utility can make changes to your database live (using the ```--do-e
 
 ## Data Migration
 
-The script generated will take advantage of one of two data migration options. The default is to do an in place data migration within the schema being analyzed. This will create a new table with the same structure as your current table, including the distribution and sort keys, but with the correct column encoding. This table will be called ```<my_table>_$mig```. Your data will be migrated into the new table with an INSERT...SELECT... and then the existing table will be renamed to ```<my_table>_$old```, and the optimised ```<my_table>_$mig``` will be renamed to ```<my_table>```. In this way, all old data and structure are retained for future use if required. Alternatively, you can specify the ```--target-schema <my_new_schema>``` option, and the data migration will be done into the target schema with all tables retaining their original names. The source schema which has been analysed will not be modified in any way.
+The script generated will take advantage of one of two data migration options. The default is to do an in place data migration within the schema being analyzed. This will create a new table with the same structure as your current table, including the distribution and sort keys, but with the correct column encoding. This table will be called ```<my_table>_$mig```. Your data will be migrated into the new table with an INSERT...SELECT... and then the existing table will be renamed to ```<my_table>_<YYYYMMDD>_<random>_$old```, and the optimised ```<my_table>_$mig``` will be renamed to ```<my_table>```. In this way, all old data and structure are retained for future use if required. Alternatively, you can specify the ```--target-schema <my_new_schema>``` option, and the data migration will be done into the target schema with all tables retaining their original names. The source schema which has been analysed will not be modified in any way.
 
 ## Running the Column Encoding Utility
 
-This utility was built and tested on Python 2.7x, but may work with other versions of Python. After cloning this Github project, you must ensure that you have installed the PyGresQL driver for Postgres (see http://www.pygresql.org or ```pip install pygresql```). You can then run the column encoding utility by typing ```python analyze-schema-compression.py``` or ```./analyze-schema-compression.py```. This will generate the following Usage instructions:
+This utility was built and tested on Python 2.7x, but may work with other versions of Python. After cloning this Github project, you must ensure that you have installed following modules:
+
+| Module  | License  |
+| :------ | :------- |
+| [pg8000](https://pypi.python.org/pypi/pg8000) | BSD |
+| [shortuuid](https://pypi.python.org/pypi/shortuuid) | BSD |
+ 
+ You can then run the column encoding utility by typing ```python analyze-schema-compression.py``` or ```./analyze-schema-compression.py```. This will generate the following Usage instructions:
 
 ```
 Usage: analyze-schema-compression.py
@@ -67,12 +74,10 @@ By default, the ANALYZE COMPRESSION command will attempt to analyze 100,000 rows
 
 This option will cause the encoding utility to run the generated script as it goes. Changes will be made to your database LIVE and cannot be undone. It is not recommended that you use this option on Production systems. Furthermore, if the ```--drop-old-data true``` option is included with ```--do-execute true```, then you will be required to confirm that you wish to run this operation before the utility will proceed.
 
-## Install Notes
+# Version Notes
 
-To install PyGreSQL (Python PostgreSQL Driver) on Amazon Linux, please ensure that you follow the below steps as the ec2-user:
+## .9.2.0
 
-```
-sudo easy_install pip
-sudo yum install postgresql postgresql-devel gcc python-devel
-sudo pip install PyGreSQL
-```
+This release was a major update to previous versions, in that it migrated away from the use of the PyGreSQL driver and to pg8000. It also fundamentally changed the runtime architecture so that the utility can be run as a [scheduled Lambda function](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/LambdaRunner).
+
+Furthermore, this version significantly reduces the amount of work that the analyzer will attempt to do. It will only attempt to change encoding modification for those tables which contain data, as before, but now will also only attempt to analyze those tables which contain unencoded columns other than the first column of the sort key. It will also suppress modifications of any tables where the outcome of the analysis is the same as the table in place already - sounds obvious but previous versions would do a migration to an identical table structure :(

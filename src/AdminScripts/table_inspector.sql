@@ -25,7 +25,7 @@ SELECT n.nspname, c.relname, c.oid,
       (SELECT COUNT(*) FROM STV_BLOCKLIST b WHERE b.tbl = c.oid)
 FROM pg_namespace n, pg_class c
 WHERE n.oid = c.relnamespace 
-  AND nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema')
+  AND nspname NOT IN ('pg_catalog', 'pg_toast', 'information_schema','pg_internal')
   AND c.relname <> 'temp_staging_tables_1';
 
 CREATE TEMP TABLE temp_staging_tables_2

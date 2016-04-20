@@ -53,4 +53,5 @@ LEFT OUTER JOIN
        GROUP BY tbl
        ) AS b 
               ON a.id=b.tbl
+WHERE pgc.relowner > 1
 ORDER BY 1,3,2;

@@ -51,7 +51,8 @@ WITH
                 s.userid > 1
                 AND s.perm_table_name NOT IN ('Internal Worktable','S3')
             GROUP BY 
-                tbl, perm_table_name) s ON s.tbl = t.table_id),
+                tbl, perm_table_name) s ON s.tbl = t.table_id
+	WHERE t."schema" NOT IN ('pg_internal')),
     scan_aggs AS (
         SELECT 
             sum(size) AS total_table_size,

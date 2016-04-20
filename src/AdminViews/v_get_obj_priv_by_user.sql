@@ -21,8 +21,10 @@ FROM
 	FROM
 		(
 		SELECT schemaname, 't' AS obj_type, tablename AS objectname, schemaname + '.' + tablename AS fullobj FROM pg_tables
+		WHERE schemaname not in ('pg_internal')
 		UNION
 		SELECT schemaname, 'v' AS obj_type, viewname AS objectname, schemaname + '.' + viewname AS fullobj FROM pg_views
+		WHERE schemaname not in ('pg_internal')
 		) AS objs
 		,(SELECT * FROM pg_user) AS usrs
 	ORDER BY fullobj
