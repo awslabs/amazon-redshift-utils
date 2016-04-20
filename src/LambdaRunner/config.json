@@ -15,6 +15,6 @@
   "targetSchema": "",
   "force": false,
   "outputFile":"/tmp/analyze-schema-compression.sql",
-  "debug":true
+  "debug":false
   }
 }

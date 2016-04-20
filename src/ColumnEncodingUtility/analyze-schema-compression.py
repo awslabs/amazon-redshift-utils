@@ -132,6 +132,7 @@ def comment(string):
         else:
             write('-- [%s] %s' % (str(os.getpid()), string))
 
+
 def print_statements(statements):
     if statements != None:
         for s in statements:
@@ -380,6 +381,7 @@ def analyze(table_info):
     # get the count of columns that have raw encoding applied
     table_unoptimised = False
     count_unoptimised = 0
+    encodings_modified = False    
     output = get_count_raw_columns(table_name)
     
     if output == None:
@@ -453,7 +455,6 @@ def analyze(table_info):
             has_zindex_sortkeys = False
             has_identity = False
             non_identity_columns = []
-            encodings_modified = False
             fks = []
             
             # process each item given back by the analyze request
@@ -615,7 +616,7 @@ def analyze(table_info):
         
         print_statements(statements)
         
-        return (OK, fks)
+        return (OK, fks, encodings_modified)
 
 
 def usage(with_message):
@@ -779,7 +780,7 @@ order by 2;
     for row in query_result:
         analyze_tables.append(row)
     
-    comment("Analyzing %s table(s)" % (len(analyze_tables)))
+    comment("Analyzing %s table(s) which contain allocated data blocks" % (len(analyze_tables)))
 
     if debug:
         [comment(str(x)) for x in analyze_tables]
@@ -820,10 +821,12 @@ order by 2;
         write("vacuum delete only;")
     
     # return any non-zero worker output statuses
+    modified_tables = 0
     for ret in result:
         if isinstance(ret, (list, tuple)):
             return_code = ret[0]
             fk_commands = ret[1]
+            modified_tables = modified_tables + 1 if ret[2] else modified_tables
         else:
             return_code = ret
             fk_commands = None
@@ -840,6 +843,8 @@ order by 2;
         if return_code != OK:
             write("Error in worker thread: return code %d. Exiting." % (return_code,))
             return return_code
+    
+    comment("Performed modification of %s tables" % modified_tables)
     
     if (do_execute):
         if not master_conn.commit():
