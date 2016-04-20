@@ -56,13 +56,10 @@ The required configuration items are placed into the ```configuration``` part of
 
 ## Building
 
-This module runs as an AWS Lambda function, and imports the required utilities from other parts of this GitHub project as required. It also imports its required dependencies and your ```config.json``` and builds a zipfile that is suitable for use by AWS Lambda. To build this module after customising your config file, just run:
-
-```./build.sh```
-
-This will result in zipfile ```lambda-redshift-util-runner.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python', and the timeout to a value long enough to accomodate running against all your tables.
+This module runs as an AWS Lambda function, and imports the required utilities from other parts of this GitHub project as required. It also imports its required dependencies and your ```config.json``` and builds a zipfile that is suitable for use by AWS Lambda. To build this module after customising your config file, just run ```build.sh```. This will result in zipfile ```lambda-redshift-util-runner.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python', and the timeout to a value long enough to accomodate running against all your tables.
 
 Also, because this function connects to a specific Redshift cluster with a specific configuration of username and password, we encourate you to use a Function Name that will be easy to understand which instance you have deployed. For instance, you might name it ```RedshiftUtilitiesMyClusterMyUser```
+
 ## Running the Modules
 
 These utilites are designed to be run via a schedule, and don't use any information from the incoming event. Given this, you can just press the 'Test' button on the AWS Lambda console to run the function and use CloudWatch Logs to determine that you are happy with the configuration, the level of debug output, and the timeout.
