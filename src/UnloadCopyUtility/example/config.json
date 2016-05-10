@@ -18,7 +18,8 @@
     // base 64 encoded AWS Secret Access Key used to access S3. Use the encryptValue.sh utility to generate this string
     "aws_secret_access_key": "my base 64 encoded secret key",
     // path on S3 to use for storing in-flight data. The current date and time is appended to the prefix
-    "path": "s3://my-bucket/prefix/"
+    "path": "s3://my-bucket/prefix/",
+    "deleteOnSuccess": "True"
   },
   // the destination database into which we will copy data
   "copyTarget": {
