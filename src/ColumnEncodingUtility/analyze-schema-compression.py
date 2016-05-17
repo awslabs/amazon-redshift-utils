@@ -767,8 +767,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
 where pgn.nspname = '%s'
-  and substring(a.name,length(a.name)-3,length(a.name)) != '$old'
-  and substring(a.name,length(a.name)-3,length(a.name)) != '$mig'
+  and a.name::text SIMILAR TO '[A-Za-z_][A-Za-z0-9_]*'
 order by 2;
         ''' % (analyze_schema,)
     
