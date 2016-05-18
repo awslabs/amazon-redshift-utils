@@ -479,7 +479,7 @@ def analyze(table_info):
                 
                 # is this the dist key?
                 distkey = descr[col][3]
-                if str(distkey).upper() == 'T':
+                if str(distkey).upper() == 'TRUE':
                     distkey = 'DISTKEY'
                 else:
                     distkey = ''
