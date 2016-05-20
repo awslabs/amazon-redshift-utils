@@ -2,7 +2,7 @@
 """
 Usage:
 
-python redshift-unload-coyp.py <config file> <region>
+python redshift-unload-copy.py <config file> <region>
 
 
 * Copyright 2014, Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -49,7 +49,7 @@ unload_stmt = """unload ('SELECT * FROM %s.%s')
                  manifest
                  encrypted
                  gzip
-                 delimiter '^' addquotes escape allowoverwrite;"""
+                 delimiter '^' addquotes escape allowoverwrite"""
 
 copy_stmt = """copy %s.%s
                from '%smanifest' credentials 
@@ -57,7 +57,7 @@ copy_stmt = """copy %s.%s
                manifest 
                encrypted
                gzip
-               delimiter '^' removequotes escape;"""
+               delimiter '^' removequotes escape"""
 
 
 def conn_to_rs(host, port, db, usr, pwd, opt=options, timeout=set_timeout_stmt):
@@ -75,8 +75,12 @@ def unload_data(conn, aws_access_key_id, aws_secret_key, master_symmetric_key, d
                               aws_secret_key, master_symmetric_key))
 
 
-def copy_data(conn, aws_access_key_id, aws_secret_key, master_symmetric_key, dataStagingPath, schema_name, table_name):
-    print "Importing %s.%s from %s" % (schema_name, table_name, dataStagingPath)
+def copy_data(conn, aws_access_key_id, aws_secret_key, master_symmetric_key, dataStagingPath, dataStagingRegion, schema_name, table_name):
+    global copy_stmt
+    if dataStagingRegion != None:
+        copy_stmt = copy_stmt + ("\nREGION '%s'" % (dataStagingRegion))
+        
+    print "Importing %s.%s from %s" % (schema_name, table_name, dataStagingPath + (":%s" % (dataStagingRegion) if dataStagingRegion != None else ""))
     conn.query(copy_stmt % (schema_name, table_name, dataStagingPath, aws_access_key_id, aws_secret_key,
                             master_symmetric_key))
 
@@ -154,6 +158,10 @@ def main(args):
         print "s3Staging.path must be a path to S3"
         sys.exit(-1)
         
+    dataStagingRegion = None
+    if 'region' in config["s3Staging"]:
+        dataStagingRegion = config["s3Staging"]['region']
+        
     accessKey = config['s3Staging']['aws_access_key_id']
     secretKey = config['s3Staging']['aws_secret_access_key']
     deleteOnSuccess = config['s3Staging']['deleteOnSuccess']
@@ -205,7 +213,7 @@ def main(args):
     dest_conn = conn_to_rs(dest_host, dest_port, dest_db, dest_user,
                           dest_pwd) 
     copy_data(dest_conn, s3_access_key, s3_secret_key,
-              master_symmetric_key, dataStagingPath,
+              master_symmetric_key, dataStagingPath, dataStagingRegion,
               dest_schema, dest_table)
 
     src_conn.close()
