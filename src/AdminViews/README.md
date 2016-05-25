@@ -14,6 +14,7 @@ All views assume you have a schema called admin.
 | v_generate_group_ddl.sql |   View to get the DDL for a group. | 
 | v_generate_schema_ddl.sql |   View to get the DDL for schemas. | 
 | v_generate_tbl_ddl.sql | View to get the DDL for a table.  This will contain the distkey, sortkey, constraints |
+| v_generate_terminate_session.sql | View to get pg_terminate_backend() statements |
 | v_generate_udf_ddl.sql | View to get the DDL for a UDF.
 | v_generate_unload_copy_cmd.sql |   View to get that will generate unload and copy commands for an object.  After running | 
 | v_generate_user_object_permissions.sql |   View to get the DDL for a users permissions to tables and views. | 
