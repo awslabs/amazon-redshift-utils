@@ -10,11 +10,11 @@ SELECT
 	schemaname
 	,objectname
 	,usename
-	,REVERSE(SUBSTRING(REVERSE(CASE WHEN sel IS TRUE THEN 'GRANT SELECT ON ' + schemaname + '.' + objectname + ' TO ' + usename + ';\n' ELSE '' END +
-		CASE WHEN ins IS TRUE THEN 'GRANT INSERT ON ' + schemaname + '.' + objectname + ' TO ' + usename + ';\n' ELSE '' END +
-		CASE WHEN upd IS TRUE THEN 'GRANT UPDATE ON ' + schemaname + '.' + objectname + ' TO ' + usename + ';\n' ELSE '' END +
-		CASE WHEN del IS TRUE THEN 'GRANT DELETE ON ' + schemaname + '.' + objectname + ' TO ' + usename + ';\n' ELSE '' END +
-		CASE WHEN ref IS TRUE THEN 'GRANT REFERENCES ON ' + schemaname + '.' + objectname + ' TO ' + usename + ';\n' ELSE '' END), 2)) AS ddl
+	,REVERSE(SUBSTRING(REVERSE(CASE WHEN sel IS TRUE THEN 'GRANT SELECT ON ' + QUOTE_IDENT(schemaname) + '.' + QUOTE_IDENT(objectname) + ' TO ' + usename + ';\n' ELSE '' END +
+		CASE WHEN ins IS TRUE THEN 'GRANT INSERT ON ' + QUOTE_IDENT(schemaname) + '.' + QUOTE_IDENT(objectname) + ' TO ' + usename + ';\n' ELSE '' END +
+		CASE WHEN upd IS TRUE THEN 'GRANT UPDATE ON ' + QUOTE_IDENT(schemaname) + '.' + QUOTE_IDENT(objectname) + ' TO ' + usename + ';\n' ELSE '' END +
+		CASE WHEN del IS TRUE THEN 'GRANT DELETE ON ' + QUOTE_IDENT(schemaname) + '.' + QUOTE_IDENT(objectname) + ' TO ' + usename + ';\n' ELSE '' END +
+		CASE WHEN ref IS TRUE THEN 'GRANT REFERENCES ON ' + QUOTE_IDENT(schemaname) + '.' + QUOTE_IDENT(objectname) + ' TO ' + usename + ';\n' ELSE '' END), 2)) AS ddl
 FROM
 	admin.v_get_obj_priv_by_user
 ;
