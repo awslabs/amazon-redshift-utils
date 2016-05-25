@@ -6,6 +6,7 @@ History:
 2014-02-10 jjschmit Created
 2015-05-18 ericfe Added support for Interleaved sortkey
 2015-10-31 ericfe Added cast tp increase size of returning constraint name
+2016-05-24 chriz-bigdata Added support for BACKUP NO tables
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
@@ -27,7 +28,7 @@ FROM
   SELECT
    n.nspname AS schemaname
    ,c.relname AS tablename
-   ,1 AS seq
+   ,0 AS seq
    ,'--DROP TABLE "' + n.nspname + '"."' + c.relname + '";' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
@@ -96,11 +97,45 @@ FROM
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
+  --BACKUP 
+  UNION SELECT
+  n.nspname AS schemaname
+   ,c.relname AS tablename
+   ,300000000 AS seq  
+   ,'BACKUP NO' as ddl
+FROM pg_namespace AS n
+  INNER JOIN pg_class AS c ON n.oid = c.relnamespace
+  INNER JOIN (SELECT 
+    SPLIT_PART(key,'_',5) id 
+    FROM pg_conf 
+    WHERE key LIKE 'pg_class_backup_%' 
+    AND SPLIT_PART(key,'_',4) = (SELECT 
+      oid 
+      FROM pg_database 
+      WHERE datname = current_database())) t ON t.id=c.oid
+  WHERE c.relkind = 'r'
+  --BACKUP WARNING
+  UNION SELECT
+  n.nspname AS schemaname
+   ,c.relname AS tablename
+   ,1 AS seq  
+   ,'--WARNING: This DDL inherited the \'BACKUP NO\' property from the source table' as ddl
+FROM pg_namespace AS n
+  INNER JOIN pg_class AS c ON n.oid = c.relnamespace
+  INNER JOIN (SELECT 
+    SPLIT_PART(key,'_',5) id 
+    FROM pg_conf 
+    WHERE key LIKE 'pg_class_backup_%' 
+    AND SPLIT_PART(key,'_',4) = (SELECT 
+      oid 
+      FROM pg_database 
+      WHERE datname = current_database())) t ON t.id=c.oid
+  WHERE c.relkind = 'r'
   --DISTSTYLE
   UNION SELECT
    n.nspname AS schemaname
    ,c.relname AS tablename
-   ,300000000 AS seq
+   ,300000001 AS seq
    ,CASE WHEN c.reldiststyle = 0 THEN 'DISTSTYLE EVEN'
     WHEN c.reldiststyle = 1 THEN 'DISTSTYLE KEY'
     WHEN c.reldiststyle = 8 THEN 'DISTSTYLE ALL'
