@@ -1,6 +1,6 @@
 --DROP VIEW admin.v_generate_terminate_session;
 /**********************************************************************************************
-Purpose: View to get pg_terminate_backend statements 
+Purpose: View to generate pg_terminate_backend statements 
 History:
 2016-05-25 chriz-bigdata Created
 **********************************************************************************************/ 
