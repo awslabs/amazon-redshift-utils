@@ -15,12 +15,12 @@ SELECT
 	schemaname,
 	udfname,
 	seq,
-	ddl FROM (
+	trim(ddl) ddl FROM (
 SELECT 
    n.nspname AS schemaname,
    p.proname AS udfname,
    p.oid AS udfoid,
-1000 as seq, 'CREATE FUNCTION ' || p.proname || ' \(' as ddl
+1000 as seq, ('CREATE FUNCTION ' || p.proname || ' \(')::varchar(max) as ddl
 FROM pg_proc p
 LEFT JOIN pg_namespace n on n.oid = p.pronamespace
 WHERE p.proowner != 1
