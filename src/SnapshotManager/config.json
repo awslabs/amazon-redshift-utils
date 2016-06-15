@@ -1,0 +1,6 @@
+{
+	"clusterIdentifier": "energy-demo",
+	"region": "eu-west-1",
+	"snapshotIntervalHours": 2,
+	"snapshotRetentionDays": 60
+}
