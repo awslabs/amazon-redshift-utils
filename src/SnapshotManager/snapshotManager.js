@@ -23,8 +23,22 @@ var s3 = new AWS.S3();
 var async = require('async');
 var moment = require('moment');
 
-var getSnapshotId = function() {
-	return constants.snapPrefix + "-" + moment().format("YYYY-MM-DDTHHmmss");
+function getFriendlyDate(t) {
+	return (t ? t : moment()).format(constants.dateFormat);
+};
+
+function getSnapshotId(clusterName) {
+	return constants.snapPrefix + "-" + clusterName + "-" + getFriendlyDate(moment());
+}
+
+function getTags() {
+	return [ {
+		Key : constants.createdByName,
+		Value : constants.createdByValue
+	}, {
+		Key : constants.createdAtName,
+		Value : getFriendlyDate()
+	} ];
 };
 
 // function to query for snapshots within the specified period
@@ -53,17 +67,14 @@ exports.getSnapshots = getSnapshots;
 
 // function to create a manual snapshot
 function createSnapshot(config, callback) {
-	var newSnapshotId = getSnapshotId();
+	var newSnapshotId = getSnapshotId(config.clusterIdentifier);
 
 	console.log("Creating new Snapshot " + newSnapshotId + " for " + config.clusterIdentifier);
 
 	var params = {
 		ClusterIdentifier : config.clusterIdentifier,
 		SnapshotIdentifier : newSnapshotId,
-		Tags : [ {
-			Key : constants.createdByName,
-			Value : constants.createdByValue
-		} ]
+		Tags : getTags()
 	};
 
 	redshift.createClusterSnapshot(params, function(err, data) {
@@ -83,7 +94,7 @@ function convertAutosnapToManual(config, snapshot, callback) {
 
 	redshift.copyClusterSnapshot({
 		SourceSnapshotIdentifier : snapshot.SnapshotIdentifier,
-		TargetSnapshotIdentifier : getSnapshotId(),
+		TargetSnapshotIdentifier : getSnapshotId(config.clusterIdentifier),
 	}, function(err, data) {
 		if (err) {
 			callback(err);
@@ -91,10 +102,7 @@ function convertAutosnapToManual(config, snapshot, callback) {
 			// tag the converted snapshot
 			var params = {
 				ResourceName : data.SnapshotIdentifier,
-				Tags : [ {
-					Key : constants.createdByName,
-					Value : constants.createdByValue,
-				} ]
+				Tags : getTags()
 			};
 			redshift.createTags(params, function(err, data) {
 				if (err) {
@@ -198,15 +206,20 @@ exports.createOrConvertSnapshots = createOrConvertSnapshots;
 
 // processor entry point
 function run(config, callback) {
-	async.waterfall([
-	// check for whether we have a snapshot taken within the required period
-	getSnapshots.bind(undefined, config),
-	// process the list of automatic snapshots, and determine if we need to
-	// create additional snaps
-	createOrConvertSnapshots.bind(undefined),
-	// now cleanup the existing snapshots
-	cleanupSnapshots.bind(undefined) ], function(err) {
-		callback(err);
-	});
+	if (!config.clusterIdentifier) {
+		console.log(JSON.stringify(config));
+		callback("Unable to resolve Cluster Identifier from provided configuration");
+	} else {
+		async.waterfall([
+		// check for whether we have a snapshot taken within the required period
+		getSnapshots.bind(undefined, config),
+		// process the list of automatic snapshots, and determine if we need to
+		// create additional snaps
+		createOrConvertSnapshots.bind(undefined),
+		// now cleanup the existing snapshots
+		cleanupSnapshots.bind(undefined) ], function(err) {
+			callback(err);
+		});
+	}
 }
 exports.run = run;

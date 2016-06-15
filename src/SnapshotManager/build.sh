@@ -35,7 +35,7 @@ fi
 
 schedule_minutes=15
 
-#zip -r $zipfile *.js package.json node_modules/ && mv $zipfile dist
+zip -r $zipfile *.js package.json node_modules/ && mv $zipfile dist
 
 existing_code_location=`aws lambda get-function --function-name $function_name --query Code.Location`
 
@@ -63,9 +63,13 @@ if [ "$following_action" == "schedule" ]; then
 	fi
 	
 	# add the CloudWatch Event
-	create_rule_cmd="aws events put-rule --name $function_name-$schedule_minutes-mins --state ENABLED --role-arn $role --schedule-expression \"rate($schedule_minutes minutes)\" --event-pattern $processed_config --query \"RuleArn\" | sed -e \"s/\\\"//g\""
+	rule_name=$function_name-$schedule_minutes-mins
+	create_rule_cmd="aws events put-rule --name $rule_name --state ENABLED --schedule-expression \"rate($schedule_minutes minutes)\" --query \"RuleArn\" | sed -e \"s/\\\"//g\""
 	echo $create_rule_cmd
 	event_rule_arn=`$create_rule_cmd`
+	
+	# now add the Lambda target
+	create_target_cmd="aws events put-targets --rule $rule_name --targets Arn=$event_rule_arn,Input=$processed_config"
 	
 	# Allow CloudWatch Events to invoke our Lambda Function
 	aws lambda add-permission --function-name $function_name --statement-id $function_nameCWEventsPermission-`date +"%Y-%m-%dt%H%M%S"` --action 'lambda:InvokeFunction' --principal events.amazonaws.com --source-arn $event_rule_arn
