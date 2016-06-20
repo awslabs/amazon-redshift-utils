@@ -13,12 +13,12 @@ var lambda = require('./index');
 event = {
 	"clusterIdentifier" : "energy-demo",
 	"region" : "eu-west-1",
-	"namespace" : "test",
-	"snapshotIntervalHours" : 2,
-	"snapshotRetentionDays" : 7
+	"namespace" : "nightly",
+	"snapshotIntervalHours" : 1,
+	"snapshotRetentionDays" : 30
 };
 
-function context() {};
+function context() {}
 context.done = function(status, message) {
 	console.log("Context Closure Status: " + JSON.stringify(status) + "\n" + JSON.stringify(message));
 

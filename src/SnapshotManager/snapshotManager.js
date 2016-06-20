@@ -24,20 +24,20 @@ var async = require('async');
 var moment = require('moment');
 
 function getFriendlyDate(t) {
-	return (t ? t : moment()).format(constants.dateFormat);
+	return t.format(constants.dateFormat);
 }
 
 function getSnapshotId(config) {
 	return config.namespace + "-" + config.clusterIdentifier + "-" + getFriendlyDate(moment());
 }
 
-function getTags(config) {
+function getTags(config, forDate) {
 	return [ {
 		Key : constants.createdByName,
 		Value : constants.createdByValue
 	}, {
 		Key : constants.createdAtName,
-		Value : getFriendlyDate()
+		Value : getFriendlyDate(forDate)
 	}, {
 		Key : constants.namespaceTagName,
 		Value : config.namespace
@@ -55,8 +55,8 @@ function getSnapshots(config, callback) {
 		StartTime : snapStartTime.toDate(),
 		// only search for snapshots in the current namespace and created by this
 		// tool
-		TagKeys : [ constants.namespaceTagName, constants.createdByName ],
-		TagValues : [ config.namespace, constants.createdByValue ]
+		TagKeys : [ constants.namespaceTagName ],
+		TagValues : [ config.namespace ]
 	}, function(err, data) {
 		// got a set of snapshots, or not, so call the callback with the snap list
 		// and the configuration
@@ -74,6 +74,8 @@ exports.getSnapshots = getSnapshots;
 
 // function to create a manual snapshot
 function createSnapshot(config, callback) {
+	var now = moment();
+
 	var newSnapshotId = getSnapshotId(config);
 
 	console.log("Creating new Snapshot " + newSnapshotId + " for " + config.clusterIdentifier);
@@ -81,7 +83,7 @@ function createSnapshot(config, callback) {
 	var params = {
 		ClusterIdentifier : config.clusterIdentifier,
 		SnapshotIdentifier : newSnapshotId,
-		Tags : getTags(config)
+		Tags : getTags(config, now)
 	};
 
 	redshift.createClusterSnapshot(params, function(err, data) {
@@ -222,6 +224,9 @@ function validateConfig(config, callback) {
 		error = "Minimum Snapshot Retention is 1 day";
 	}
 
+	if (!config.namespace || config.namespace === "") {
+		error = "You must provide a configuration namespace";
+	}
 	callback(error);
 }
 exports.validateConfig = validateConfig;

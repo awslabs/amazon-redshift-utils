@@ -35,7 +35,7 @@ fi
 
 schedule_minutes=15
 
-#zip -r $zipfile *.js package.json node_modules/ && mv $zipfile dist
+zip -r $zipfile *.js package.json node_modules/ && mv $zipfile dist
 
 existing_code_location=`aws lambda get-function --function-name $function_name --query Configuration.FunctionArn`
 

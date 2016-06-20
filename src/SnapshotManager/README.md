@@ -23,13 +23,17 @@ Amazon Redshift's automatic recovery snapshots are created every 8 hours, or eve
 
 ## Getting Started
 
+### Install Pre-requisites
+
+The included build mechanism requires that you be able to use a terminal/command line, and have the [aws-cli](https://aws.amazon.com/cli), python and [boto3](https://github.com/boto/boto3) installed. Alternatively you can deploy the zip file in the 'dist' folder and configure through the AWS Console.
+
 ### Deploy the Lambda Function
 
-You can now generate an AWS Lambda compatible archive by running:
+If you want to make changes, you can generate an AWS Lambda compatible archive by running:
 
 ```build.sh```
 
-This will build RedshiftSnapshotManager-\<version\>.zip, which you can deploy once with a configuration that manages multiople clusters, or you can have a single Lambda function per config location on S3.
+This will build `RedshiftSnapshotManager-<version>.zip`, which you can deploy once with a configuration that manages multiple clusters, or you can have a single Lambda function per config location on S3.
 
 You can now deploy this AWS Lambda function by hand using the AWS Console or Command Line tools, or alternatively to the above command, you can run
 
@@ -60,6 +64,7 @@ The supplied configuration includes:
 {
 	"clusterIdentifier": "my-redshift-cluster",
 	"region": "us-east-1",
+	"namespace": "my-every-2-hour-schedule",
 	"snapshotIntervalHours": 2,
 	"snapshotRetentionDays": 7
 }
@@ -71,7 +76,14 @@ Running the schedule command will create a CloudWatch Events Schedule that runs 
 
 ### Confirm Execution
 
-Once running, you will see that existing automatic snapshots, or new manual snapshots are created within the ```snapshotIntervalHours```. These snapshots are called ```rs-snapman-<cluster-name>-<yyyy>-<mm>-<dd>t<hh><mi><ss>```, and are tagged with ```createdBy=AWS Redshift Utils Snapshot Manager```, values which can be modified by updatin ```constants.json``` and redploying. __Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the CloudWatch Log Streams for execution to see debug output about what the function is doing.
+Once running, you will see that existing automatic snapshots, or new manual snapshots are created within the ```snapshotIntervalHours```. These snapshots are called ```rs-snapman-<cluster-name>-<yyyy>-<mm>-<dd>t<hh><mi><ss>```, and are tagged with:
+
+* ```createdBy=AWS Redshift Utils Snapshot Manager```
+* ```creationTimestamp=YYYY-MM-DD-HHmmss```
+* ```scheduleNamespace=<config.namespace>```
+
+
+These tag names can be modified by updating ```constants.json``` and redeploying. __Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the CloudWatch Log Streams for execution to see debug output about what the function is doing.
 
 ----
 
