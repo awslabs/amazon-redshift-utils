@@ -25,21 +25,24 @@ var moment = require('moment');
 
 function getFriendlyDate(t) {
 	return (t ? t : moment()).format(constants.dateFormat);
-};
-
-function getSnapshotId(clusterName) {
-	return constants.snapPrefix + "-" + clusterName + "-" + getFriendlyDate(moment());
 }
 
-function getTags() {
+function getSnapshotId(config) {
+	return config.namespace + "-" + config.clusterIdentifier + "-" + getFriendlyDate(moment());
+}
+
+function getTags(config) {
 	return [ {
 		Key : constants.createdByName,
 		Value : constants.createdByValue
 	}, {
 		Key : constants.createdAtName,
 		Value : getFriendlyDate()
+	}, {
+		Key : constants.namespaceTagName,
+		Value : config.namespace
 	} ];
-};
+}
 
 // function to query for snapshots within the specified period
 function getSnapshots(config, callback) {
@@ -49,7 +52,11 @@ function getSnapshots(config, callback) {
 
 	redshift.describeClusterSnapshots({
 		ClusterIdentifier : config.clusterIdentifier,
-		StartTime : snapStartTime.toDate()
+		StartTime : snapStartTime.toDate(),
+		// only search for snapshots in the current namespace and created by this
+		// tool
+		TagKeys : [ constants.namespaceTagName, constants.createdByName ],
+		TagValues : [ config.namespace, constants.createdByValue ]
 	}, function(err, data) {
 		// got a set of snapshots, or not, so call the callback with the snap list
 		// and the configuration
@@ -67,14 +74,14 @@ exports.getSnapshots = getSnapshots;
 
 // function to create a manual snapshot
 function createSnapshot(config, callback) {
-	var newSnapshotId = getSnapshotId(config.clusterIdentifier);
+	var newSnapshotId = getSnapshotId(config);
 
 	console.log("Creating new Snapshot " + newSnapshotId + " for " + config.clusterIdentifier);
 
 	var params = {
 		ClusterIdentifier : config.clusterIdentifier,
 		SnapshotIdentifier : newSnapshotId,
-		Tags : getTags()
+		Tags : getTags(config)
 	};
 
 	redshift.createClusterSnapshot(params, function(err, data) {
@@ -94,7 +101,7 @@ function convertAutosnapToManual(config, snapshot, callback) {
 
 	redshift.copyClusterSnapshot({
 		SourceSnapshotIdentifier : snapshot.SnapshotIdentifier,
-		TargetSnapshotIdentifier : getSnapshotId(config.clusterIdentifier),
+		TargetSnapshotIdentifier : getSnapshotId(config),
 	}, function(err, data) {
 		if (err) {
 			callback(err);
@@ -102,7 +109,7 @@ function convertAutosnapToManual(config, snapshot, callback) {
 			// tag the converted snapshot
 			var params = {
 				ResourceName : data.SnapshotIdentifier,
-				Tags : getTags()
+				Tags : getTags(config)
 			};
 			redshift.createTags(params, function(err, data) {
 				if (err) {
@@ -178,7 +185,7 @@ exports.cleanupSnapshots = cleanupSnapshots;
 
 /*
  * function which determines if we need to create or convert snapshots based on
- * the snapshots that exist
+ * the snapshots that currently exist
  */
 function createOrConvertSnapshots(config, snapshotList, callback) {
 	if (snapshotList.length === 0) {
@@ -204,21 +211,54 @@ function createOrConvertSnapshots(config, snapshotList, callback) {
 }
 exports.createOrConvertSnapshots = createOrConvertSnapshots;
 
+function validateConfig(config, callback) {
+	var error;
+
+	if (config.snapshotIntervalHours < 1) {
+		error = "Minimum Snapshot Interval is 1 hour";
+	}
+
+	if (config.snapshotRetentionDays < 1) {
+		error = "Minimum Snapshot Retention is 1 day";
+	}
+
+	callback(error);
+}
+exports.validateConfig = validateConfig;
+
 // processor entry point
 function run(config, callback) {
+	var checksPassed = true;
+	var error;
 	if (!config.clusterIdentifier) {
+		checksPassed = false;
+		error = "Unable to resolve Cluster Identifier from provided configuration";
+	}
+
+	if (!config.namespace) {
+		checksPassed = false;
+		error = "Configuration namespace must be provided";
+	}
+
+	if (!checksPassed) {
 		console.log(JSON.stringify(config));
-		callback("Unable to resolve Cluster Identifier from provided configuration");
+		callback(error);
 	} else {
-		async.waterfall([
-		// check for whether we have a snapshot taken within the required period
-		getSnapshots.bind(undefined, config),
-		// process the list of automatic snapshots, and determine if we need to
-		// create additional snaps
-		createOrConvertSnapshots.bind(undefined),
-		// now cleanup the existing snapshots
-		cleanupSnapshots.bind(undefined) ], function(err) {
-			callback(err);
+		validateConfig(config, function(err) {
+			if (err) {
+				callback(err);
+			} else {
+				async.waterfall([
+				// check for whether we have a snapshot taken within the required period
+				getSnapshots.bind(undefined, config),
+				// process the list of automatic snapshots, and determine if we need to
+				// create additional snaps
+				createOrConvertSnapshots.bind(undefined),
+				// now cleanup the existing snapshots
+				cleanupSnapshots.bind(undefined) ], function(err) {
+					callback(err);
+				});
+			}
 		});
 	}
 }

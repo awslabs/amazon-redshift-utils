@@ -13,6 +13,7 @@ var lambda = require('./index');
 event = {
 	"clusterIdentifier" : "energy-demo",
 	"region" : "eu-west-1",
+	"namespace" : "test",
 	"snapshotIntervalHours" : 2,
 	"snapshotRetentionDays" : 7
 };

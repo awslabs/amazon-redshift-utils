@@ -13,11 +13,11 @@ There are two dimensions to disaster recovery which must be carefully considered
 
 A comprehensive overview of how to build systems which implement best practices for disaster recovery can be found [here](https://aws.amazon.com/blogs/aws/new-whitepaper-use-aws-for-disaster-recovery/).
 
-## Recovery Time Objective in Redshift
+### Recovery Time Objective in Redshift
 
 When using Amazon Redshift, your RTO is dictated by the size of the cluster, and the node type you are using. It is vital that you restore from the snapshots created on the cluster to correctly determine the time it will take to bring up a new cluster from a snapshot, and ensure you re-test any time you resize the clsuter or your data volume changes significantly.
 
-## Recovery Point Objective in Redshift
+### Recovery Point Objective in Redshift
 
 Amazon Redshift's automatic recovery snapshots are created every 8 hours, or every 5GB of changed data on disk, whichever comes first. For some customers, an 8 hour RPO is too long, and they require the ability to take snapshots more frequently. That's where this module comes in - by supplying a simple configuration, you can ensure that snapshots are taken on a specified basis that meets your needs for data recovery.
 
@@ -46,37 +46,32 @@ This command will automatically build the Lambda function as before, and then de
 This Lambda function can be run by any scheduler, but [AWS CloudWatch Scheduled Events](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html) are a great way to ensure your function runs periodically. You can configure CloudWatch Events to be used as the event source for your function, and this includes the configuration for which cluster to work on!
 
 
-```build.sh deploy <role-arn> schedule```
+```build.sh deploy <role-arn> schedule <config.json>```
 
-* ```snapshotIntervalHours``` The Recovery Point Objective that is used to ensure you take snapshots on the specified interval
-* ```snapshotRetentionDays``` How long snapshots should be retained before being deleted. Manual snapshots (which can be restored into new clusters) will be kept forever by default.
+The supplied configuration includes:
+
+* `clusterIdentifier` The name of your cluster, excluding `<region>`.amazonaws.com
+* `region` The region where your Redshift Cluster resides
+* `namespace` A unique namespace for this cluster that will be used to identify the snapshots created
+* `snapshotIntervalHours` The Recovery Point Objective that is used to ensure you take snapshots on the specified interval
+* `snapshotRetentionDays` How long snapshots should be retained before being deleted. Manual snapshots (which can be restored into new clusters) will be kept forever by default.
 
 ```
-[
-	{
-		// the name of your redshift cluster, minus the '<region>.redshift.amazonaws.com' suffix
-		"clusterIdentifier": "my-redshift-cluster",
-		// the region in which your cluster has been created
-		"region": "us-east-1",
-		// the frequency in hours that the snapshot manager should create snapshots
-		"snapshotIntervalHours": 2,
-		// the number of days after which the snapshots created by this process should be deleted
-		"snapshotRetentionDays": 60
-	}
-	// you can create additional cluster configurations here
-]
+{
+	"clusterIdentifier": "my-redshift-cluster",
+	"region": "us-east-1",
+	"snapshotIntervalHours": 2,
+	"snapshotRetentionDays": 7
+}
 ```
 
-This will create a CloudWatch Events Schedule that runs your function every __15 Minutes__. This means that your snapshots will be taken around 15 minutes from the specified snapshots interval. If you require more frequent execution due to differing snapshot intervals, or to limit the duration between your snapshot interval and snapshot creation, then you can run:
+Please note that the default limit for Redshift manual snapshots is 20. This module will create `24/snapshotIntervalHours * snapshotRetentionDays` snapshots, and so if this number is greater than 20 please open a support case to have the limit increased. For example, an RPO of 2 hours with 7 days retention (as shown above) will create `24/2 * 7 = 84` snapshots.
 
-```build.sh deploy <role-arn> schedule <N>```
-
-Where N is the number of minutes between each schedule invocation (minimum 5 minutes).
-
+Running the schedule command will create a CloudWatch Events Schedule that runs your function every __15 Minutes__. This means that your snapshots will be taken around 15 minutes from the specified snapshots interval.
 
 ### Confirm Execution
 
-Once running, you will see that existing automatic snapshots, or new manual snapshots are created within the ```snapshotIntervalHours```. These snapshots are called ```redshift-utils-snapman-<yyyy>-<mm>-<dd>t<hh><mi><ss>```, and are tagged with ```createdBy=AWS Redshift Utils Snapshot Manager```, values which can be modified by updatin ```constants.json``` and redploying. __Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the CloudWatch Log Streams for execution to see debug output about what the function is doing.
+Once running, you will see that existing automatic snapshots, or new manual snapshots are created within the ```snapshotIntervalHours```. These snapshots are called ```rs-snapman-<cluster-name>-<yyyy>-<mm>-<dd>t<hh><mi><ss>```, and are tagged with ```createdBy=AWS Redshift Utils Snapshot Manager```, values which can be modified by updatin ```constants.json``` and redploying. __Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the CloudWatch Log Streams for execution to see debug output about what the function is doing.
 
 ----
 
