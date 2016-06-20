@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+set +x
 
 ver=`cat package.json | grep version | cut -d: -f2 | sed -e "s/\"//g" | sed -e "s/ //g" | sed -e "s/\,//g"`
 
@@ -35,9 +35,9 @@ fi
 
 schedule_minutes=15
 
-zip -r $zipfile *.js package.json node_modules/ && mv $zipfile dist
+#zip -r $zipfile *.js package.json node_modules/ && mv $zipfile dist
 
-existing_code_location=`aws lambda get-function --function-name $function_name --query Code.Location`
+existing_code_location=`aws lambda get-function --function-name $function_name --query Configuration.FunctionArn`
 
 exists=0
 if [ $existing_code_location != "" ]; then
@@ -53,24 +53,8 @@ if [ "$action" == "deploy" ]; then
 fi
 
 if [ "$following_action" == "schedule" ]; then
-	config=`cat $config_file | tr -d '\n' | sed -e "s/[[:blank:]]//g"`
-	
-	# run the configuration through json escape
-	processed_config=`json_escape $config `
-	
-	if [ "$config" == "" ]; then
-		usage
-	fi
-	
-	# add the CloudWatch Event
-	rule_name=$function_name-$schedule_minutes-mins
-	create_rule_cmd="aws events put-rule --name $rule_name --state ENABLED --schedule-expression \"rate($schedule_minutes minutes)\" --query \"RuleArn\""
-	echo $create_rule_cmd
-	event_rule_arn=`$create_rule_cmd | sed -e "s/\"//g"`
-	
-	# now add the Lambda target
-	aws events put-targets --rule $rule_name --targets '[{"Id":"123","Arn":"$event_rule_arn","Input":$processed_config}]'
+	python schedule.py $config_file $existing_code_location
 	
 	# Allow CloudWatch Events to invoke our Lambda Function
-	aws lambda add-permission --function-name $function_name --statement-id $function_nameCWEventsPermission-`date +"%Y-%m-%dt%H%M%S"` --action 'lambda:InvokeFunction' --principal events.amazonaws.com --source-arn $event_rule_arn
+	#aws lambda add-permission --function-name $function_name --statement-id $function_nameCWEventsPermission-`date +"%Y-%m-%dt%H%M%S"` --action 'lambda:InvokeFunction' --principal events.amazonaws.com --source-arn $event_rule_arn
 fi
