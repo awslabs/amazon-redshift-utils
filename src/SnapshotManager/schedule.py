@@ -29,7 +29,7 @@ def schedule(args):
     
     # add the CW target
     target = {}
-    target["Id"] = "%s-target" % (rulename)
+    target["Id"] = "%s" % (json_config['namespace'])
     target["Arn"] = function_arn
     target["Input"] = json.dumps(json_config)
     target = cw.put_targets(Rule=rulename, Targets=[target])

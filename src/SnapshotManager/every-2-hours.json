@@ -3,5 +3,7 @@
 	"region": "eu-west-1",
 	"namespace" : "every-2-hours",
 	"snapshotIntervalHours": 2,
-	"snapshotRetentionDays": 7
+	"snapshotRetentionDays": 1
 }
+
+        

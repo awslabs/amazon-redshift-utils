@@ -12,6 +12,11 @@ function json_escape {
   echo -n "$1" | python -c 'import json,sys; print json.dumps(sys.stdin.read())'
 }
 
+if [ "$AWS_REGION" == "" ]; then
+  echo "You must set environment variable AWS_REGION to continue"
+  exit -1
+fi
+
 # grab args
 action=$1
 role=$2
@@ -30,21 +35,25 @@ if [ "$action" == "" ]; then
 	action="None"
 elif [ "$action" == "schedule" ]; then
 	# arguments out of order
-	action="None"
+	action="schedule"
+	config_file=$2
 fi
 
 schedule_minutes=15
 
-zip -r $zipfile *.js package.json node_modules/ && mv $zipfile dist
-
-existing_code_location=`aws lambda get-function --function-name $function_name --query Configuration.FunctionArn`
-
-exists=0
-if [ $existing_code_location != "" ]; then
-	exists=1
+if [ "$action" == "assemble" ]; then 
+	zip -r $zipfile *.js package.json node_modules/ && mv $zipfile dist
 fi
 
 if [ "$action" == "deploy" ]; then
+	echo "Checking for an existing version of this function in AWS Lambda..."
+	existing_code_location=`aws lambda get-function --function-name $function_name --query Configuration.FunctionArn`
+	
+	exists=0
+	if [ "$existing_code_location" != "" ]; then
+		exists=1
+	fi
+
 	if [ $exists == 1 ]; then
 		aws lambda update-function-code --function-name $function_name --zip-file $zipfile_ref
 	else
@@ -52,7 +61,7 @@ if [ "$action" == "deploy" ]; then
 	fi
 fi
 
-if [ "$following_action" == "schedule" ]; then
+if [ "$action" == "schedule" -o "$following_action" == "schedule" ]; then
 	python schedule.py $config_file $existing_code_location
 	
 	# Allow CloudWatch Events to invoke our Lambda Function

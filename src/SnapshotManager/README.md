@@ -1,62 +1,82 @@
 # Amazon Redshift Snapshot Manager
 
-Amazon Redshift is a fast, fully managed, petabyte-scale data warehouse that makes it simple and cost-effective to analyze all your data using your existing business intelligence tools. A Redshift Cluster is made up of a single leader node, and multiple compute nodes which communicate via a high performance 10Gb network. This cluster is automatically backed up to Amazon S3, and snapshots of the cluster are retained for the amount of time you specify. You can restore into new clusters at any time from existing snapshots, without having to use any third-party backup/recovery software.
+Amazon Redshift is a fast, fully managed, petabyte-scale data warehouse that makes it simple and cost-effective to analyze all your data using your existing business intelligence tools. A Redshift cluster is automatically backed up to Amazon S3 by default, and 3 automatic snapshots of the cluster are retained for 24 hours. You can also convert these automatic snapshots to 'manual', which means they are kept forever. You can restore manual snapshots into new clusters at any time, or you can use them to do table restores, without having to use any third-party backup/recovery software.
 
-This module gives you the ability to coordinate the Automatic Snapshot mechanism in your Amazon Redshift Clusters so that you can meet your disaster recovery requirements. You don't have to write any code or manage any servers; all execution is done within [AWS Lambda](https://aws.amazon.com/lambda), and scheduled with Amazon CloudWatch Events.
+This module gives you the ability to coordinate the Automatic Snapshot mechanism in your Amazon Redshift Clusters so that you can meet fine grained backup requirements. You don't have to write any code or manage any servers; all execution is done from [AWS Lambda](https://aws.amazon.com/lambda), and scheduled with Amazon CloudWatch Events.
 
 ## Addressing your Disaster Recovery requirements
 
 There are two dimensions to disaster recovery which must be carefully considered when running a system at scale:
 
-* RTO: Recovery Time Objective - how long does it take to recovery from  disaster recovery scenario
+* RTO: Recovery Time Objective - how long does it take to recover from an outage scenario?
 * RPO: Recovery Point Objective - when you have recovered, at what point in time will the system be consistent to?
 
-A comprehensive overview of how to build systems which implement best practices for disaster recovery can be found [here](https://aws.amazon.com/blogs/aws/new-whitepaper-use-aws-for-disaster-recovery/).
+A comprehensive overview of how to build systems which implement best practices for disaster recovery can be found [the AWS Disaster Re4covery Whitepaper](https://aws.amazon.com/blogs/aws/new-whitepaper-use-aws-for-disaster-recovery/).
 
 ### Recovery Time Objective in Redshift
 
-When using Amazon Redshift, your RTO is dictated by the size of the cluster, and the node type you are using. It is vital that you restore from the snapshots created on the cluster to correctly determine the time it will take to bring up a new cluster from a snapshot, and ensure you re-test any time you resize the clsuter or your data volume changes significantly.
+When using Amazon Redshift, the recovery time is determined by __the node type you are using__, __how many of those nodes you have__, and the __size of the data being restored__. It is vital that you practice restoration from snapshots created on the cluster to correctly determine the actual recovery time you'll see, so as to ensure your customer's expectations are met. This must be retested  any time you resize the cluster, or if your data volume changes significantly.
 
 ### Recovery Point Objective in Redshift
 
-Amazon Redshift's automatic recovery snapshots are created every 8 hours, or every 5GB of changed data on disk, whichever comes first. For some customers, an 8 hour RPO is too long, and they require the ability to take snapshots more frequently. That's where this module comes in - by supplying a simple configuration, you can ensure that snapshots are taken on a specified basis that meets your needs for data recovery.
+Amazon Redshift's automatic recovery snapshots are created every 8 hours, or every 5GB of data changed on disk, whichever comes first. For some customers, an 8 hour RPO is too long, and they require the ability to take snapshots more frequently. For other customers who have a very large amount of data change, these snapshots may be taken far too frequently and not allow long enough retention. 
+
+That's where this module comes in - by supplying a simple configuration, you can ensure that snapshots are taken on a fixed time basis that meets your needs for data recovery.
 
 ## Getting Started
 
 ### Install Pre-requisites
 
-The included build mechanism requires that you be able to use a terminal/command line, and have the [aws-cli](https://aws.amazon.com/cli), python and [boto3](https://github.com/boto/boto3) installed. Alternatively you can deploy the zip file in the 'dist' folder and configure through the AWS Console.
+The included build script requires that you be able to use a terminal/command line, and have the [aws-cli](https://aws.amazon.com/cli), python (2.7x) and [boto3](https://github.com/boto/boto3) installed. Alternatively you can deploy the zip file in the ['dist'](dist/RedshiftSnapshotManager-1.0.0.zip) folder and configure through the AWS Console.
 
 ### Deploy the Lambda Function
 
-If you want to make changes, you can generate an AWS Lambda compatible archive by running:
-
-```build.sh```
-
-This will build `RedshiftSnapshotManager-<version>.zip`, which you can deploy once with a configuration that manages multiple clusters, or you can have a single Lambda function per config location on S3.
-
-You can now deploy this AWS Lambda function by hand using the AWS Console or Command Line tools, or alternatively to the above command, you can run
+You can deploy this AWS Lambda function by hand using the AWS Console or Command Line tools, or alternatively you can run:
 
 ```build.sh deploy <role-arn>```
 
-This command will automatically build the Lambda function as before, and then deploy it to AWS Lambda in your configured account and configure it to assume the IAM role indicated. The deployed module will be published with:
+where `<role-arn>` is the Amazon Resource Name for the IAM you want the function to run as (which determines what it can do). This Role will require at least the following permissions:
 
-* Timeout: 60 Seconds
-* Memory Size: 128 MB
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "Stmt1466597619000",
+            "Effect": "Allow",
+            "Action": [
+                "redshift:CopyClusterSnapshot",
+                "redshift:CreateClusterSnapshot",
+                "redshift:CreateTags",
+                "redshift:DeleteClusterSnapshot",
+                "redshift:DescribeClusterSnapshots"
+            ],
+            "Resource": [
+                "*"
+            ]
+        }
+    ]
+}
+```
+
+You only need to deploy the function once to support multiple clusters. The deployed module will be configured with:
+
+* Max Runtime: 60 Seconds (each function only runs for 1 cluster, so this is plenty long enough - you can even reduce it)
+* Memory Size: 128 MB (the minimum)
 * Runtime: Node.js 4.3
 
 ### Schedule Execution
 
-This Lambda function can be run by any scheduler, but [AWS CloudWatch Scheduled Events](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html) are a great way to ensure your function runs periodically. You can configure CloudWatch Events to be used as the event source for your function, and this includes the configuration for which cluster to work on!
+This Lambda function can be run by any scheduler, but [AWS CloudWatch Scheduled Events](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html) are a great way to ensure your function runs on a fixed schedule, without the need for any servers. You can configure CloudWatch Events to be used as the event source for your function, and this can include the configuration for which cluster to work on! To do this, you can add the `schedule` directive to the previous deploy command:
 
 
 ```build.sh deploy <role-arn> schedule <config.json>```
 
-The supplied configuration includes:
+The supplied configuration file must include:
 
-* `clusterIdentifier` The name of your cluster, excluding `<region>`.amazonaws.com
+* `clusterIdentifier` The name of your cluster, excluding `<region>.amazonaws.com`
 * `region` The region where your Redshift Cluster resides
-* `namespace` A unique namespace for this cluster that will be used to identify the snapshots created
+* `namespace` A unique namespace for the backup schedule that will be used to identify the snapshots created
 * `snapshotIntervalHours` The Recovery Point Objective that is used to ensure you take snapshots on the specified interval
 * `snapshotRetentionDays` How long snapshots should be retained before being deleted. Manual snapshots (which can be restored into new clusters) will be kept forever by default.
 
@@ -70,9 +90,17 @@ The supplied configuration includes:
 }
 ```
 
-Please note that the default limit for Redshift manual snapshots is 20. This module will create `24/snapshotIntervalHours * snapshotRetentionDays` snapshots, and so if this number is greater than 20 please open a support case to have the limit increased. For example, an RPO of 2 hours with 7 days retention (as shown above) will create `24/2 * 7 = 84` snapshots.
+Once deployed, you can edit the above configuration from the definition of the CloudWatch Events Rule.
 
-Running the schedule command will create a CloudWatch Events Schedule that runs your function every __15 Minutes__. This means that your snapshots will be taken around 15 minutes from the specified snapshots interval.
+Please note that the current account limit for Redshift manual snapshots is 20 per region. This module will create `24/snapshotIntervalHours * snapshotRetentionDays` snapshots, and so if this number is greater than 20 please open an AWS support case to have the limit increased. For example, an RPO of 2 hours with 7 days retention (as shown above) will create `24/2 * 7 = 84` snapshots.
+
+Running the schedule command will create a CloudWatch Events Schedule that runs your function every __15 Minutes__. This means that your snapshots will be taken within 15 minutes of the specified snapshots interval.
+
+### What's Created
+
+After completion, you'll notice a Lambda Function called `RedshiftUtilsSnapshotManager`, plus there will be a CloudWatch Events Rule called `RedshiftUtilsSnapshotManager-15-mins` which runs every 15 minutes. This will have one Target for each namespace configuration that you've created - so a single Rule firing multiple events to a single Lambda function. This will create a Lambda Function invocation for each event - one per namespace.
+
+You can run `./build.sh schedule <config.json>` as many times as you need to create additional schedules.
 
 ### Confirm Execution
 
@@ -83,7 +111,15 @@ Once running, you will see that existing automatic snapshots, or new manual snap
 * ```scheduleNamespace=<config.namespace>```
 
 
-These tag names can be modified by updating ```constants.json``` and redeploying. __Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the CloudWatch Log Streams for execution to see debug output about what the function is doing.
+__Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the Lambda function's CloudWatch Log Streams for execution details, which include output about what the function is doing:
+
+```
+Example Log Data
+```
+
+## Making Changes
+
+IF you'd like to make changes, then great - we love open source. You can code your changes, and then you'll need to pull in the Node.js dependencies in order to test or deploy. From the `src/SnapshotManager` folder, run `npm install`, which will perform this download. You can then create a new Lambda zip archive by running `./build.sh assemble`, which will create `RedshiftSnapshotManager-<version>.zip` in the the `dist` folder. You can then run `./build.sh deploy...schedule...` as before.
 
 ----
 

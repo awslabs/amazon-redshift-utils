@@ -25,15 +25,13 @@ if (!setRegion) {
 }
 var AWS = require("aws-sdk");
 AWS.config.apiVersions = {
-	redshift : '2012-12-01',
-	s3 : '2006-03-01'
+	redshift : '2012-12-01'
 };
 AWS.config.update({
 	region : setRegion
 });
 
 var redshift = new AWS.Redshift();
-var s3 = new AWS.S3();
 var async = require('async');
 var moment = require('moment');
 
