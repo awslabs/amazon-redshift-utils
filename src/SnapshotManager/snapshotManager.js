@@ -40,7 +40,7 @@ function getFriendlyDate(t) {
 }
 
 function getSnapshotId(config) {
-	return config.namespace + "-" + config.clusterIdentifier + "-" + getFriendlyDate(moment());
+	return config.namespace + "-" + config.targetResource + "-" + getFriendlyDate(moment());
 }
 
 function getTags(config, forDate) {
@@ -60,10 +60,10 @@ function getTags(config, forDate) {
 function getSnapshots(config, callback) {
 	var snapStartTime = moment().subtract(config.snapshotIntervalHours, 'hours');
 
-	console.log("Requesting Snapshots for " + config.clusterIdentifier + " since " + snapStartTime.format());
-
+	console.log("Requesting Snapshots for " + config.targetResource + " since " + snapStartTime.format());
+	
 	redshift.describeClusterSnapshots({
-		ClusterIdentifier : config.clusterIdentifier,
+		ClusterIdentifier : config.targetResource,
 		StartTime : snapStartTime.toDate(),
 		// only search for snapshots in the current namespace and created by this
 		// tool
@@ -90,10 +90,10 @@ function createSnapshot(config, callback) {
 
 	var newSnapshotId = getSnapshotId(config);
 
-	console.log("Creating new Snapshot " + newSnapshotId + " for " + config.clusterIdentifier);
+	console.log("Creating new Snapshot " + newSnapshotId + " for " + config.targetResource);
 
 	var params = {
-		ClusterIdentifier : config.clusterIdentifier,
+		ClusterIdentifier : config.targetResource,
 		SnapshotIdentifier : newSnapshotId,
 		Tags : getTags(config, now)
 	};
@@ -102,7 +102,7 @@ function createSnapshot(config, callback) {
 		if (err) {
 			callback(err);
 		} else {
-			console.log("Created New Manual Snapshot " + data.Snapshot.SnapshotIdentifier);
+			console.log("Created new Manual Snapshot " + data.Snapshot.SnapshotIdentifier);
 			callback(null, config);
 		}
 	});
@@ -129,7 +129,7 @@ function convertAutosnapToManual(config, snapshot, callback) {
 				if (err) {
 					callback(err);
 				} else {
-					console.log("Converted latest Snapshot " + snapshot.SnapshotIdentifier + " to new manual snapshot "
+					console.log("Converted latest Snapshot " + snapshot.SnapshotIdentifier + " to new Manual Snapshot "
 							+ data.SnapshotIdentifier);
 					callback(null, config);
 				}
@@ -141,19 +141,19 @@ exports.convertAutosnapToManual = convertAutosnapToManual;
 
 // function to cleanup snapshots older than the specified retention period
 function cleanupSnapshots(config, callback) {
-	// customer may not have configured a snapshots retention
 	if (!config.snapshotRetentionDays) {
-		console.log("No snapshot retention limits configured - all snapshots will be retained");
+		// customer may not have configured a snapshots retention - ok
+		console.log("No Snapshot retention limits configured - all Snapshots will be retained");
 		callback(null);
 	}
 
 	var snapEndTime = moment().subtract(config.snapshotRetentionDays, 'days');
 
-	console.log("Cleaning up snapshots older than " + config.snapshotRetentionDays + " days (" + snapEndTime.format()
+	console.log("Cleaning up Snapshots older than " + config.snapshotRetentionDays + " days (" + snapEndTime.format()
 			+ ")");
 
 	redshift.describeClusterSnapshots({
-		ClusterIdentifier : config.clusterIdentifier,
+		ClusterIdentifier : config.targetResource,
 		EndTime : snapEndTime.toDate(),
 		SnapshotType : "manual",
 		TagKeys : [ constants.createdByName ],
@@ -163,7 +163,7 @@ function cleanupSnapshots(config, callback) {
 			callback(err);
 		} else {
 			if (data.Snapshots && data.Snapshots.length > 0) {
-				console.log("Cleaning up " + data.Snapshots.length + " previous snapshots");
+				console.log("Cleaning up " + data.Snapshots.length + " previous Snapshots");
 
 				async.map(data.Snapshots, function(item, mapCallback) {
 					console.log("Deleting Snapshot " + item.SnapshotIdentifier);
@@ -171,12 +171,11 @@ function cleanupSnapshots(config, callback) {
 					// delete this manual snapshot
 					redshift.deleteClusterSnapshot({
 						SnapshotIdentifier : item.SnapshotIdentifier,
-						SnapshotClusterIdentifier : config.clusterIdentifier
+						SnapshotClusterIdentifier : config.targetResource
 					}, function(err, data) {
 						if (err) {
 							mapCallback(err);
 						} else {
-							console.log("Deleted Cluster Snapshot ");
 							callback(null);
 						}
 					});
@@ -247,9 +246,9 @@ exports.validateConfig = validateConfig;
 function run(config, callback) {
 	var checksPassed = true;
 	var error;
-	if (!config.clusterIdentifier) {
+	if (!config.targetResource) {
 		checksPassed = false;
-		error = "Unable to resolve Cluster Identifier from provided configuration";
+		error = "Unable to resolve target resource from provided configuration";
 	}
 
 	if (!config.namespace) {

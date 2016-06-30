@@ -17,8 +17,9 @@ def schedule(args):
     # read the supplied configuration file
     config_file = open(config, 'r')
     json_config = json.load(config_file)
+    namespace = json_config['namespace']
     
-    rulename = "%s-%s-mins" % (function_name, schedule_mins)
+    rulename = "%s.%s-%s-mins" % (function_name, namespace, schedule_mins)
     
     # create the cloudwatch event rule
     rule = cw.put_rule(Name=rulename,
@@ -29,7 +30,7 @@ def schedule(args):
     
     # add the CW target
     target = {}
-    target["Id"] = "%s" % (json_config['namespace'])
+    target["Id"] = "%s" % (namespace)
     target["Arn"] = function_arn
     target["Input"] = json.dumps(json_config)
     target = cw.put_targets(Rule=rulename, Targets=[target])

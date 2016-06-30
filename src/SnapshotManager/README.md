@@ -2,7 +2,9 @@
 
 Amazon Redshift is a fast, fully managed, petabyte-scale data warehouse that makes it simple and cost-effective to analyze all your data using your existing business intelligence tools. A Redshift cluster is automatically backed up to Amazon S3 by default, and 3 automatic snapshots of the cluster are retained for 24 hours. You can also convert these automatic snapshots to 'manual', which means they are kept forever. You can restore manual snapshots into new clusters at any time, or you can use them to do table restores, without having to use any third-party backup/recovery software.
 
-This module gives you the ability to coordinate the Automatic Snapshot mechanism in your Amazon Redshift Clusters so that you can meet fine grained backup requirements. You don't have to write any code or manage any servers; all execution is done from [AWS Lambda](https://aws.amazon.com/lambda), and scheduled with Amazon CloudWatch Events.
+This module gives you the ability to coordinate the Automatic Snapshot mechanism in your Amazon Redshift Clusters so that you can meet fine grained backup requirements. You don't have to write any code or manage any servers; all execution is done within [AWS Lambda](https://aws.amazon.com/lambda), and scheduled with [Amazon CloudWatch Events](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html).
+
+![Architecture Diagram](Diagram.png)
 
 ## Addressing your Disaster Recovery requirements
 
@@ -59,7 +61,7 @@ where `<role-arn>` is the Amazon Resource Name for the IAM you want the function
 }
 ```
 
-You only need to deploy the function once to support multiple clusters. The deployed module will be configured with:
+You only need to deploy the function once to support a virtually unlimited number of clusters. The function will be configured with:
 
 * Max Runtime: 60 Seconds (each function only runs for 1 cluster, so this is plenty long enough - you can even reduce it)
 * Memory Size: 128 MB (the minimum)
@@ -74,17 +76,17 @@ This Lambda function can be run by any scheduler, but [AWS CloudWatch Scheduled 
 
 The supplied configuration file must include:
 
-* `clusterIdentifier` The name of your cluster, excluding `<region>.amazonaws.com`
-* `region` The region where your Redshift Cluster resides
 * `namespace` A unique namespace for the backup schedule that will be used to identify the snapshots created
+* `targetResource` The name of your Redshift Cluster, excluding `<region>.amazonaws.com`
+* `region` The region where your Redshift Cluster resides
 * `snapshotIntervalHours` The Recovery Point Objective that is used to ensure you take snapshots on the specified interval
-* `snapshotRetentionDays` How long snapshots should be retained before being deleted. Manual snapshots (which can be restored into new clusters) will be kept forever by default.
+* `snapshotRetentionDays` How long snapshots should be retained before being deleted. Manual snapshots (which can be restored into new clusters) will be kept forever by default. This is an optional parameter, and when omitted all snapshots will be retained.
 
 ```
 {
-	"clusterIdentifier": "my-redshift-cluster",
-	"region": "us-east-1",
 	"namespace": "my-every-2-hour-schedule",
+	"targetResource": "my-redshift-cluster",
+	"region": "us-east-1",
 	"snapshotIntervalHours": 2,
 	"snapshotRetentionDays": 7
 }
@@ -96,9 +98,11 @@ Please note that the current account limit for Redshift manual snapshots is 20 p
 
 Running the schedule command will create a CloudWatch Events Schedule that runs your function every __15 Minutes__. This means that your snapshots will be taken within 15 minutes of the specified snapshots interval.
 
+# architecture diagram TODO
+
 ### What's Created
 
-After completion, you'll notice a Lambda Function called `RedshiftUtilsSnapshotManager`, plus there will be a CloudWatch Events Rule called `RedshiftUtilsSnapshotManager-15-mins` which runs every 15 minutes. This will have one Target for each namespace configuration that you've created - so a single Rule firing multiple events to a single Lambda function. This will create a Lambda Function invocation for each event - one per namespace.
+After completion, you'll notice a Lambda Function called `RedshiftUtilsSnapshotManager`, plus there will be a CloudWatch Events Rule called `RedshiftUtilsSnapshotManager.<namespace>-15-mins` which runs every 15 minutes. 
 
 You can run `./build.sh schedule <config.json>` as many times as you need to create additional schedules.
 

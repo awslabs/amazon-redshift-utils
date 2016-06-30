@@ -1,3 +1,4 @@
+// TODO comments about what these are...
 exports.snapPrefix = "rs-snapman";
 exports.createdByName = "createdBy";
 exports.createdByValue = "AWS Redshift Utils Snapshot Manager";
