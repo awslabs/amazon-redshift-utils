@@ -251,7 +251,7 @@ def run_vacuum(conn):
                                                    + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;'
 
                                         FROM svv_table_info
-                                        WHERE (unsorted > %s OR empty > %s)
+                                        WHERE (unsorted > %s OR (empty*100)/size > %s)
                                             AND   size < %s
                                             AND  "schema" = '%s'
                                             AND  "table" = '%s';
@@ -328,7 +328,7 @@ def run_vacuum(conn):
                                                 AND   
                                                  (
                                                 --If the size of the table is less than the max_table_size_mb then , run vacuum based on condition: >min_unsorted_pct AND >deleted_pct
-                                                    ((size < %s) AND (unsorted > %s OR empty > %s)) 
+                                                    ((size < %s) AND (unsorted > %s OR (empty*100)/size > %s)) 
                                                     OR
                                                 --If the size of the table is greater than the max_table_size_mb then , run vacuum based on condition:  
                                                 -- >min_unsorted_pct AND < max_unsorted_pct AND >deleted_pct
