@@ -113,11 +113,7 @@ Once running, you will see that existing automatic snapshots, or new manual snap
 * ```scheduleNamespace=<config.namespace>```
 
 
-__Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the Lambda function's CloudWatch Log Streams for execution details, which include output about what the function is doing:
-
-```
-Example Log Data
-```
+__Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the Lambda function's CloudWatch Log Streams for execution details, which include output about what the function is doing.
 
 ## Making Changes
 
