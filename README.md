@@ -49,6 +49,10 @@ The [Redshift Unload/Copy Utility](src/UnloadCopyUtility) helps you to migrate d
 
 This [project](src/LambdaRunner) includes code that is able to run a subset of the Amazon Redshift Utilities via AWS Lambda. By using a Lambda function scheduled via a CloudWatch Event (http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html), you can ensure that these valuable utilities run automatically and keep your Redshift cluster running well.
 
+# Snapshot Manager
+
+This [project](src/SnapshotManager) includes a Lambda function that will ensure that your Redshift cluster is backed up as frequently as you require, and that the snapshots that it creates are cleaned up automatically when they are no longer needed.
+
 # Presentation
 We included a presentation which describes main features of the Amazon-Redshift-Utils including some examples, tips and best practices: Redshift_DBA_Commands.pptx
 
