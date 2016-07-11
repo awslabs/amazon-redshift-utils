@@ -98,8 +98,6 @@ Please note that the current account limit for Redshift manual snapshots is 20 p
 
 Running the schedule command will create a CloudWatch Events Schedule that runs your function every __15 Minutes__. This means that your snapshots will be taken within 15 minutes of the specified snapshots interval.
 
-# architecture diagram TODO
-
 ### What's Created
 
 After completion, you'll notice a Lambda Function called `RedshiftUtilsSnapshotManager`, plus there will be a CloudWatch Events Rule called `RedshiftUtilsSnapshotManager.<namespace>-15-mins` which runs every 15 minutes. 
