@@ -1,7 +1,7 @@
 {
     "name": "amazon-redshift-snapshot-manager",
     "description": "An Amazon Redshift Database Snapshot Manager written in AWS Lambda",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "homepage": "https://github.com/awslabs/amazon-redshift-utils/tree/master/src/SnapshotManager",
     "bugs": {
         "url": "http://github.com/awslabs/amazon-redshift-utils/issues",

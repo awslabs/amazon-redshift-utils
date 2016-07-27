@@ -61,7 +61,7 @@ function getSnapshots(config, callback) {
 	var snapStartTime = moment().subtract(config.snapshotIntervalHours, 'hours');
 
 	console.log("Requesting Snapshots for " + config.targetResource + " since " + snapStartTime.format());
-	
+
 	redshift.describeClusterSnapshots({
 		ClusterIdentifier : config.targetResource,
 		StartTime : snapStartTime.toDate(),
@@ -152,13 +152,15 @@ function cleanupSnapshots(config, callback) {
 	console.log("Cleaning up Snapshots older than " + config.snapshotRetentionDays + " days (" + snapEndTime.format()
 			+ ")");
 
-	redshift.describeClusterSnapshots({
+	var describeParams = {
 		ClusterIdentifier : config.targetResource,
 		EndTime : snapEndTime.toDate(),
 		SnapshotType : "manual",
-		TagKeys : [ constants.createdByName ],
-		TagValues : [ constants.createdByValue ]
-	}, function(err, data) {
+		TagKeys : [ constants.createdByName, constants.namespaceTagName ],
+		TagValues : [ constants.createdByValue, config.namespace ]
+	};
+
+	redshift.describeClusterSnapshots(describeParams, function(err, data) {
 		if (err) {
 			callback(err);
 		} else {
@@ -248,7 +250,7 @@ function run(config, callback) {
 	var error;
 	if (!config.targetResource) {
 		checksPassed = false;
-		error = "Unable to resolve target resource from provided configuration";
+		error = "Unable to resolve target resource from provided config.targetResource";
 	}
 
 	if (!config.namespace) {

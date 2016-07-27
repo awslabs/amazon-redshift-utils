@@ -11,7 +11,7 @@
 var lambda = require('./index');
 
 event = {
-	"clusterIdentifier" : "energy-demo",
+	"targetResource" : "energy-demo",
 	"region" : "eu-west-1",
 	"namespace" : "nightly",
 	"snapshotIntervalHours" : 1,
