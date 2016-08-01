@@ -44,45 +44,92 @@ function getSnapshotId(config) {
 }
 
 function getTags(config, forDate) {
-	return [ {
+	var tags = [ {
 		Key : constants.createdByName,
 		Value : constants.createdByValue
-	}, {
-		Key : constants.createdAtName,
-		Value : getFriendlyDate(forDate)
 	}, {
 		Key : constants.namespaceTagName,
 		Value : config.namespace
 	} ];
+
+	if (forDate) {
+		tags.push({
+			Key : constants.createdAtName,
+			Value : getFriendlyDate(forDate)
+		});
+	}
+	return tags;
 }
 
-// function to query for snapshots within the specified period
+// function to query for snapshots created since the configuration start time
 function getSnapshots(config, callback) {
-	var snapStartTime = moment().subtract(config.snapshotIntervalHours, 'hours');
 
-	console.log("Requesting Snapshots for " + config.targetResource + " since " + snapStartTime.format());
+	var snapStartTime;
+	var intervalExpression;
 
-	redshift.describeClusterSnapshots({
-		ClusterIdentifier : config.targetResource,
-		StartTime : snapStartTime.toDate(),
-		// only search for snapshots in the current namespace and created by this
-		// tool
+	if (config.snapshotInterval) {
+		snapStartTime = moment().subtract(config.snapshotInterval.duration, config.snapshotInterval.units);
+		intervalExpression = config.snapshotInterval.duration + " " + config.snapshotInterval.units;
+	} else {
+		snapStartTime = moment().subtract(config.snapshotIntervalHours, 'hours');
+		intervalExpression = config.snapshotIntervalHours + " hours";
+	}
+
+	exports.getSnapshotsInInterval(config.targetResource, config.namespace, snapStartTime, undefined, undefined,
+			function(err, snapshots) {
+				if (err) {
+					callback(err);
+				} else {
+					console.log("Resolved " + snapshots.length + " Snapshots in the last " + intervalExpression);
+
+					callback(null, config, snapshots);
+				}
+			});
+}
+exports.getSnapshots = getSnapshots;
+
+function getSnapshotsInInterval(targetResource, namespace, startTime, endTime, extraSearchCriteria, callback) {
+	var startSearchLabel = startTime ? startTime.format() : "any";
+	var endSearchLabel = endTime ? endTime.format() : "any";
+
+	console.log("Requesting '" + namespace + "' Snapshots for " + targetResource + " in interval (" + startSearchLabel
+			+ " - " + endSearchLabel + ")");
+
+	var describeParams = {
+		ClusterIdentifier : targetResource,
+		// only search for snapshots in the current namespace
 		TagKeys : [ constants.namespaceTagName ],
-		TagValues : [ config.namespace ]
-	}, function(err, data) {
+		TagValues : [ namespace ]
+	};
+
+	// add time search criteria
+	if (startTime) {
+		describeParams.StartTime = startTime.toDate();
+	}
+
+	if (endTime) {
+		describeParams.EndTime = endTime.toDate();
+	}
+
+	// add any provided extra search items
+	if (extraSearchCriteria) {
+		Object.keys(extraSearchCriteria).map(function(item) {
+			describeParams[item] = extraSearchCriteria[item];
+		});
+	}
+
+	// console.log(JSON.stringify(describeParams));
+
+	redshift.describeClusterSnapshots(describeParams, function(err, data) {
 		// got a set of snapshots, or not, so call the callback with the snap list
-		// and the configuration
 		if (err) {
 			callback(err);
 		} else {
-			console.log("Resolved " + data.Snapshots.length + " Snapshots in the last " + config.snapshotIntervalHours
-					+ " hours");
-
-			callback(null, config, data.Snapshots);
+			callback(null, data.Snapshots);
 		}
 	});
 }
-exports.getSnapshots = getSnapshots;
+exports.getSnapshotsInInterval = getSnapshotsInInterval;
 
 // function to create a manual snapshot
 function createSnapshot(config, callback) {
@@ -141,60 +188,64 @@ exports.convertAutosnapToManual = convertAutosnapToManual;
 
 // function to cleanup snapshots older than the specified retention period
 function cleanupSnapshots(config, callback) {
-	if (!config.snapshotRetentionDays) {
+	if (!config.snapshotRetentionDays && !config.snapshotRetention) {
 		// customer may not have configured a snapshots retention - ok
 		console.log("No Snapshot retention limits configured - all Snapshots will be retained");
 		callback(null);
-	}
+	} else {
 
-	var snapEndTime = moment().subtract(config.snapshotRetentionDays, 'days');
+		var snapEndTime;
+		var intervalExpression;
 
-	console.log("Cleaning up Snapshots older than " + config.snapshotRetentionDays + " days (" + snapEndTime.format()
-			+ ")");
-
-	var describeParams = {
-		ClusterIdentifier : config.targetResource,
-		EndTime : snapEndTime.toDate(),
-		SnapshotType : "manual",
-		TagKeys : [ constants.createdByName, constants.namespaceTagName ],
-		TagValues : [ constants.createdByValue, config.namespace ]
-	};
-
-	redshift.describeClusterSnapshots(describeParams, function(err, data) {
-		if (err) {
-			callback(err);
+		if (config.snapshotRetention) {
+			snapEndTime = moment().subtract(config.snapshotRetention.duration, config.snapshotRetention.units);
+			intervalExpression = config.snapshotRetention.duration + " " + config.snapshotRetention.units + " ("
+					+ snapEndTime.format() + ")";
 		} else {
-			if (data.Snapshots && data.Snapshots.length > 0) {
-				console.log("Cleaning up " + data.Snapshots.length + " previous Snapshots");
+			snapEndTime = moment().subtract(config.snapshotRetentionDays, 'days');
+			intervalExpression = config.snapshotRetentionDays + " days (" + snapEndTime.format() + ")";
+		}
 
-				async.map(data.Snapshots, function(item, mapCallback) {
-					console.log("Deleting Snapshot " + item.SnapshotIdentifier);
+		console.log("Cleaning up '" + config.namespace + "' Snapshots older than ");
 
-					// delete this manual snapshot
-					redshift.deleteClusterSnapshot({
-						SnapshotIdentifier : item.SnapshotIdentifier,
-						SnapshotClusterIdentifier : config.targetResource
-					}, function(err, data) {
+		exports.getSnapshotsInInterval(config.targetResource, config.namespace, undefined, snapEndTime, {
+			SnapshotType : "manual"
+		}, function(err, snapshots) {
+			if (err) {
+				callback(err);
+			} else {
+				if (snapshots && snapshots.length > 0) {
+					console.log("Cleaning up " + snapshots.length + " previous Snapshots");
+
+					async.map(snapshots, function(item, mapCallback) {
+						console.log("Deleting Snapshot " + item.SnapshotIdentifier);
+
+						// delete this manual snapshot
+						redshift.deleteClusterSnapshot({
+							SnapshotIdentifier : item.SnapshotIdentifier,
+							SnapshotClusterIdentifier : config.targetResource
+						}, function(err, data) {
+							if (err) {
+								mapCallback(err);
+							} else {
+								callback(null);
+							}
+						});
+					}, function(err, results) {
 						if (err) {
-							mapCallback(err);
+							callback(err);
 						} else {
 							callback(null);
 						}
 					});
-				}, function(err, results) {
-					if (err) {
-						callback(err);
-					} else {
-						callback(null);
-					}
-				});
-			} else {
-				// there are no snapshots older than the retention period - so all ok
-				console.log("No old snapshots found to clear");
-				callback(null);
+				} else {
+					// there are no snapshots older than the retention period - so all ok
+					console.log("No old snapshots found to clear");
+					callback(null);
+				}
 			}
-		}
-	});
+		});
+	}
 }
 exports.cleanupSnapshots = cleanupSnapshots;
 
@@ -229,17 +280,18 @@ exports.createOrConvertSnapshots = createOrConvertSnapshots;
 function validateConfig(config, callback) {
 	var error;
 
-	if (config.snapshotIntervalHours < 1) {
-		error = "Minimum Snapshot Interval is 1 hour";
-	}
-
-	if (config.snapshotRetentionDays < 1) {
-		error = "Minimum Snapshot Retention is 1 day";
-	}
-
 	if (!config.namespace || config.namespace === "") {
 		error = "You must provide a configuration namespace";
 	}
+
+	if (config.snapshotInterval && constants.validTimeUnits.indexOf(config.snapshotInterval.units) == -1) {
+		error = "Snapshot Interval Units must be one of: " + JSON.stringify(constants.validTimeUnits);
+	}
+
+	if (config.snapshotRetention && constants.validTimeUnits.indexOf(config.snapshotRetention.units) == -1) {
+		error = "Snapshot Retention Units must be one of: " + JSON.stringify(constants.validTimeUnits);
+	}
+
 	callback(error);
 }
 exports.validateConfig = validateConfig;
@@ -257,6 +309,8 @@ function run(config, callback) {
 		checksPassed = false;
 		error = "Configuration namespace must be provided";
 	}
+
+	console.log("Configuration Provided: " + JSON.stringify(config));
 
 	if (!checksPassed) {
 		console.log(JSON.stringify(config));

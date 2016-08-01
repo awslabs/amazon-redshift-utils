@@ -46,6 +46,11 @@ if [ "$action" == "assemble" ]; then
 fi
 
 if [ "$action" == "deploy" ]; then
+	if [ "$role" == "" ]; then
+		echo "Cannot deploy without a Role specified"
+		exit -1
+	fi
+	
 	echo "Checking for an existing version of this function in AWS Lambda..."
 	existing_code_location=`aws lambda get-function --function-name $function_name --query Configuration.FunctionArn`
 	
