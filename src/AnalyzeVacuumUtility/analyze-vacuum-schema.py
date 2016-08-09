@@ -264,7 +264,8 @@ def run_vacuum(conn):
         get_vacuum_statement = '''
                 SELECT DISTINCT 'vacuum %s ' + feedback_tbl.schema_name + '.' + feedback_tbl.table_name + ' ; '
                 + '/* '+ ' Table Name : ' + info_tbl."schema" + '.' + info_tbl."table" 
-                                                   + ',  Size : ' + CAST(info_tbl."size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + CAST(info_tbl."unsorted" AS VARCHAR(10))
+                                                   + ',  Size : ' + CAST(info_tbl."size" AS VARCHAR(10)) + ' MB'
+                                                   + ',  Unsorted_pct : ' + COALESCE(CAST(info_tbl."unsorted" AS VARCHAR(10)), 'N/A')
                                                    + ',  Deleted_pct : ' + CAST(info_tbl."empty" AS VARCHAR(10)) +' */ ;'
                     FROM (SELECT schema_name,
                                  table_name
@@ -320,7 +321,8 @@ def run_vacuum(conn):
         comment("Extracting Candidate Tables for vacuum ...")
         get_vacuum_statement = '''SELECT DISTINCT 'vacuum %s ' + "schema" + '.' + "table" + ' ; '
                                                    + '/* '+ ' Table Name : ' + "schema" + '.' + "table" 
-                                                   + ',  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + CAST("unsorted" AS VARCHAR(10))
+                                                   + ',  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
+                                                   + ',  Unsorted_pct : ' + COALESCE(CAST(info_tbl."unsorted" AS VARCHAR(10)), 'N/A')
                                                    + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;'
 
                                         FROM svv_table_info
