@@ -981,6 +981,8 @@ def main(argv):
         usage("Missing Parameter 'output-file'")
     if analyze_schema == None and analyze_table == None:
         usage("You must supply analyze-schema or analyze-table")
+    if analyze_schema == None:
+        analyze_schema = 'public'
     if target_schema == None:
         target_schema = analyze_schema
         
