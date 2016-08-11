@@ -193,7 +193,7 @@ def get_pg_conn():
                 write(e.message)
             return None
 
-        if query_group is not None:
+        if query_group != None:
             set_query_group = 'set query_group to %s' % (query_group)
 
             if debug:
@@ -688,8 +688,8 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     drop_old_data = False if _drop_old_data == None else _drop_old_data
     query_group = None if _query_group == "" else _query_group
     threads = 1 if _threads == None else int(_threads)
-    comprows = None if _comprows == -1 else int(_comprows)
-    query_slot_count = int(_query_slot_count)
+    comprows = None if _comprows == -1 or _comprows == None else int(_comprows)
+    query_slot_count = None if _query_slot_count == -1 or _query_slot_count == None else int(_query_slot_count)
     ssl_option = False if _ssl_option == None else _ssl_option
     
     if (debug == True):
@@ -979,8 +979,6 @@ def main(argv):
         usage("Missing Parameter 'db-port'")
     if output_file == None:
         usage("Missing Parameter 'output-file'")
-    if analyze_schema == None and analyze_table == None:
-        usage("You must supply analyze-schema or analyze-table")
     if analyze_schema == None:
         analyze_schema = 'public'
     if target_schema == None:
