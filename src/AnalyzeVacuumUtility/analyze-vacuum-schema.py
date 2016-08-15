@@ -325,7 +325,7 @@ def run_vacuum(conn):
                                                    + ',  Unsorted_pct : ' + COALESCE(CAST(info_tbl."unsorted" AS VARCHAR(10)), 'N/A')
                                                    + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;'
 
-                                        FROM svv_table_info
+                                        FROM svv_table_info info_tbl
                                         WHERE "schema" = '%s'
                                                 AND   
                                                  (
