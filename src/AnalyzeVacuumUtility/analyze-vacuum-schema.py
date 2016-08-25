@@ -245,9 +245,9 @@ def run_vacuum(conn):
     
     if table_name != None:
         
-        get_vacuum_statement = '''SELECT DISTINCT 'vacuum %s ' + "schema" + '.' + "table" + ' ; '
-                                                   + '/* '+ ' Table Name : ' + "schema" + '.' + "table" 
-                                                   + ',  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + CAST("unsorted" AS VARCHAR(10))
+        get_vacuum_statement = '''SELECT DISTINCT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
+                                                   + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
+                                                   + '",  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + CAST("unsorted" AS VARCHAR(10))
                                                    + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;'
 
                                         FROM svv_table_info
@@ -262,9 +262,9 @@ def run_vacuum(conn):
         comment("Extracting Candidate Tables for vacuum based on the alerts...")
         
         get_vacuum_statement = '''
-                SELECT DISTINCT 'vacuum %s ' + feedback_tbl.schema_name + '.' + feedback_tbl.table_name + ' ; '
-                + '/* '+ ' Table Name : ' + info_tbl."schema" + '.' + info_tbl."table" 
-                                                   + ',  Size : ' + CAST(info_tbl."size" AS VARCHAR(10)) + ' MB'
+                SELECT DISTINCT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" ; '
+                + '/* '+ ' Table Name : ' + info_tbl."schema" + '."' + info_tbl."table"
+                                                   + '",  Size : ' + CAST(info_tbl."size" AS VARCHAR(10)) + ' MB'
                                                    + ',  Unsorted_pct : ' + COALESCE(CAST(info_tbl."unsorted" AS VARCHAR(10)), 'N/A')
                                                    + ',  Deleted_pct : ' + CAST(info_tbl."empty" AS VARCHAR(10)) +' */ ;'
                     FROM (SELECT schema_name,
@@ -319,9 +319,9 @@ def run_vacuum(conn):
         
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Tables for vacuum ...")
-        get_vacuum_statement = '''SELECT DISTINCT 'vacuum %s ' + "schema" + '.' + "table" + ' ; '
-                                                   + '/* '+ ' Table Name : ' + "schema" + '.' + "table" 
-                                                   + ',  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
+        get_vacuum_statement = '''SELECT DISTINCT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
+                                                   + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
+                                                   + '",  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                                    + ',  Unsorted_pct : ' + COALESCE(CAST(info_tbl."unsorted" AS VARCHAR(10)), 'N/A')
                                                    + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;'
 
@@ -363,8 +363,8 @@ def run_vacuum(conn):
         # query for all tables in the schema for vacuum reindex
         
         comment("Extracting Candidate Tables for vacuum reindex ...")
-        get_vacuum_statement = ''' SELECT DISTINCT 'vacuum REINDEX ' + schema_name + '.' + table_name + ' ; ' + '/* ' + ' Table Name : ' 
-                                    + schema_name + '.' + table_name + ',  Rows : ' + CAST("rows" AS VARCHAR(10)) 
+        get_vacuum_statement = ''' SELECT DISTINCT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" ; ' + '/* ' + ' Table Name : '
+                                    + schema_name + '."' + table_name + '",  Rows : ' + CAST("rows" AS VARCHAR(10))
                                     + ',  Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10)) 
                                     + ' ,  Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;'
                                     
@@ -410,9 +410,9 @@ def run_analyze(conn):
         
         # If it is one table , just check if this needs to be analyzed and prepare analyze statements 
         
-        get_analyze_statement_feedback = '''SELECT DISTINCT 'analyze ' + "schema" + '.' + "table" + ' ; '
-                                                   + '/* '+ ' Table Name : ' + "schema" + '.' + "table" 
-                                                   + ',  stats_off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;' 
+        get_analyze_statement_feedback = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '" ; '
+                                                   + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
+                                                   + '",  stats_off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
                                                 FROM svv_table_info
                                                 WHERE   stats_off::DECIMAL (32,4) > %s ::DECIMAL (32,4)
                                                 AND  trim("schema") = '%s'
@@ -426,9 +426,9 @@ def run_analyze(conn):
         get_analyze_statement_feedback = '''
                                  --Get top N rank tables based on the missing statistics alerts
                                  
-                                    SELECT DISTINCT 'analyze ' + feedback_tbl.schema_name + '.' + feedback_tbl.table_name + ' ; '
-                                    + '/* '+ ' Table Name : ' + info_tbl."schema" + '.' + info_tbl."table" 
-                                        + ', Stats_Off : ' + CAST(info_tbl."stats_off" AS VARCHAR(10)) + ' */ ;' 
+                                    SELECT DISTINCT 'analyze ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" ; '
+                                    + '/* '+ ' Table Name : ' + info_tbl."schema" + '."' + info_tbl."table"
+                                        + '", Stats_Off : ' + CAST(info_tbl."stats_off" AS VARCHAR(10)) + ' */ ;'
                                     FROM ((SELECT TRIM(n.nspname) schema_name,
                                           c.relname table_name
                                    FROM (SELECT TRIM(SPLIT_PART(SPLIT_PART(a.plannode,':',2),' ',2)) AS Table_Name,
@@ -499,9 +499,9 @@ def run_analyze(conn):
                           
         comment("Extracting Candidate Tables for analyze based on stats off from system table info ...")
         
-        get_analyze_statement = '''SELECT DISTINCT 'analyze ' + "schema" + '.' + "table" + ' ; '
-                                        + '/* '+ ' Table Name : ' + "schema" + '.' + "table" 
-                                        + ', Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;' 
+        get_analyze_statement = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '" ; '
+                                        + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
+                                        + '", Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
                                         FROM svv_table_info
                                         WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
                                         AND  trim("schema") = '%s' 
