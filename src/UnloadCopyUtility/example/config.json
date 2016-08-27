@@ -13,6 +13,9 @@
   },
   // location and credentials for S3, which are used to store migrated data while in flight
   "s3Staging": {
+    // Either use AWS IAM role or specify access_key / secret for s3 access. Read http://docs.aws.amazon.com/redshift/latest/mgmt/copy-unload-iam-role.html
+    // AWS IAM Role to use. If role is specified, access keys are ignored
+    "aws_iam_role": "aws iam role which is assigned to Redshift and has access to the s3 bucket",
     // base 64 encoded AWS Access Key used to access S3. Use the encryptValue.sh utility to generate this string
     "aws_access_key_id": "my base 64 encoded access key",
     // base 64 encoded AWS Secret Access Key used to access S3. Use the encryptValue.sh utility to generate this string
