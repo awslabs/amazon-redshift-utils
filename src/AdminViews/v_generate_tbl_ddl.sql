@@ -194,7 +194,7 @@ from (SELECT
   INNER JOIN  pg_class AS c ON n.oid = c.relnamespace
   INNER JOIN  pg_attribute AS a ON c.oid = a.attrelid
   WHERE c.relkind = 'r'
-    AND a.attsortkeyord > 0
+    AND abs(a.attsortkeyord) > 0
     AND a.attnum > 0
   --END SEMICOLON
   UNION SELECT n.nspname AS schemaname, c.relname AS tablename, 600000000 AS seq, ';' AS ddl
