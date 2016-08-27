@@ -219,7 +219,7 @@ def main(args):
     src_conn.close()
     dest_conn.close()
     
-    if deleteOnSuccess:
+    if 'true' == deleteOnSuccess.lower():
         s3Delete(dataStagingPath)
 
 
