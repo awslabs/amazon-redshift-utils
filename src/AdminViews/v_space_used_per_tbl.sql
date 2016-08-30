@@ -30,36 +30,36 @@ SELECT
 			ELSE 'n/a'
 		END AS recommendation
 FROM
-       (
-       SELECT
-              db_id
-              ,id
-              ,name
-              ,SUM(rows) AS rows
-              ,SUM(rows)-SUM(sorted_rows) AS unsorted_rows 
-       FROM stv_tbl_perm
-       GROUP BY db_id, id, name
-       ) AS a 
+	(
+	SELECT
+		db_id
+		,id
+		,name
+		,SUM(rows) AS rows
+		,SUM(rows)-SUM(sorted_rows) AS unsorted_rows 
+	FROM stv_tbl_perm
+	GROUP BY db_id, id, name
+	) AS a 
 INNER JOIN
-       pg_class AS pgc 
-              ON pgc.oid = a.id
+	pg_class AS pgc 
+		ON pgc.oid = a.id
 INNER JOIN
-       pg_namespace AS pgn 
-              ON pgn.oid = pgc.relnamespace
+	pg_namespace AS pgn 
+		ON pgn.oid = pgc.relnamespace
 INNER JOIN
-       pg_database AS pgdb 
-              ON pgdb.oid = a.db_id
+	pg_database AS pgdb 
+		ON pgdb.oid = a.db_id
 INNER JOIN
-       svv_table_info AS ti
-              ON ti."database" = pgdb.datname AND ti."schema" = pgn.nspname AND ti."table" = a.name
+	svv_table_info AS ti
+		ON ti."database" = pgdb.datname AND ti."schema" = pgn.nspname AND ti."table" = a.name
 LEFT OUTER JOIN
-       (
-       SELECT
-              tbl
-              ,COUNT(*) AS mbytes 
-       FROM stv_blocklist 
-       GROUP BY tbl
-       ) AS b 
-              ON a.id=b.tbl
+	(
+	SELECT
+		tbl
+		,COUNT(*) AS mbytes 
+	FROM stv_blocklist 
+	GROUP BY tbl
+	) AS b 
+		ON a.id=b.tbl
 WHERE pgc.relowner > 1
 ORDER BY 1,3,2;
