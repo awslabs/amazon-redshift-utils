@@ -6,6 +6,7 @@ History:
 2014-02-18 jjschmit Removed hardcoded where clause against 'public' schema
 2014-02-21 jjschmit Added pct_unsorted and recommendation fields
 2015-03-31 tinkerbotfoo Handled a special case to avoid divide by zero for pct_unsorted 
+2016-08-30 ziggythehamster Made recommendation consider sortkey, add has_sort_key column
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_space_used_per_tbl
 AS
@@ -17,10 +18,14 @@ SELECT
 		,b.mbytes AS megabytes
 		,a.rows AS rowcount
 		,a.unsorted_rows AS unsorted_rowcount
+		,CASE WHEN ti.sortkey1 IS NOT NULL THEN 1
+			ELSE 0
+		END AS has_sort_key
 		,CASE WHEN a.rows = 0 then 0
 			ELSE ROUND((a.unsorted_rows::FLOAT / a.rows::FLOAT) * 100, 5)
 		END AS pct_unsorted
 		,CASE WHEN a.rows = 0 THEN 'n/a'
+			WHEN ti.sortkey1 IS NULL THEN 'add a SORTKEY'
 			WHEN (a.unsorted_rows::FLOAT / a.rows::FLOAT) * 100 >= 20 THEN 'VACUUM recommended'
 			ELSE 'n/a'
 		END AS recommendation
@@ -44,6 +49,9 @@ INNER JOIN
 INNER JOIN
        pg_database AS pgdb 
               ON pgdb.oid = a.db_id
+INNER JOIN
+       svv_table_info AS ti
+              ON ti."database" = pgdb.datname AND ti."schema" = pgn.nspname AND ti."table" = a.name
 LEFT OUTER JOIN
        (
        SELECT
