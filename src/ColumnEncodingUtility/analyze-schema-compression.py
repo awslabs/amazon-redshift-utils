@@ -822,7 +822,12 @@ order by 2;
         
     # do a final vacuum if needed
     if drop_old_data:
-        write("vacuum delete only;")
+        if do_execute:
+            if not run_commands(master_conn, "vacuum delete only;"):
+                write("Error during Vaccuum Delete")
+                return ERROR
+        else:
+            write("vacuum delete only;")
     
     # return any non-zero worker output statuses
     modified_tables = 0
