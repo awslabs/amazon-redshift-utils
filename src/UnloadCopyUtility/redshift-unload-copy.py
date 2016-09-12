@@ -147,6 +147,9 @@ def main(args):
     global s3Client    
     s3Client = boto.s3.connect_to_region(region)
     
+    global kmsClient
+    kmsClient = boto.kms.connect_to_region(region)
+    
     # load the configuration
     getConfig(args[1])
     
@@ -196,9 +199,6 @@ def main(args):
     dest_schema = destConfig['schemaName']
     dest_table = destConfig['tableName']
     dest_user = destConfig['connectUser']
-    
-    global kmsClient
-    kmsClient = boto.kms.connect_to_region(region)
     
     # create a new data key for the unload operation        
     dataKey = kmsClient.generate_data_key(encryptionKeyID, key_spec="AES_256")
