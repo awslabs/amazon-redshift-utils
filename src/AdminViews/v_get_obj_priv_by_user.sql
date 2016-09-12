@@ -2,6 +2,7 @@
 Purpose: View to get the table/views that a user has access to
 History:
 2013-10-29 jjschmit Created
+2016-05-24 chriz-bigdata addressed edge case for objects with names containing '.'
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_get_obj_priv_by_user
 AS
@@ -20,10 +21,10 @@ FROM
 		,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'references') AS ref
 	FROM
 		(
-		SELECT schemaname, 't' AS obj_type, tablename AS objectname, schemaname + '.' + tablename AS fullobj FROM pg_tables
+		SELECT schemaname, 't' AS obj_type, tablename AS objectname, QUOTE_IDENT(schemaname) || '.' || QUOTE_IDENT(tablename) AS fullobj FROM pg_tables
 		WHERE schemaname not in ('pg_internal')
 		UNION
-		SELECT schemaname, 'v' AS obj_type, viewname AS objectname, schemaname + '.' + viewname AS fullobj FROM pg_views
+		SELECT schemaname, 'v' AS obj_type, viewname AS objectname, QUOTE_IDENT(schemaname) || '.' || QUOTE_IDENT(viewname) AS fullobj FROM pg_views
 		WHERE schemaname not in ('pg_internal')
 		) AS objs
 		,(SELECT * FROM pg_user) AS usrs

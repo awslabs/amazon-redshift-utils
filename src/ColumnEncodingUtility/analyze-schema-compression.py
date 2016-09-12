@@ -86,6 +86,7 @@ force = False
 drop_old_data = False
 comprows = None
 query_group = None
+ssl_option = False
 
 
 def execute_query(str):
@@ -166,7 +167,7 @@ def get_pg_conn():
             comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
         
         try:
-            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd, ssl=False, timeout=None, keepalives=1, keepalives_idle=200, keepalives_interval=200, keepalives_count=5)
+            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd, ssl=ssl_option, timeout=None, keepalives=1, keepalives_idle=200, keepalives_interval=200, keepalives_count=5)
         except Exception as e:
             write(e)
             write('Unable to connect to Cluster Endpoint')
@@ -192,7 +193,7 @@ def get_pg_conn():
                 write(e.message)
             return None
 
-        if query_group is not None:
+        if query_group != None:
             set_query_group = 'set query_group to %s' % (query_group)
 
             if debug:
@@ -478,7 +479,7 @@ def analyze(table_info):
                 
                 # is this the dist key?
                 distkey = descr[col][3]
-                if str(distkey).upper() == 'T':
+                if str(distkey).upper()[0] == 'T':
                     distkey = 'DISTKEY'
                 else:
                     distkey = ''
@@ -524,8 +525,8 @@ def analyze(table_info):
                 encode_columns.extend(['"%s" %s %s %s encode %s %s'
                                        % (col, col_type, default_value, col_null, compression, distkey)])
             
-            # if this table's encodings have not changed, then dont do a modification, including if the force options is set
-            if not encodings_modified:
+            # if this table's encodings have not changed, then dont do a modification, unless force options is set
+            if (not force) and (not encodings_modified):
                 comment("Column Encoding resulted in an identical table - no changes will be made")
             else:
                 comment("Column Encoding will be modified for %s.%s" % (analyze_schema, table_name))
@@ -628,6 +629,7 @@ def usage(with_message):
         
     write('Arguments: --db             - The Database to Use')
     write('           --db-user        - The Database User to connect to')
+    write('           --db-pwd         - The Password for the Database User to connect to')
     write('           --db-host        - The Cluster endpoint')
     write('           --db-port        - The Cluster endpoint port (default 5439)')
     write('           --analyze-schema - The Schema to be Analyzed (default public)')
@@ -643,11 +645,12 @@ def usage(with_message):
     write('           --drop-old-data  - Drop the old version of the data table, rather than renaming')
     write('           --comprows       - Set the number of rows to use for Compression Encoding Analysis')
     write('           --query_group    - Set the query_group for all queries')
+    write('           --ssl-option     - Set SSL to True or False (default False)')
     sys.exit(INVALID_ARGS)
 
 
 # method used to configure global variables, so that we can call the run method
-def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze_schema, _target_schema, _analyze_table, _threads, _do_execute, _query_slot_count, _ignore_errors, _force, _drop_old_data, _comprows, _query_group, _debug):
+def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze_schema, _target_schema, _analyze_table, _threads, _do_execute, _query_slot_count, _ignore_errors, _force, _drop_old_data, _comprows, _query_group, _debug, _ssl_option):
     # setup globals
     global db
     global db_user
@@ -667,6 +670,7 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     global comprows
     global query_group
     global output_file
+    global ssl_option
 
     # set global variable values
     output_file = _output_file    
@@ -685,8 +689,9 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     drop_old_data = False if _drop_old_data == None else _drop_old_data
     query_group = None if _query_group == "" else _query_group
     threads = 1 if _threads == None else int(_threads)
-    comprows = None if _comprows == -1 else int(_comprows)
-    query_slot_count = int(_query_slot_count)
+    comprows = None if _comprows == -1 or _comprows == None else int(_comprows)
+    query_slot_count = None if _query_slot_count == -1 or _query_slot_count == None else int(_query_slot_count)
+    ssl_option = False if _ssl_option == None else _ssl_option
     
     if (debug == True):
         comment("Redshift Column Encoding Utility Configuration")
@@ -707,6 +712,7 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
         comment("drop_old_data: %s " % (drop_old_data))
         comment("comprows: %s " % (comprows))
         comment("query_group: %s " % (query_group))
+        comment("ssl_option: %s " % (ssl_option))
     
     
 def run():
@@ -762,8 +768,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
 where pgn.nspname = '%s'
-  and substring(a.name,length(a.name)-3,length(a.name)) != '$old'
-  and substring(a.name,length(a.name)-3,length(a.name)) != '$mig'
+  and a.name::text SIMILAR TO '[A-Za-z_][A-Za-z0-9_]*'
 order by 2;
         ''' % (analyze_schema,)
     
@@ -818,7 +823,12 @@ order by 2;
         
     # do a final vacuum if needed
     if drop_old_data:
-        write("vacuum delete only;")
+        if do_execute:
+            if not run_commands(master_conn, "vacuum delete only;"):
+                write("Error during Vaccuum Delete")
+                return ERROR
+        else:
+            write("vacuum delete only;")
     
     # return any non-zero worker output statuses
     modified_tables = 0
@@ -875,8 +885,9 @@ def main(argv):
     drop_old_data = None
     comprows = None
     query_group = None
+    ssl_option = None
     
-    supported_args = """db= db-user= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option="""
     
     # extract the command line arguments
     try:
@@ -905,6 +916,9 @@ def main(argv):
         elif arg == "--db-port":
             if value != '' and value != None:
                 db_port = int(value)
+        elif arg == "--db-pwd":
+            if value != '' and value != None:
+                db_pwd = value
         elif arg == "--analyze-schema":
             if value != '' and value != None:
                 analyze_schema = value
@@ -954,6 +968,11 @@ def main(argv):
         elif arg == "--query_group":
             if value != '' and value != None:
                 query_group = value
+        elif arg == "--ssl-option":
+            if value == 'true' or value == 'True':
+                ssl_option = True
+            else:
+                ssl_option = False
         else:
             assert False, "Unsupported Argument " + arg
             usage()
@@ -969,8 +988,8 @@ def main(argv):
         usage("Missing Parameter 'db-port'")
     if output_file == None:
         usage("Missing Parameter 'output-file'")
-    if analyze_schema == None and analyze_table == None:
-        usage("You must supply analyze-schema or analyze-table")
+    if analyze_schema == None:
+        analyze_schema = 'public'
     if target_schema == None:
         target_schema = analyze_schema
         
@@ -979,10 +998,11 @@ def main(argv):
         threads = 1
         
     # get the database password
-    db_pwd = getpass.getpass("Password <%s>: " % db_user)
+    if not db_pwd:
+        db_pwd = getpass.getpass("Password <%s>: " % db_user)
     
     # setup the configuration
-    configure(output_file, db, db_user, db_pwd, db_host, db_port, analyze_schema, target_schema, analyze_table, threads, do_execute, query_slot_count, ignore_errors, force, drop_old_data, comprows, query_group, debug)
+    configure(output_file, db, db_user, db_pwd, db_host, db_port, analyze_schema, target_schema, analyze_table, threads, do_execute, query_slot_count, ignore_errors, force, drop_old_data, comprows, query_group, debug, ssl_option)
     
     # run the analyser
     result_code = run()

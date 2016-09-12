@@ -13,18 +13,24 @@
   },
   // location and credentials for S3, which are used to store migrated data while in flight
   "s3Staging": {
+    // Either use AWS IAM role or specify access_key / secret for s3 access. Read http://docs.aws.amazon.com/redshift/latest/mgmt/copy-unload-iam-role.html
+    // AWS IAM Role to use. If role is specified, access keys are ignored
+    "aws_iam_role": "aws iam role which is assigned to Redshift and has access to the s3 bucket",
     // base 64 encoded AWS Access Key used to access S3. Use the encryptValue.sh utility to generate this string
     "aws_access_key_id": "my base 64 encoded access key",
     // base 64 encoded AWS Secret Access Key used to access S3. Use the encryptValue.sh utility to generate this string
     "aws_secret_access_key": "my base 64 encoded secret key",
     // path on S3 to use for storing in-flight data. The current date and time is appended to the prefix
-    "path": "s3://my-bucket/prefix/"
+    "path": "s3://my-bucket/prefix/",
+    "deleteOnSuccess": "True",
+    // region to use for the S3 export
+    "region": "us-east-1"
   },
   // the destination database into which we will copy data
   "copyTarget": {
     "clusterEndpoint": "my-other-cluster.d7bdmd4addft.eu-west-1.redshift.amazonaws.com",
     "clusterPort": 5439,
-    // base 64 encoded password for the user to UNLOAD data as. Use the encryptValue.sh utility to generate this string
+    // base 64 encoded password for the user to COPY data as. Use the encryptValue.sh utility to generate this string
     "connectPwd": "my base 64 encoded password",
     "connectUser": "master",
     "db": "mydb",
@@ -32,3 +38,4 @@
     "tableName": "import_table"
   }
 }
+        
