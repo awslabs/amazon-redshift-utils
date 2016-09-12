@@ -525,8 +525,8 @@ def analyze(table_info):
                 encode_columns.extend(['"%s" %s %s %s encode %s %s'
                                        % (col, col_type, default_value, col_null, compression, distkey)])
             
-            # if this table's encodings have not changed, then dont do a modification, including if the force options is set
-            if not encodings_modified:
+            # if this table's encodings have not changed, then dont do a modification, unless force options is set
+            if (not force) and (not encodings_modified):
                 comment("Column Encoding resulted in an identical table - no changes will be made")
             else:
                 comment("Column Encoding will be modified for %s.%s" % (analyze_schema, table_name))
