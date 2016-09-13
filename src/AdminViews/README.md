@@ -10,6 +10,7 @@ All views assume you have a schema called admin.
 | v_check_wlm_query_trend_daily.sql | View to get  WLM Query Count, Queue Wait Time , Execution Time and Total Time by Day  |
 | v_check_wlm_query_trend_hourly.sql | View to get  WLM Query Count, Queue Wait Time , Execution Time and Total Time by Hour |
 | v_constraint_dependency.sql |   View to get the the foreign key constraints between tables | 
+| v_extended_table_info.sql| View to get extended table information for permanent database tables.
 | v_generate_cancel_query.sql | View to get cancel query |
 | v_generate_group_ddl.sql |   View to get the DDL for a group. | 
 | v_generate_schema_ddl.sql |   View to get the DDL for schemas. | 
