@@ -88,7 +88,7 @@ FROM
    ,200000000 + CAST(con.oid AS INT) AS seq
    ,'\t,' + pg_get_constraintdef(con.oid) AS ddl
   FROM pg_constraint AS con
-  INNER JOIN pg_class AS c ON c.relnamespace = con.connamespace AND c.relfilenode = con.conrelid
+  INNER JOIN pg_class AS c ON c.relnamespace = con.connamespace AND c.oid = con.conrelid
   INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
   WHERE c.relkind = 'r' AND pg_get_constraintdef(con.oid) NOT LIKE 'FOREIGN KEY%'
   ORDER BY seq)
@@ -209,7 +209,7 @@ from (SELECT
     FROM pg_constraint AS con
       INNER JOIN pg_class AS c
               ON c.relnamespace = con.connamespace
-             AND c.relfilenode = con.conrelid
+             AND c.oid = con.conrelid
       INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
     WHERE c.relkind = 'r'
     AND   pg_get_constraintdef (con.oid) LIKE 'FOREIGN KEY%'
