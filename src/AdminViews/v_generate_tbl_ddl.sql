@@ -119,7 +119,7 @@ FROM pg_namespace AS n
   n.nspname AS schemaname
    ,c.relname AS tablename
    ,1 AS seq  
-   ,'--WARNING: This DDL inherited the \'BACKUP NO\' property from the source table' as ddl
+   ,'--WARNING: This DDL inherited the BACKUP NO property from the source table' as ddl
 FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   INNER JOIN (SELECT 
