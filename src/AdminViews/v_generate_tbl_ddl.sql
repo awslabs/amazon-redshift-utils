@@ -97,38 +97,38 @@ FROM
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
-  --BACKUP 
+  --BACKUP
   UNION SELECT
   n.nspname AS schemaname
    ,c.relname AS tablename
-   ,300000000 AS seq  
+   ,300000000 AS seq
    ,'BACKUP NO' as ddl
 FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
-  INNER JOIN (SELECT 
-    SPLIT_PART(key,'_',5) id 
-    FROM pg_conf 
-    WHERE key LIKE 'pg_class_backup_%' 
-    AND SPLIT_PART(key,'_',4) = (SELECT 
-      oid 
-      FROM pg_database 
+  INNER JOIN (SELECT
+    SPLIT_PART(key,'_',5) id
+    FROM pg_conf
+    WHERE key LIKE 'pg_class_backup_%'
+    AND SPLIT_PART(key,'_',4) = (SELECT
+      oid
+      FROM pg_database
       WHERE datname = current_database())) t ON t.id=c.oid
   WHERE c.relkind = 'r'
   --BACKUP WARNING
   UNION SELECT
   n.nspname AS schemaname
    ,c.relname AS tablename
-   ,1 AS seq  
+   ,1 AS seq
    ,'--WARNING: This DDL inherited the BACKUP NO property from the source table' as ddl
 FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
-  INNER JOIN (SELECT 
-    SPLIT_PART(key,'_',5) id 
-    FROM pg_conf 
-    WHERE key LIKE 'pg_class_backup_%' 
-    AND SPLIT_PART(key,'_',4) = (SELECT 
-      oid 
-      FROM pg_database 
+  INNER JOIN (SELECT
+    SPLIT_PART(key,'_',5) id
+    FROM pg_conf
+    WHERE key LIKE 'pg_class_backup_%'
+    AND SPLIT_PART(key,'_',4) = (SELECT
+      oid
+      FROM pg_database
       WHERE datname = current_database())) t ON t.id=c.oid
   WHERE c.relkind = 'r'
   --DISTSTYLE
@@ -202,10 +202,10 @@ from (SELECT
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r' )
   UNION (
-    SELECT n.nspname AS schemaname,
+    SELECT 'zzzzzzzz' AS schemaname,
        'zzzzzzzz' AS tablename,
        700000000 + CAST(con.oid AS INT) AS seq,
-       'ALTER TABLE ' + c.relname + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
+       'ALTER TABLE ' + n.nspname + '.' + c.relname + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
     FROM pg_constraint AS con
       INNER JOIN pg_class AS c
               ON c.relnamespace = con.connamespace
