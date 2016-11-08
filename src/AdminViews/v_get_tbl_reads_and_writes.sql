@@ -9,6 +9,10 @@ following:
  - A if the query statement got aborted this could be due to a serializable isolation violation
    the user will need to check the query manually.
 
+Another output is the transaction actions (tx_action) which will be:
+ - R if the transaction is rolled back
+ - C if the transaction is committed
+
 History:
 2016-11-03 pvbouwel Created
 **********************************************************************************************/
@@ -22,13 +26,25 @@ WITH v_operations AS
     SELECT query, tbl, 'W' AS operation FROM stl_insert GROUP BY query, tbl
       UNION ALL
     SELECT query, NULL::int as tbl, 'A' AS operation FROM stl_query WHERE aborted=1 GROUP BY query, tbl
+  ),
+v_end_of_transaction AS
+  ( SELECT xid, MAX(tx_action) AS tx_action, MAX(endtime) as endtime FROM
+    (  SELECT xid, 'R' AS tx_action, endtime FROM stl_utilitytext WHERE text ILIKE '%rollback%' OR text ILIKE '%aborted%'
+         UNION ALL
+       SELECT xid, 'C' AS tx_action, endtime FROM stl_utilitytext WHERE text ILIKE '%commit%' OR text ILIKE '%end%'
+         UNION ALL
+       SELECT xid, 'C' AS tx_action, endtime from stl_commit_stats WHERE node=-1
+    ) GROUP BY xid
   )
 SELECT
-  sq.xid
-  ,sq.query
-  ,vo.tbl
-  ,vo.operation
-  ,sq.starttime
-  ,sq.endtime
+  sq.xid as xid
+  ,sq.query as query
+  ,vo.tbl as tbl
+  ,vo.operation as operation
+  ,sq.starttime as statement_starttime
+  ,sq.endtime as statement_endtime
+  ,ve.endtime as transaction_endtime
+  ,ve.tx_action as transaction_action
 FROM stl_query sq
-     LEFT JOIN v_operations vo ON sq.query=vo.query;
+     LEFT JOIN v_operations vo ON sq.query=vo.query
+     LEFT JOIN v_end_of_transaction ve ON sq.xid=ve.xid;
