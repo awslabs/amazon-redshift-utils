@@ -149,47 +149,47 @@ dev=# select pg_last_query_id();
 Checking the physical execution plan for these two queries we can see the only deviation being the `rows_pre_filter` amount and the `avgtime` duration.
 
 ```sql
-dev=# select query,seg,step,avgtime,rows,bytes,label,is_rrscan,rows_pre_filter from svl_query_summary where query in (320310,320312) order by stm,seg,step,query;
- query  | seg | step | avgtime |  rows  |  bytes   |                   label                   | is_rrscan | rows_pre_filter
---------+-----+------+---------+--------+----------+-------------------------------------------+-----------+-----------------
- 320310 |   0 |    0 |  201479 | 419516 | 19297736 | scan   tbl=108315 name=lineitem           | t         |         6290562
- 320312 |   0 |    0 | 2580793 | 419516 | 19297736 | scan   tbl=108338 name=lineitem           | t         |       280234000
- 320310 |   0 |    1 |  201479 | 419516 |        0 | project                                   | f         |               0
- 320312 |   0 |    1 | 2580793 | 419516 |        0 | project                                   | f         |               0
- 320310 |   0 |    2 |  201479 | 419516 |        0 | project                                   | f         |               0
- 320312 |   0 |    2 | 2580793 | 419516 |        0 | project                                   | f         |               0
- 320310 |   0 |    3 |  201479 |      6 |      960 | aggr   tbl=263                            | f         |               0
- 320312 |   0 |    3 | 2580793 |      6 |      960 | aggr   tbl=263                            | f         |               0
- 320310 |   0 |    4 |  201479 |      6 |        0 | dist                                      | f         |               0
- 320312 |   0 |    4 | 2580793 |      6 |        0 | dist                                      | f         |               0
- 320310 |   1 |    0 |  226696 |      6 |      960 | scan   tbl=105575 name=Internal Worktable | f         |               0
- 320312 |   1 |    0 | 2656280 |      6 |      960 | scan   tbl=105579 name=Internal Worktable | f         |               0
- 320310 |   1 |    1 |  226696 |      1 |      160 | aggr   tbl=266                            | f         |               0
- 320312 |   1 |    1 | 2656280 |      1 |      160 | aggr   tbl=266                            | f         |               0
- 320310 |   1 |    2 |  226696 |      1 |        0 | project                                   | f         |               0
- 320312 |   1 |    2 | 2656280 |      1 |        0 | project                                   | f         |               0
- 320310 |   1 |    3 |  226696 |      1 |        0 | project                                   | f         |               0
- 320312 |   1 |    3 | 2656280 |      1 |        0 | project                                   | f         |               0
- 320310 |   1 |    4 |  226696 |      1 |      128 | sort   tbl=269                            | f         |               0
- 320312 |   1 |    4 | 2656280 |      1 |      128 | sort   tbl=269                            | f         |               0
- 320310 |   1 |    5 |  226696 |      0 |        0 | merge                                     | f         |               0
- 320312 |   1 |    5 | 2656280 |      0 |        0 | merge                                     | f         |               0
- 320310 |   1 |    6 |  226696 |      0 |        0 | aggr   tbl=271                            | f         |               0
- 320312 |   1 |    6 | 2656280 |      0 |        0 | aggr   tbl=271                            | f         |               0
- 320310 |   1 |    7 |  226696 |      0 |        0 | project                                   | f         |               0
- 320312 |   1 |    7 | 2656280 |      0 |        0 | project                                   | f         |               0
- 320310 |   2 |    0 |      53 |      1 |      128 | scan   tbl=269 name=Internal Worktable    | f         |               0
- 320312 |   2 |    0 |      65 |      1 |      128 | scan   tbl=269 name=Internal Worktable    | f         |               0
- 320310 |   2 |    1 |      53 |      1 |        0 | return                                    | f         |               0
- 320312 |   2 |    1 |      65 |      1 |        0 | return                                    | f         |               0
- 320310 |   3 |    0 |      91 |      0 |        0 | merge                                     | f         |               0
- 320312 |   3 |    0 |      90 |      0 |        0 | merge                                     | f         |               0
- 320310 |   3 |    1 |      91 |      1 |        0 | project                                   | f         |               0
- 320312 |   3 |    1 |      90 |      1 |        0 | project                                   | f         |               0
- 320310 |   3 |    2 |      91 |      1 |        0 | project                                   | f         |               0
- 320312 |   3 |    2 |      90 |      1 |        0 | project                                   | f         |               0
- 320310 |   3 |    3 |      91 |      0 |        0 | return                                    | f         |               0
- 320312 |   3 |    3 |      90 |      0 |        0 | return                                    | f         |               0
+dev=# select query,seg,step,avgtime,rows,rows_pre_filter,bytes,label,is_rrscan from svl_query_summary where query in (320310,320312) order by stm,seg,step,query;
+ query  | seg | step | avgtime |  rows  | rows_pre_filter |  bytes   |                   label                   | is_rrscan
+--------+-----+------+---------+--------+-----------------+----------+-------------------------------------------+-----------
+ 320310 |   0 |    0 |  201479 | 419516 |         6290562 | 19297736 | scan   tbl=108315 name=lineitem           | t
+ 320312 |   0 |    0 | 2580793 | 419516 |       280234000 | 19297736 | scan   tbl=108338 name=lineitem           | t
+ 320310 |   0 |    1 |  201479 | 419516 |               0 |        0 | project                                   | f
+ 320312 |   0 |    1 | 2580793 | 419516 |               0 |        0 | project                                   | f
+ 320310 |   0 |    2 |  201479 | 419516 |               0 |        0 | project                                   | f
+ 320312 |   0 |    2 | 2580793 | 419516 |               0 |        0 | project                                   | f
+ 320310 |   0 |    3 |  201479 |      6 |               0 |      960 | aggr   tbl=263                            | f
+ 320312 |   0 |    3 | 2580793 |      6 |               0 |      960 | aggr   tbl=263                            | f
+ 320310 |   0 |    4 |  201479 |      6 |               0 |        0 | dist                                      | f
+ 320312 |   0 |    4 | 2580793 |      6 |               0 |        0 | dist                                      | f
+ 320310 |   1 |    0 |  226696 |      6 |               0 |      960 | scan   tbl=105575 name=Internal Worktable | f
+ 320312 |   1 |    0 | 2656280 |      6 |               0 |      960 | scan   tbl=105579 name=Internal Worktable | f
+ 320310 |   1 |    1 |  226696 |      1 |               0 |      160 | aggr   tbl=266                            | f
+ 320312 |   1 |    1 | 2656280 |      1 |               0 |      160 | aggr   tbl=266                            | f
+ 320310 |   1 |    2 |  226696 |      1 |               0 |        0 | project                                   | f
+ 320312 |   1 |    2 | 2656280 |      1 |               0 |        0 | project                                   | f
+ 320310 |   1 |    3 |  226696 |      1 |               0 |        0 | project                                   | f
+ 320312 |   1 |    3 | 2656280 |      1 |               0 |        0 | project                                   | f
+ 320310 |   1 |    4 |  226696 |      1 |               0 |      128 | sort   tbl=269                            | f
+ 320312 |   1 |    4 | 2656280 |      1 |               0 |      128 | sort   tbl=269                            | f
+ 320310 |   1 |    5 |  226696 |      0 |               0 |        0 | merge                                     | f
+ 320312 |   1 |    5 | 2656280 |      0 |               0 |        0 | merge                                     | f
+ 320310 |   1 |    6 |  226696 |      0 |               0 |        0 | aggr   tbl=271                            | f
+ 320312 |   1 |    6 | 2656280 |      0 |               0 |        0 | aggr   tbl=271                            | f
+ 320310 |   1 |    7 |  226696 |      0 |               0 |        0 | project                                   | f
+ 320312 |   1 |    7 | 2656280 |      0 |               0 |        0 | project                                   | f
+ 320310 |   2 |    0 |      53 |      1 |               0 |      128 | scan   tbl=269 name=Internal Worktable    | f
+ 320312 |   2 |    0 |      65 |      1 |               0 |      128 | scan   tbl=269 name=Internal Worktable    | f
+ 320310 |   2 |    1 |      53 |      1 |               0 |        0 | return                                    | f
+ 320312 |   2 |    1 |      65 |      1 |               0 |        0 | return                                    | f
+ 320310 |   3 |    0 |      91 |      0 |               0 |        0 | merge                                     | f
+ 320312 |   3 |    0 |      90 |      0 |               0 |        0 | merge                                     | f
+ 320310 |   3 |    1 |      91 |      1 |               0 |        0 | project                                   | f
+ 320312 |   3 |    1 |      90 |      1 |               0 |        0 | project                                   | f
+ 320310 |   3 |    2 |      91 |      1 |               0 |        0 | project                                   | f
+ 320312 |   3 |    2 |      90 |      1 |               0 |        0 | project                                   | f
+ 320310 |   3 |    3 |      91 |      0 |               0 |        0 | return                                    | f
+ 320312 |   3 |    3 |      90 |      0 |               0 |        0 | return                                    | f
 (38 rows)
 ```
 
