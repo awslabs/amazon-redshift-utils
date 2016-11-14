@@ -17,7 +17,7 @@ unsorted: Percent of rows in the unsorted space of the table
 stats_off: Number that indicates how stale the table's statistics are; 0 is current, 100 is out of date.
 scans:rr:filt:sel:del :
   scans: number of scans against the table
-  rr: number of rr_scans against the table
+  rr: number of range restricted scans (scans which leverage the zone maps) against the table
   filt: number of scans against the table which leveraged filter criteria
   sel: number of scans against the table which triggered an alert for selective query filter
   del: number of scans against the table which triggered an alert for scanning number of deleted rows
