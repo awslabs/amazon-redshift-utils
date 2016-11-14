@@ -10,3 +10,18 @@ The content in this project subfolder will serve as a collection of various inve
 
 
 [1]: https://github.com/awslabs/amazon-redshift-utils/blob/master/src/Investigations/EarlyMaterialization.md
+
+[//]: # (Predicate operator cost)
+[//]: # (Zone Map Invalidation)
+[//]: # (Redundant Compression Analysis)
+[//]: # (Colocation vs Parallelism: ALL vs KEY)
+[//]: # (Colocation vs Parallelism: EVEN vs KEY)
+[//]: # (Commit Queuing)
+[//]: # (WLM Queuing)
+[//]: # (Unsorted sorted tables) 
+[//]: # (Wide column impact)
+[//]: # (Interleaved Sortkey Skew and Bucket monitoring)
+[//]: # (ODBC HTTP/TCP Proxy Support) 
+[//]: # (ODBC Tracing configuration) 
+[//]: # (JDBC tracing configuration)
+[//]: # (Serializable Isolation Violations)
