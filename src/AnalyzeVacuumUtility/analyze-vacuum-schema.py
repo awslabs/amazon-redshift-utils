@@ -371,11 +371,11 @@ def run_vacuum(conn):
                                 FROM (SELECT TRIM(n.nspname) schema_name, t.relname table_name,
                                                  MAX(v.interleaved_skew) max_skew, MAX(c.count) AS rows,
                                                  CASE
-                                                   WHEN (MAX(v.interleaved_skew) > 5 AND MAX(c.count) > 10240) THEN 'Yes'
+                                                   WHEN (max(c.max_bucket) = 0) OR (MAX(v.interleaved_skew) > 5 AND MAX(c.count) > 10240) THEN 'Yes'
                                                    ELSE 'No'
                                                  END AS reindex_flag
                                             FROM svv_interleaved_columns v
-                                            JOIN (SELECT tbl,col,SUM(count) AS count
+                                            JOIN (SELECT tbl,col, max(compressed_val) AS max_bucket,  SUM(count) AS count
                                                   FROM stv_interleaved_counts
                                                   GROUP BY tbl,col) c
                                             ON (v.tbl = c.tbl AND v.col = c.col)
