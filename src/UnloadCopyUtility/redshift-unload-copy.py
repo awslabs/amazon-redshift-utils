@@ -45,7 +45,7 @@ set_timeout_stmt = "set statement_timeout = 1200000"
 
 unload_stmt = """unload ('SELECT * FROM %s.%s')
                  to '%s' credentials 
-                 'aws_access_key_id=%s;aws_secret_access_key=%s;master_symmetric_key=%s'
+                 '%s;master_symmetric_key=%s'
                  manifest
                  encrypted
                  gzip
@@ -53,7 +53,7 @@ unload_stmt = """unload ('SELECT * FROM %s.%s')
 
 copy_stmt = """copy %s.%s
                from '%smanifest' credentials 
-               'aws_access_key_id=%s;aws_secret_access_key=%s;master_symmetric_key=%s'
+               '%s;master_symmetric_key=%s'
                manifest 
                encrypted
                gzip
@@ -69,24 +69,22 @@ def conn_to_rs(host, port, db, usr, pwd, opt=options, timeout=set_timeout_stmt):
     return rs_conn
 
 
-def unload_data(conn, aws_access_key_id, aws_secret_key, master_symmetric_key, dataStagingPath, schema_name, table_name):
+def unload_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPath, schema_name, table_name):
     print "Exporting %s.%s to %s" % (schema_name, table_name, dataStagingPath)
-    conn.query(unload_stmt % (schema_name, table_name, dataStagingPath, aws_access_key_id,
-                              aws_secret_key, master_symmetric_key))
+    conn.query(unload_stmt % (schema_name, table_name, dataStagingPath, s3_access_credentials, master_symmetric_key))
 
 
-def copy_data(conn, aws_access_key_id, aws_secret_key, master_symmetric_key, dataStagingPath, dataStagingRegion, schema_name, table_name):
+def copy_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPath, dataStagingRegion, schema_name, table_name):
     global copy_stmt
     if dataStagingRegion != None:
         copy_stmt = copy_stmt + ("\nREGION '%s'" % (dataStagingRegion))
         
     print "Importing %s.%s from %s" % (schema_name, table_name, dataStagingPath + (":%s" % (dataStagingRegion) if dataStagingRegion != None else ""))
-    conn.query(copy_stmt % (schema_name, table_name, dataStagingPath, aws_access_key_id, aws_secret_key,
-                            master_symmetric_key))
+    conn.query(copy_stmt % (schema_name, table_name, dataStagingPath, s3_access_credentials, master_symmetric_key))
 
 
 def decrypt(b64EncodedValue):
-        return kmsClient.decrypt(base64.b64decode(b64EncodedValue))['Plaintext']
+    return kmsClient.decrypt(base64.b64decode(b64EncodedValue))['Plaintext']
 
 
 def tokeniseS3Path(path):
@@ -149,6 +147,9 @@ def main(args):
     global s3Client    
     s3Client = boto.s3.connect_to_region(region)
     
+    global kmsClient
+    kmsClient = boto.kms.connect_to_region(region)
+    
     # load the configuration
     getConfig(args[1])
     
@@ -161,9 +162,22 @@ def main(args):
     dataStagingRegion = None
     if 'region' in config["s3Staging"]:
         dataStagingRegion = config["s3Staging"]['region']
-        
-    accessKey = config['s3Staging']['aws_access_key_id']
-    secretKey = config['s3Staging']['aws_secret_access_key']
+
+
+    s3_access_credentials = ''
+    if 'aws_iam_role' in config["s3Staging"]:
+        accessRole = config['s3Staging']['aws_iam_role']
+        s3_access_credentials = "aws_iam_role=%s" % accessRole
+    else:
+        accessKey = config['s3Staging']['aws_access_key_id']
+        secretKey = config['s3Staging']['aws_secret_access_key']
+
+        # decrypt aws access keys
+        s3_access_key = decrypt(accessKey)
+        s3_secret_key = decrypt(secretKey)
+
+        s3_access_credentials = "aws_access_key_id=%s;aws_secret_access_key=%s" % (s3_access_key, s3_secret_key)
+
     deleteOnSuccess = config['s3Staging']['deleteOnSuccess']
     
     # source from which to export data
@@ -186,9 +200,6 @@ def main(args):
     dest_table = destConfig['tableName']
     dest_user = destConfig['connectUser']
     
-    global kmsClient
-    kmsClient = boto.kms.connect_to_region(region)
-    
     # create a new data key for the unload operation        
     dataKey = kmsClient.generate_data_key(encryptionKeyID, key_spec="AES_256")
 
@@ -197,29 +208,23 @@ def main(args):
     # decrypt the source and destination passwords
     src_pwd = decrypt(srcConfig["connectPwd"])
     dest_pwd = decrypt(destConfig["connectPwd"])
-    
-    # decrypt aws access keys
-    s3_access_key = decrypt(accessKey)
-    s3_secret_key = decrypt(secretKey)
-    
+
     print "Exporting from Source"
     src_conn = conn_to_rs(src_host, src_port, src_db, src_user,
                           src_pwd) 
-    unload_data(src_conn, s3_access_key, s3_secret_key,
-                master_symmetric_key, dataStagingPath,
+    unload_data(src_conn, s3_access_credentials, master_symmetric_key, dataStagingPath,
                 src_schema, src_table) 
 
     print "Importing to Target"
     dest_conn = conn_to_rs(dest_host, dest_port, dest_db, dest_user,
                           dest_pwd) 
-    copy_data(dest_conn, s3_access_key, s3_secret_key,
-              master_symmetric_key, dataStagingPath, dataStagingRegion,
+    copy_data(dest_conn, s3_access_credentials, master_symmetric_key, dataStagingPath, dataStagingRegion,
               dest_schema, dest_table)
 
     src_conn.close()
     dest_conn.close()
     
-    if deleteOnSuccess:
+    if 'true' == deleteOnSuccess.lower():
         s3Delete(dataStagingPath)
 
 

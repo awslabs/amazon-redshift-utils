@@ -47,7 +47,7 @@ import shortuuid
 import datetime
 from _curses import OK
 
-__version__ = ".9.2.0"
+__version__ = ".9.2.1"
 
 OK = 0
 ERROR = 1
@@ -525,8 +525,8 @@ def analyze(table_info):
                 encode_columns.extend(['"%s" %s %s %s encode %s %s'
                                        % (col, col_type, default_value, col_null, compression, distkey)])
             
-            # if this table's encodings have not changed, then dont do a modification, including if the force options is set
-            if not encodings_modified:
+            # if this table's encodings have not changed, then don't do a modification, unless force options is set
+            if (not force) and (not encodings_modified):
                 comment("Column Encoding resulted in an identical table - no changes will be made")
             else:
                 comment("Column Encoding will be modified for %s.%s" % (analyze_schema, table_name))
@@ -629,6 +629,7 @@ def usage(with_message):
         
     write('Arguments: --db             - The Database to Use')
     write('           --db-user        - The Database User to connect to')
+    write('           --db-pwd         - The Password for the Database User to connect to')
     write('           --db-host        - The Cluster endpoint')
     write('           --db-port        - The Cluster endpoint port (default 5439)')
     write('           --analyze-schema - The Schema to be Analyzed (default public)')
@@ -819,10 +820,6 @@ order by 2;
                 result.append(analyze(t))
     else:
         comment("No Tables Found to Analyze")
-        
-    # do a final vacuum if needed
-    if drop_old_data:
-        write("vacuum delete only;")
     
     # return any non-zero worker output statuses
     modified_tables = 0
@@ -881,7 +878,7 @@ def main(argv):
     query_group = None
     ssl_option = None
     
-    supported_args = """db= db-user= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option="""
     
     # extract the command line arguments
     try:
@@ -910,6 +907,9 @@ def main(argv):
         elif arg == "--db-port":
             if value != '' and value != None:
                 db_port = int(value)
+        elif arg == "--db-pwd":
+            if value != '' and value != None:
+                db_pwd = value
         elif arg == "--analyze-schema":
             if value != '' and value != None:
                 analyze_schema = value
@@ -989,7 +989,8 @@ def main(argv):
         threads = 1
         
     # get the database password
-    db_pwd = getpass.getpass("Password <%s>: " % db_user)
+    if not db_pwd:
+        db_pwd = getpass.getpass("Password <%s>: " % db_user)
     
     # setup the configuration
     configure(output_file, db, db_user, db_pwd, db_host, db_port, analyze_schema, target_schema, analyze_table, threads, do_execute, query_slot_count, ignore_errors, force, drop_old_data, comprows, query_group, debug, ssl_option)

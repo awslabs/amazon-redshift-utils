@@ -13,7 +13,7 @@ There are two dimensions to disaster recovery which must be carefully considered
 * RTO: Recovery Time Objective - how long does it take to recover from an outage scenario?
 * RPO: Recovery Point Objective - when you have recovered, at what point in time will the system be consistent to?
 
-A comprehensive overview of how to build systems which implement best practices for disaster recovery can be found [the AWS Disaster Re4covery Whitepaper](https://aws.amazon.com/blogs/aws/new-whitepaper-use-aws-for-disaster-recovery/).
+A comprehensive overview of how to build systems which implement best practices for disaster recovery can be found [the AWS Disaster Recovery Whitepaper](https://aws.amazon.com/blogs/aws/new-whitepaper-use-aws-for-disaster-recovery/).
 
 ### Recovery Time Objective in Redshift
 

@@ -21,7 +21,7 @@ SELECT
 			ELSE ROUND((a.unsorted_rows::FLOAT / a.rows::FLOAT) * 100, 5)
 		END AS pct_unsorted
 		,CASE WHEN a.rows = 0 THEN 'n/a'
-			WHEN (a.unsorted_rows::FLOAT / a.rows::FLOAT) * 100 >= 20 THEN 'VACUUM recommended'
+			WHEN (a.unsorted_rows::FLOAT / a.rows::FLOAT) * 100 >= 20 THEN 'VACUUM SORT recommended'
 			ELSE 'n/a'
 		END AS recommendation
 FROM
