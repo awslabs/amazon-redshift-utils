@@ -47,7 +47,7 @@ import shortuuid
 import datetime
 from _curses import OK
 
-__version__ = ".9.2.1"
+__version__ = ".9.2.2"
 
 OK = 0
 ERROR = 1
@@ -60,7 +60,7 @@ NO_CONNECTION = 5
 RETRY_TIMEOUT = 100. / 1000
     
 # compiled regular expressions
-IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
+IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \(?\'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
 
 def get_env_var(name, defaultVal):
     return os.environ[name] if name in os.environ else defaultVal
