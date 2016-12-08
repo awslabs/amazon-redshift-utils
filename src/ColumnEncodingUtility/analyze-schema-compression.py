@@ -47,7 +47,7 @@ import shortuuid
 import datetime
 from _curses import OK
 
-__version__ = ".9.2.0"
+__version__ = ".9.2.2"
 
 OK = 0
 ERROR = 1
@@ -60,7 +60,7 @@ NO_CONNECTION = 5
 RETRY_TIMEOUT = 100. / 1000
     
 # compiled regular expressions
-IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
+IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \(?\'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
 
 def get_env_var(name, defaultVal):
     return os.environ[name] if name in os.environ else defaultVal
@@ -525,7 +525,7 @@ def analyze(table_info):
                 encode_columns.extend(['"%s" %s %s %s encode %s %s'
                                        % (col, col_type, default_value, col_null, compression, distkey)])
             
-            # if this table's encodings have not changed, then dont do a modification, unless force options is set
+            # if this table's encodings have not changed, then don't do a modification, unless force options is set
             if (not force) and (not encodings_modified):
                 comment("Column Encoding resulted in an identical table - no changes will be made")
             else:
@@ -820,15 +820,6 @@ order by 2;
                 result.append(analyze(t))
     else:
         comment("No Tables Found to Analyze")
-        
-    # do a final vacuum if needed
-    if drop_old_data:
-        if do_execute:
-            if not run_commands(master_conn, "vacuum delete only;"):
-                write("Error during Vaccuum Delete")
-                return ERROR
-        else:
-            write("vacuum delete only;")
     
     # return any non-zero worker output statuses
     modified_tables = 0

@@ -14,7 +14,7 @@ SELECT trunc(a.service_class_start_time) AS day,
        COUNT(a.query) AS query_count, 
        SUM(a.total_queue_time) AS total_queue_time_sum, 
        SUM(a.total_exec_time) AS total_exec_time_sum, 
-       (SUM(a.total_queue_time)::FLOAT/ SUM(a.total_exec_time)::FLOAT)*100 AS percent_wlm_queue_time 
+       (SUM(a.total_queue_time)::FLOAT/ NULLIF(SUM(a.total_exec_time),0)::FLOAT)*100 AS percent_wlm_queue_time 
 FROM stl_wlm_query a 
   JOIN stv_wlm_classification_config b ON a.service_class = b.action_service_class 
 GROUP BY trunc(a.service_class_start_time) , 

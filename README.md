@@ -56,6 +56,9 @@ This [project](src/SnapshotManager) includes a Lambda function that will ensure 
 # Presentation
 We included a presentation which describes main features of the Amazon-Redshift-Utils including some examples, tips and best practices: Redshift_DBA_Commands.pptx
 
+# Investigations
+This project includes a number of detailed investigations into various types of Redshift edge cases, nuances, and workload scenarios. 
+
 ----
 Copyright 2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 

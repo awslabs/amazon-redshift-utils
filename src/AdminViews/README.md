@@ -10,6 +10,7 @@ All views assume you have a schema called admin.
 | v_check_wlm_query_trend_daily.sql | View to get  WLM Query Count, Queue Wait Time , Execution Time and Total Time by Day  |
 | v_check_wlm_query_trend_hourly.sql | View to get  WLM Query Count, Queue Wait Time , Execution Time and Total Time by Hour |
 | v_constraint_dependency.sql |   View to get the the foreign key constraints between tables | 
+| v_extended_table_info.sql| View to get extended table information for permanent database tables.
 | v_generate_cancel_query.sql | View to get cancel query |
 | v_generate_group_ddl.sql |   View to get the DDL for a group. | 
 | v_generate_schema_ddl.sql |   View to get the DDL for schemas. | 
@@ -23,6 +24,7 @@ All views assume you have a schema called admin.
 | v_get_obj_priv_by_user.sql |   View to get the table/views that a user has access to | 
 | v_get_schema_priv_by_user.sql |   View to get the schema that a user has access to | 
 | v_get_tbl_priv_by_user.sql |   View to get the tables that a user has access to | 
+| v_get_tbl_reads_and_writes.sql | View to get operations performed per table for transactions ID or query ID |
 | v_get_tbl_scan_frequency.sql |   View to get list of each permanent table's scan frequency | 
 | v_get_users_in_group.sql |   View to get all users in a group | 
 | v_get_vacuum_details.sql | View to get vacuum details like table name, Schema Name, Deleted Rows , processing time |
