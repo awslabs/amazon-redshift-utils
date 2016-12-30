@@ -1,12 +1,16 @@
 --DROP VIEW admin.v_generate_tbl_ddl;
 /**********************************************************************************************
 Purpose: View to get the DDL for a table.  This will contain the distkey, sortkey, constraints,
-	not null, defaults, etc.
+         not null, defaults, etc.
 History:
 2014-02-10 jjschmit Created
 2015-05-18 ericfe Added support for Interleaved sortkey
 2015-10-31 ericfe Added cast tp increase size of returning constraint name
 2016-05-24 chriz-bigdata Added support for BACKUP NO tables
+2016-12-30 pvbouwel Change table & schemaname of Foreign key constraints to allow for filters
+           that avoid filtering the foreing key constraints.  Constraints still need to be at
+           the end but this change allows for filtering using predicates. For example:
+           tablename like '%tablename' or schemaname like '%schemaname'
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
@@ -202,17 +206,17 @@ from (SELECT
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r' )
   UNION (
-    SELECT 'zzzzzzzz' AS schemaname,
-       'zzzzzzzz' AS tablename,
+    SELECT 'zzzzzzzz' || n.nspname AS schemaname,
+       'zzzzzzzz' || c.relname AS tablename,
        700000000 + CAST(con.oid AS INT) AS seq,
        'ALTER TABLE ' + n.nspname + '.' + c.relname + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
     FROM pg_constraint AS con
       INNER JOIN pg_class AS c
-              ON c.relnamespace = con.connamespace
+             ON c.relnamespace = con.connamespace
              AND c.oid = con.conrelid
       INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
     WHERE c.relkind = 'r'
-    AND   pg_get_constraintdef (con.oid) LIKE 'FOREIGN KEY%'
+    AND con.contype = 'f'
     ORDER BY seq
   )
  ORDER BY schemaname, tablename, seq
