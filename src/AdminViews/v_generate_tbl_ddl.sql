@@ -8,15 +8,12 @@ History:
 2015-10-31 ericfe Added cast tp increase size of returning constraint name
 2016-05-24 chriz-bigdata Added support for BACKUP NO tables
 2016-12-30 pvbouwel Change table & schemaname of Foreign key constraints to allow for filters
-           that avoid filtering the foreing key constraints.  Constraints still need to be at
-           the end but this change allows for filtering using predicates. For example:
-           tablename like '%tablename' or schemaname like '%schemaname'
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
 SELECT
- schemaname
- ,tablename
+ REGEXP_REPLACE (schemaname, '^zzzzzzzz', '') AS schemaname
+ ,REGEXP_REPLACE (tablename, '^zzzzzzzz', '') AS tablename
  ,seq
  ,ddl
 FROM
