@@ -1,6 +1,6 @@
 
 /**********************************************************************************************
-Purpose: Uses a python UDF and a CTAS statement to build a calendar dimension table.
+Purpose: Uses a python UDF and a CTAS statement to build a calendar dimension table template.
 Columns:
 id: Unique identifier of date represented as integer (YEAR*10000 + MONTH*100 + DAY)
 date: Date represented as date data type
@@ -15,6 +15,7 @@ holiday_flag: Boolean for US Federal Holidays
 weekend_flag: Boolean for Saturday and Sunday
 
 Notes:
+* Feel free to add additional columns to meet your reporting requirements, open issues for help
 * Use a custom calendar if interested in holidays rather than US Federal Holidays
 * Modify date literals and LIMIT clause if interested in ranges of dates beyond 1900->2049
 * Requires 54787 rows in STL_SCAN to generate calendar from 2049-12-31 to 1900-01-01
