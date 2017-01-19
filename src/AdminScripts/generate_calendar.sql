@@ -36,7 +36,7 @@ $$ LANGUAGE plpythonu;
 
 CREATE TABLE dim_calendar DISTSTYLE ALL SORTKEY (id) AS
 SELECT
- DATE_PART('y', date_gen.dt)*10000+DATE_PART('mon', date_gen.dt)*100+DATE_PART('day', date_gen.dt)::int AS "id",
+ (DATE_PART('y', date_gen.dt)*10000+DATE_PART('mon', date_gen.dt)*100+DATE_PART('day', date_gen.dt))::int AS "id",
  date_gen.dt AS "date",
  DATE_PART('y', date_gen.dt)::smallint AS "year",
  DATE_PART('mon', date_gen.dt)::smallint AS "month",
