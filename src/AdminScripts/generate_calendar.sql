@@ -17,7 +17,7 @@ weekend_flag: Boolean for Saturday and Sunday
 Notes:
 * Use a custom calendar if interested in holidays rather than US Federal Holidays
 * Modify date literals and LIMIT clause if interested in ranges of dates beyond 1900->2049
-* Requires 54788 rows in STL_SCAN to generate calendar from 2049-12-31 to 1900-01-01
+* Requires 54787 rows in STL_SCAN to generate calendar from 2049-12-31 to 1900-01-01
 ** Use a different table with that many rows in the date_gen subquery if STL_SCAN is too small
 
 History:
