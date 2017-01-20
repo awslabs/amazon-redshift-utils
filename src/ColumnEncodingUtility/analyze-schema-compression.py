@@ -48,7 +48,7 @@ import datetime
 from _curses import OK
 import math
 
-__version__ = ".9.2.3"
+__version__ = ".9.2.4"
 
 OK = 0
 ERROR = 1
@@ -879,7 +879,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
 where pgn.nspname = '%s'
-  and a.name::text SIMILAR TO '[A-Za-z_][A-Za-z0-9_]*'
+  and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
 order by 2;
         ''' % (analyze_schema,)
     
