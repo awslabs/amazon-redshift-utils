@@ -19,7 +19,7 @@ def schedule(args):
     json_config = json.load(config_file)
     namespace = json_config['namespace']
     
-    rulename = "%s.%s-%s-mins" % (function_name, namespace, schedule_mins)
+    rulename = "%s-%s-%s-mins" % (function_name, namespace, schedule_mins)
     
     # create the cloudwatch event rule
     rule = cw.put_rule(Name=rulename,
