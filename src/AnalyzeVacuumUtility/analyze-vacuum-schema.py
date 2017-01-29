@@ -40,15 +40,14 @@ Srinikri Amazon Web Services (2015)
 
 '''
 
-import sys
-import pg
 import getopt
 import os
 import re
-import getpass
+import sys
 import traceback
+
 import datetime
-from string import uppercase
+import pg
 
 __version__ = ".9.1.3.4"
 
@@ -83,9 +82,9 @@ query_group = None
 analyze_flag       = True
 vacuum_flag        = True
 vacuum_parameter   = 'FULL'
-min_unsorted_pct   = 05
+min_unsorted_pct   = 5
 max_unsorted_pct   = 50
-deleted_pct        = 05
+deleted_pct        = 5
 stats_off_pct      = 10
 max_table_size_mb  = (700*1024)
 goback_no_of_days  = 1
@@ -562,7 +561,7 @@ def main(argv):
     try:
         optlist, remaining = getopt.getopt(argv[1:], "", supported_args.split())
     except getopt.GetoptError as err:
-        print str(err)
+        print(str(err))
         usage(None)
 
     # setup globals
