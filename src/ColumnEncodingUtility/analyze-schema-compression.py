@@ -48,7 +48,7 @@ import datetime
 from _curses import OK
 import math
 
-__version__ = ".9.2.4"
+__version__ = ".9.2.5"
 
 OK = 0
 ERROR = 1
@@ -316,7 +316,7 @@ def get_table_desc(table_name):
  from pg_table_def de, pg_attribute at LEFT JOIN pg_attrdef ad ON (at.attrelid, at.attnum) = (ad.adrelid, ad.adnum)
  where de.schemaname = '%s'
  and de.tablename = '%s'
- and at.attrelid = '%s.%s'::regclass
+ and at.attrelid = '%s."%s"'::regclass
  and de.column = at.attname
 ''' % (analyze_schema, table_name, analyze_schema, table_name)
 
@@ -403,7 +403,7 @@ def analyze(table_info):
         if force:
             comment("Using Force Override Option")
     
-        statement = 'analyze compression %s.%s' % (analyze_schema, table_name)
+        statement = 'analyze compression %s."%s"' % (analyze_schema, table_name)
         
         if comprows != None:
             statement = statement + (" comprows %s" % int(comprows))
@@ -446,7 +446,7 @@ def analyze(table_info):
             else:
                 target_table = table_name
             
-            create_table = 'begin;\nlock table %s.%s;\ncreate table %s.%s(' % (analyze_schema, table_name, target_schema, target_table,)
+            create_table = 'begin;\nlock table %s."%s";\ncreate table %s."%s"(' % (analyze_schema, table_name, target_schema, target_table,)
             
             # query the table column definition
             descr = get_table_desc(table_name)
@@ -481,7 +481,7 @@ def analyze(table_info):
                 if analyze_col_width and "character varying" in col_type:                 
                     curr_col_length = int(re.search(r'\d+', col_type).group())
                     if curr_col_length > 255:
-                        col_len_statement = 'select max(len(%s)) from %s.%s' % (descr[col][0], analyze_schema, table_name)
+                        col_len_statement = 'select /* computing max column length */ max(len(%s)) from %s."%s"' % (descr[col][0], analyze_schema, table_name)
                         try:
                             if debug:
                                 comment(col_len_statement)
@@ -531,7 +531,7 @@ def analyze(table_info):
                 
                 # check whether number columns are too wide
                 if analyze_col_width and "int" in col_type:  
-                    col_len_statement = 'select max(%s) from %s.%s' % (descr[col][0], analyze_schema, table_name)
+                    col_len_statement = 'select max(%s) from %s."%s"' % (descr[col][0], analyze_schema, table_name)
                     try:
                         if debug:
                             comment(col_len_statement)
@@ -678,7 +678,7 @@ def analyze(table_info):
                     source_columns = '*'
                     mig_columns = ''
     
-                insert = 'insert into %s.%s %s select %s from %s.%s;' % (target_schema,
+                insert = 'insert into %s."%s" %s select %s from %s."%s";' % (target_schema,
                                                                          target_table,
                                                                          mig_columns,
                                                                          source_columns,
@@ -687,21 +687,21 @@ def analyze(table_info):
                 statements.extend([insert])
                         
                 # analyze the new table
-                analyze = 'analyze %s.%s;' % (target_schema, target_table)
+                analyze = 'analyze %s."%s";' % (target_schema, target_table)
                 statements.extend([analyze])
                         
                 if (target_schema == analyze_schema):
                     # rename the old table to _$old or drop
                     if drop_old_data:
-                        drop = 'drop table %s.%s cascade;' % (target_schema, table_name)
+                        drop = 'drop table %s."%s" cascade;' % (target_schema, table_name)
                     else:
                         # the alter table statement for the current data will use the first 104 characters of the original table name, the current datetime as YYYYMMDD and a 10 digit random string
-                        drop = 'alter table %s.%s rename to %s_%s_%s_$old;' % (target_schema, table_name, table_name[0:104] , datetime.date.today().strftime("%Y%m%d") , shortuuid.ShortUUID().random(length=10))
+                        drop = 'alter table %s."%s" rename to "%s_%s_%s_$old";' % (target_schema, table_name, table_name[0:104] , datetime.date.today().strftime("%Y%m%d") , shortuuid.ShortUUID().random(length=10))
                     
                     statements.extend([drop])
                             
                     # rename the migrate table to the old table name
-                    rename = 'alter table %s.%s rename to %s;' % (target_schema, target_table, table_name)
+                    rename = 'alter table %s."%s" rename to "%s";' % (target_schema, target_table, table_name)
                     statements.extend([rename])
                 
                 # add foreign keys
