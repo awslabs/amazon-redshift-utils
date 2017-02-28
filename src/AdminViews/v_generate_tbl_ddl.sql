@@ -2,6 +2,18 @@
 /**********************************************************************************************
 Purpose: View to get the DDL for a table.  This will contain the distkey, sortkey, constraints,
          not null, defaults, etc.
+
+Notes:   The view orders output automatically such that foreign keys are only created at the end.
+         This is needed due to dependencies of the foreign key constraint and the tables it
+         links.  Due to this one should not manually order the output.  It is still possible to
+         order if you filter out the FOREIGN KEYS and then apply them later.
+
+         The following filters are useful:
+           where ddl not like 'ALTER TABLE %'  -- do not return FOREIGN KEY CONSTRAINTS
+           where ddl like 'ALTER TABLE %'      -- only get FOREIGN KEY CONSTRAINTS
+           where tablename in ('t1', 't2')     -- only get DDL for specific tables
+           where schemaname in ('s1', 's2')    -- only get DDL for specific schemas
+
 History:
 2014-02-10 jjschmit Created
 2015-05-18 ericfe Added support for Interleaved sortkey
