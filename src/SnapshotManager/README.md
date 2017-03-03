@@ -100,7 +100,7 @@ Running the schedule command will create a CloudWatch Events Schedule that runs 
 
 ### What's Created
 
-After completion, you'll notice a Lambda Function called `RedshiftUtilsSnapshotManager`, plus there will be a CloudWatch Events Rule called `RedshiftUtilsSnapshotManager.<namespace>-15-mins` which runs every 15 minutes. 
+After completion, you'll notice a Lambda Function called `RedshiftUtilsSnapshotManager`, plus there will be a CloudWatch Events Rule called `RedshiftUtilsSnapshotManager-<namespace>-15-mins` which runs every 15 minutes.
 
 You can run `./build.sh schedule <config.json>` as many times as you need to create additional schedules.
 
