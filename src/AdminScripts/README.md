@@ -8,6 +8,7 @@ If you are using psql, you can use ``` psql [option] -f &lt;script.sql&gt;``` to
 | copy_performance.sql | Shows longest running copy for past 7 days |
 | current_session_info.sql | Query showing information about sessions with currently running queries |
 | filter_used.sql | Return filter applied to tables on scans. To aid on choosing sortkey |
+| generate_calendar.sql | Creates a calendar dimension table useful for star-schema joins |
 | missing_table_stats.sql | Query shows EXPLAIN plans which flagged "missing statistics" on the underlying tables |
 | perf_alert.sql | Return top occurrences of alerts, join with table scans |
 | queuing_queries.sql | Query showing queries which are waiting on a WLM Query Slot |
