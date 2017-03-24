@@ -29,7 +29,7 @@ That's where this module comes in - by supplying a simple configuration, you can
 
 ### Install Pre-requisites
 
-The included build script requires that you be able to use a terminal/command line, and have the [aws-cli](https://aws.amazon.com/cli), python (2.7x) and [boto3](https://github.com/boto/boto3) installed. Alternatively you can deploy the zip file in the ['dist'](dist/RedshiftSnapshotManager-1.0.0.zip) folder and configure through the AWS Console.
+The included build script requires that you be able to use a terminal/command line, and have the [aws-cli](https://aws.amazon.com/cli), python (2.7x), [boto3](https://github.com/boto/boto3), and [shortuuid](https://pypi.python.org/pypi/shortuuid) installed. Alternatively you can deploy the zip file in the ['dist'](dist/RedshiftSnapshotManager-1.0.0.zip) folder and configure through the AWS Console.
 
 ### Deploy the Lambda Function
 
@@ -56,9 +56,19 @@ where `<role-arn>` is the Amazon Resource Name for the IAM you want the function
             "Resource": [
                 "*"
             ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+              "logs:CreateLogGroup",
+              "logs:CreateLogStream",
+              "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:*:*:*"
         }
     ]
 }
+
 ```
 
 You only need to deploy the function once to support a virtually unlimited number of clusters. The function will be configured with:
@@ -102,7 +112,7 @@ Running the schedule command will create a CloudWatch Events Schedule that runs 
 
 After completion, you'll notice a Lambda Function called `RedshiftUtilsSnapshotManager`, plus there will be a CloudWatch Events Rule called `RedshiftUtilsSnapshotManager-<namespace>-15-mins` which runs every 15 minutes.
 
-You can run `./build.sh schedule <config.json>` as many times as you need to create additional schedules.
+You can run `./build.sh schedule <config.json>` as many times as you need to create additional schedules or modify existing schedules (based on the namespace supplied in the config file).
 
 ### Confirm Execution
 

@@ -67,7 +67,7 @@ if [ "$action" == "deploy" ]; then
 fi
 
 if [ "$action" == "schedule" -o "$following_action" == "schedule" ]; then
-	python schedule.py $config_file $existing_code_location
+	python schedule.py $config_file
 	
 	# Allow CloudWatch Events to invoke our Lambda Function
 	#aws lambda add-permission --function-name $function_name --statement-id $function_nameCWEventsPermission-`date +"%Y-%m-%dt%H%M%S"` --action 'lambda:InvokeFunction' --principal events.amazonaws.com --source-arn $event_rule_arn
