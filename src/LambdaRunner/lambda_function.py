@@ -17,7 +17,7 @@ import analyze_schema_compression
 import analyze_vacuum_schema
 
 config = None
-config2=None
+# config2=None
 region_key = 'AWS_REGION'
 
 def event_handler(event, context):
@@ -35,35 +35,23 @@ def event_handler(event, context):
     authContext = utils.get_encryption_context(currentRegion)
 
     global config
-    global config2
+    # global config2
 
     # lazy load the configuration file
     if config == None:
         try:
-            config_file_e = open("config.json", 'r')
-            config_e = json.load(config_file_e)
+            config_file = open("config.json", 'r')
+            config_e = json.load(config_file)
 
-            if config_e == None:
+            if config== None:
                 raise Exception("No Configuration Found")
         except:
             print sys.exc_info()[0]
             raise
 
-    #vacuum, lazy load the configuration file
-    if config2 == None:
-        try:
-            config_file_v = open("config_new.json", 'r')
-            config_v = json.load(config_file_v)
-
-            if config_v == None:
-                raise Exception("No Configuration Found for Vacuum utility")
-        except:
-            print sys.exc_info()[0]
-            raise
-
     # resolve password
-    configDetail_e = config_e["configuration"]
-    configDetail_v = config_v["configuration"]
+    configDetail_e = config["configuration"]
+    configDetail_v = config["configuration2"]
     encryptedPassword_e = configDetail_e["dbPassword"]
     encryptedPassword_e = base64.b64decode(encryptedPassword_e)
 
