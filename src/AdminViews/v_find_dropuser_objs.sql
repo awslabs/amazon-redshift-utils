@@ -36,6 +36,6 @@ select 'Schema',pgu.usename,pgu.usesysid,null,pgn.nspname from pg_namespace pgn,
 UNION ALL
 -- Tables or Views owned by the user
 select case pgc.relkind when 'r' then 'Table' when 'v' then 'View' end,pgu.usename,pgu.usesysid,nc.nspname,pgc.relname
-from
+from 
 pgc,pgu,nc 
 where pgc.relnamespace=nc.oid and pgc.relkind in ('r','v') and pgu.usesysid=pgc.relowner) owner("objtype","objowner","userid","schemaname","objname");
