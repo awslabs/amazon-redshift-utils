@@ -41,7 +41,7 @@ Srinikri Amazon Web Services (2015)
 '''
 
 import sys
-# import pg
+import pg
 import getopt
 import os
 import re
@@ -238,110 +238,6 @@ def run_commands(conn, commands):
                 return False
 
     return True
-def run():
-    global master_conn
-    global output_file_handle
-
-    # open the output file
-    output_file_handle = open(output_file, 'w')
-
-    # get a connection for the controlling processes
-    master_conn = get_pg_conn()
-
-    if master_conn == None or master_conn == ERROR:
-        return NO_CONNECTION
-
-    # get a connection for the controlling processes
-    master_conn = get_pg_conn()
-
-    if master_conn == None:
-        sys.exit(NO_CONNECTION)
-    # setup the configuration
-    configure(output_file, db, db_user, db_pwd, db_host, db_port, schema_name, table_name, query_slot_count, ignore_errors, analyze_flag, vacuum_flag, vacuum_parameter, min_unsorted_pct, max_unsorted_pct, deleted_pct, query_group, debug, stats_off_pct, max_table_size_mb)
-
-    comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
-
-    if vacuum_flag != False:
-        # Run vacuum based on the Unsorted , Stats off and Size of the table
-        run_vacuum(master_conn)
-    else:
-        comment("vacuum flag arg is set as %s.Vacuum is not performed." % (vacuum_flag))
-
-    if analyze_flag != False:
-        # Run Analyze based on the  Stats off Metrics table
-        run_analyze(master_conn)
-    else:
-        comment("anlayze flag arg is set as %s.Analyze is not performed." % (analyze_flag))
-
-    comment('Processing Complete')
-    cleanup()
-
-# new method used to configure global variables, so that we can call the run_analyze and run_vacuum methods
-def configure(_output_file, _db,_db_user,_db_pwd,_db_host,_db_port,_schema_name,_table_name,_query_slot_count,_ignore_errors,_analyze_flag, _vacuum_flag, _vacuum_parameter,_min_unsorted_pct,_max_unsorted_pct,_deleted_pct,_query_group,_debug,_stats_off_pct,_max_table_size_mb):
-
- # setup globals
-    global master_conn
-    global db
-    global db_user
-    global db_pwd
-    global db_host
-    global db_port
-    global schema_name
-    global table_name
-    global debug
-    global query_slot_count
-    global ignore_errors
-    global query_group
-    global analyze_flag
-    global vacuum_flag
-    global vacuum_parameter
-    global min_unsorted_pct
-    global max_unsorted_pct
-    global deleted_pct
-    global stats_off_pct
-    global max_table_size_mb
-    global output_file
-
-
-    # set global variable values
-    output_file = _output_file
-    db = None if _db == "" else _db
-    db_user = _db_user
-    db_pwd = _db_pwd
-    db_host = _db_host
-    db_port = _db_port
-    schema_name = 'Public' if _schema_name == "" else _schema_name
-    table_name = 'Schema' if _table_name == "" else _table_name
-    debug = False if _debug == None else _debug
-    ignore_errors = False if _ignore_errors == None else _ignore_errors
-    query_group = None if _query_group == "" else _query_group
-    analyze_flag = True if _analyze_flag == None else _analyze_flag
-    vacuum_flag = True if _vacuum_flag == None else _vacuum_flag
-    vacuum_parameter='FULL' if _vacuum_parameter=="" else _vacuum_parameter
-    min_unsorted_pct=0.05 if _min_unsorted_pct=="" else _min_unsorted_pct
-    max_unsorted_pct=0.5 if _max_unsorted_pct=="" else _max_unsorted_pct
-    deleted_pct=0.05 if _deleted_pct=="" else _deleted_pct
-    stats_off_pct=0.1 if _stats_off_pct=="" else _stats_off_pct
-    max_table_size_mb=(700*1024) if _max_table_size_mb=="" else _max_table_size_mb
-
-    query_slot_count = None if _query_slot_count == -1 or _query_slot_count == None else int(_query_slot_count)
-
-
-    if (debug == True):
-        comment("Redshift Analyze Vacuum Utility Configuration")
-        comment("output_file: %s " % (output_file))
-        comment("db: %s " % (db))
-        comment("db_user: %s " % (db_user))
-        comment("db_host: %s " % (db_host))
-        comment("db_port: %s " % (db_port))
-        comment("table: %s " % (table_name))
-        comment("schema: %s " % (schema_name))
-        comment("debug: %s " % (debug))
-        comment("do_execute: %s " % (do_execute))
-        comment("query_slot_count: %s " % (query_slot_count))
-        comment("ignore_errors: %s " % (ignore_errors))
-        comment("query_group: %s " % (query_group))
-
 
 def run_vacuum(conn):
 
@@ -802,8 +698,6 @@ def main(argv):
 
     if master_conn == None:
         sys.exit(NO_CONNECTION)
-    # setup the configuration
-    configure(output_file, db, db_user, db_pwd, db_host, db_port, schema_name, table_name, query_slot_count, ignore_errors, analyze_flag, vacuum_flag, vacuum_parameter, min_unsorted_pct, max_unsorted_pct, deleted_pct, query_group, debug, stats_off_pct, max_table_size_mb)
 
     comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
 
