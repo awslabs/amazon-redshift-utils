@@ -11,12 +11,13 @@ grantor:        User that granted the privilege
 grantee:        User/Group the privilege is granted to
 
 
-Notes:          Create prepared statement. Run it i.e execute finduserprivs('<username>'). This
+Notes:          Create prepared statement. Run it i.e execute find_drop_userprivs('<username>'). This
                 will return all the privileges granted to or by the user. You can then revoke these 
                 privileges
                 
 History:
 2017-03-24 adedotua created
+2017-03-27 adedotua updated prepared statement name
 **********************************************************************************************/
 
 prepare find_drop_userprivs(varchar) as WITH 
