@@ -104,7 +104,7 @@ from pg_class c join sc on c.relnamespace=sc.oid, pg_group g,u
             select 1 WHERE aclcontains(c.relacl, makeaclitem(0,g.grosysid,u.usesysid,'INSERT',false))
             UNION ALL
             select 1 WHERE aclcontains(c.relacl, makeaclitem(0,g.grosysid,u.usesysid,'UPDATE',false))
-            UNION ALL
+            UNION ALL 
             select 1 WHERE aclcontains(c.relacl, makeaclitem(0,g.grosysid,u.usesysid,'REFERENCES',false))
         )
 UNION ALL
