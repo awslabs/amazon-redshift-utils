@@ -8,12 +8,13 @@ userid:			Object owner user id
 schemaname:		Schema for the user object
 objname:		Name of the object
 
-Notes:			Create prepared statement. Run it i.e execute finduserobjs('<username>'). This
+Notes:			Create prepared statement. Run it i.e execute find_drop_userobjs('<username>'). This
 				will return all the objects owned by the user. You can then alter the object owner
 				or drop the object
 
 History:
 2017-03-24 adedotua created
+2017-03-27 adedotua updated prepared statement name
 **********************************************************************************************/
 
 prepare find_drop_userobjs(varchar) as WITH
