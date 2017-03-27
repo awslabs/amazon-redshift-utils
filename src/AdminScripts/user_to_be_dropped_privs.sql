@@ -19,7 +19,7 @@ History:
 2017-03-24 adedotua created
 **********************************************************************************************/
 
-prepare finduserprivs(varchar) as WITH 
+prepare find_drop_userprivs(varchar) as WITH 
 u as (select usesysid,usename from pg_user where usename= $1),
 sc as (select oid,nspname,nspacl,nspowner from pg_namespace),
 lang as (select lanname,lanacl from pg_language)
