@@ -41,7 +41,7 @@ Srinikri Amazon Web Services (2015)
 '''
 
 import sys
-# import pg
+import pg
 import getopt
 import os
 import re
@@ -238,6 +238,7 @@ def run_commands(conn, commands):
                 return False
 
     return True
+
 def run():
     global master_conn
     global output_file_handle
