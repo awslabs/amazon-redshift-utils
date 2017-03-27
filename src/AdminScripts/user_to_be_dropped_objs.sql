@@ -16,7 +16,7 @@ History:
 2017-03-24 adedotua created
 **********************************************************************************************/
 
-prepare finduserobjs(varchar) as WITH
+prepare find_drop_userobjs(varchar) as WITH
 pgu as (select usesysid,usename from pg_user where usename=$1),
 nc as (select oid,nspname from pg_namespace),
 pproc as (select oid,proowner,pronamespace from pg_proc),
