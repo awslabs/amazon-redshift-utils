@@ -1,4 +1,4 @@
-{"utilities":["ColumnEncodingUtility"],
+{"utilities":["ColumnEncodingUtility", "AnalyzeVacuumUtility"],
 "configuration":{
   "analyzeTable": "",
   "analyzeSchema": "public",
