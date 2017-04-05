@@ -14,12 +14,9 @@ import base64
 import boto3
 import utils
 import analyze_schema_compression
-import analyze_vacuum_schema
 
 config = None
-# config2=None
 region_key = 'AWS_REGION'
-
 
 def event_handler(event, context):
     try:
@@ -36,7 +33,6 @@ def event_handler(event, context):
     authContext = utils.get_encryption_context(currentRegion)
 
     global config
-    # global config2
 
     # lazy load the configuration file
     if config == None:
@@ -51,50 +47,60 @@ def event_handler(event, context):
             raise
 
     # resolve password
-    configDetail_e = config["configuration"]
-    configDetail_v = config["configuration2"]
-    encryptedPassword_e = configDetail_e["dbPassword"]
-    encryptedPassword_e = base64.b64decode(encryptedPassword_e)
+    configDetail_encoding = config["configuration"]
+    encryptedPassword_encoding = configDetail_encoding["dbPassword"]
+    encryptedPassword_encoding = base64.b64decode(encryptedPassword_encoding)
 
-    encryptedPassword_v = configDetail_v["dbPassword"]
-    encryptedPassword_v = base64.b64decode(encryptedPassword_v)
+    configDetail_vacuum = config["configuration2"]
+    encryptedPassword_vacuum = configDetail_vacuum["dbPassword"]
+    encryptedPassword_vacuum = base64.b64decode(encryptedPassword_vacuum)
 
-    if encryptedPassword_e != "" and encryptedPassword_e != None:
+    if encryptedPassword_encoding != "" and encryptedPassword_encoding != None:
         # decrypt the password using KMS
-        usePassword_e = kmsConnection.decrypt(CiphertextBlob=encryptedPassword_e, EncryptionContext=authContext)[
+        usePassword_encoding = \
+        kmsConnection.decrypt(CiphertextBlob=encryptedPassword_encoding, EncryptionContext=authContext)[
             'Plaintext']
     else:
         raise Exception("Unable to run Encoding Utilities without a configured Password")
 
-    if encryptedPassword_v != "" and encryptedPassword_v != None:
+    if encryptedPassword_vacuum != "" and encryptedPassword_vacuum != None:
         # decrypt the password using KMS
-        usePassword_v = kmsConnection.decrypt(CiphertextBlob=encryptedPassword_v, EncryptionContext=authContext)[
+        usePassword_vacuum = \
+        kmsConnection.decrypt(CiphertextBlob=encryptedPassword_vacuum, EncryptionContext=authContext)[
             'Plaintext']
     else:
         raise Exception("Unable to run Vacuum Utilities without a configured Password")
+
     encoding_result = []
     # run the column encoding utility, if requested
     if "ColumnEncodingUtility" in config["utilities"]:
-        analyze_schema_compression.configure(configDetail_e["outputFile"], configDetail_e["db"],
-                                             configDetail_e["dbUser"], usePassword_e, configDetail_e["dbHost"],
-                                             configDetail_e["dbPort"], configDetail_e["analyzeSchema"],
-                                             configDetail_e["targetSchema"], configDetail_e["analyzeTable"], 1, True,
-                                             configDetail_e["querySlotCount"], configDetail_e["ignoreErrors"],
-                                             configDetail_e["force"], configDetail_e["dropOldData"],
-                                             configDetail_e["comprows"], configDetail_e["queryGroup"],
-                                             configDetail_e["debug"])
+        analyze_schema_compression.configure(configDetail_encoding["outputFile"], configDetail_encoding["db"],
+                                             configDetail_encoding["dbUser"], usePassword_encoding,
+                                             configDetail_encoding["dbHost"],
+                                             configDetail_encoding["dbPort"], configDetail_encoding["analyzeSchema"],
+                                             configDetail_encoding["targetSchema"],
+                                             configDetail_encoding["analyzeTable"], 1, True,
+                                             configDetail_encoding["querySlotCount"],
+                                             configDetail_encoding["ignoreErrors"],
+                                             configDetail_encoding["force"], configDetail_encoding["dropOldData"],
+                                             configDetail_encoding["comprows"], configDetail_encoding["queryGroup"],
+                                             configDetail_encoding["debug"])
         encoding_result.append(analyze_schema_compression.run())
 
     print "Processing Complete for Encoding"
-
+    # run the analyze vacuum utility, if requested
     if "AnalyzeVacuumUtility" in config["utilities"]:
-        analyze_vacuum_schema.configure(configDetail_v["outputFile"], configDetail_v["db"], configDetail_e["dbUser"],
-                                        usePassword_v, configDetail_v["dbHost"], configDetail_v["dbPort"],
-                                        configDetail_v["schemaName"], configDetail_v["tableName"],
-                                        configDetail_v["querySlotCount"], configDetail_v["ignoreErrors"],
-                                        configDetail_v["analyzeFlag"], configDetail_v["vacuumFlag"],
-                                        configDetail_v["vacuumParameter"], 0.05, 0.5, 0.1, configDetail_v["queryGroup"],
-                                        configDetail_v["debug"], 0.1, configDetail_v["maxTableSize"])
+        import analyze_vacuum_schema
+        analyze_vacuum_schema.configure(configDetail_vacuum["outputFile"], configDetail_vacuum["db"],
+                                        configDetail_encoding["dbUser"],
+                                        usePassword_vacuum, configDetail_vacuum["dbHost"],
+                                        configDetail_vacuum["dbPort"],
+                                        configDetail_vacuum["schemaName"], configDetail_vacuum["tableName"],
+                                        configDetail_vacuum["querySlotCount"], configDetail_vacuum["ignoreErrors"],
+                                        configDetail_vacuum["analyzeFlag"], configDetail_vacuum["vacuumFlag"],
+                                        configDetail_vacuum["vacuumParameter"], 0.05, 0.5, 0.1,
+                                        configDetail_vacuum["queryGroup"],
+                                        configDetail_vacuum["debug"], 0.1, configDetail_vacuum["maxTableSize"])
         encoding_result.append(analyze_vacuum_schema.run())
 
     print "Processing Complete for Vacuum"
