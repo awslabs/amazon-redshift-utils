@@ -18,6 +18,7 @@ import analyze_schema_compression
 config = None
 region_key = 'AWS_REGION'
 
+
 def event_handler(event, context):
     try:
         currentRegion = os.environ[region_key]
@@ -58,41 +59,45 @@ def event_handler(event, context):
     if encryptedPassword_encoding != "" and encryptedPassword_encoding != None:
         # decrypt the password using KMS
         usePassword_encoding = \
-        kmsConnection.decrypt(CiphertextBlob=encryptedPassword_encoding, EncryptionContext=authContext)[
-            'Plaintext']
+            kmsConnection.decrypt(CiphertextBlob=encryptedPassword_encoding, EncryptionContext=authContext)[
+                'Plaintext']
     else:
         raise Exception("Unable to run Encoding Utilities without a configured Password")
 
     if encryptedPassword_vacuum != "" and encryptedPassword_vacuum != None:
         # decrypt the password using KMS
         usePassword_vacuum = \
-        kmsConnection.decrypt(CiphertextBlob=encryptedPassword_vacuum, EncryptionContext=authContext)[
-            'Plaintext']
+            kmsConnection.decrypt(CiphertextBlob=encryptedPassword_vacuum, EncryptionContext=authContext)[
+                'Plaintext']
     else:
         raise Exception("Unable to run Vacuum Utilities without a configured Password")
 
     encoding_result = []
-    # run the column encoding utility, if requested
+    #run the column encoding utility, if requested
     if "ColumnEncodingUtility" in config["utilities"]:
         analyze_schema_compression.configure(configDetail_encoding["outputFile"], configDetail_encoding["db"],
                                              configDetail_encoding["dbUser"], usePassword_encoding,
-                                             configDetail_encoding["dbHost"],
-                                             configDetail_encoding["dbPort"], configDetail_encoding["analyzeSchema"],
+                                             configDetail_encoding["dbHost"], configDetail_encoding["dbPort"],
+                                             configDetail_encoding["analyzeSchema"],
                                              configDetail_encoding["targetSchema"],
-                                             configDetail_encoding["analyzeTable"], 1, True,
+                                             configDetail_encoding["analyzeTable"],
+                                             configDetail_encoding["analyze_col_width"],
+                                             configDetail_encoding["threads"], configDetail_encoding["do-execute"],
                                              configDetail_encoding["querySlotCount"],
-                                             configDetail_encoding["ignoreErrors"],
-                                             configDetail_encoding["force"], configDetail_encoding["dropOldData"],
-                                             configDetail_encoding["comprows"], configDetail_encoding["queryGroup"],
-                                             configDetail_encoding["debug"])
-        encoding_result.append(analyze_schema_compression.run())
+                                             configDetail_encoding["ignoreErrors"], configDetail_encoding["force"],
+                                             configDetail_encoding["dropOldData"], configDetail_encoding["comprows"],
+                                             configDetail_encoding["queryGroup"], configDetail_encoding["debug"],
+                                             configDetail_encoding["ssl-option"]
+
+                                             )
+    encoding_result.append(analyze_schema_compression.run())
 
     print "Processing Complete for Encoding"
-    # run the analyze vacuum utility, if requested
+    #run the analyze vacuum utility, if requested
     if "AnalyzeVacuumUtility" in config["utilities"]:
         import analyze_vacuum_schema
         analyze_vacuum_schema.configure(configDetail_vacuum["outputFile"], configDetail_vacuum["db"],
-                                        configDetail_encoding["dbUser"],
+                                        configDetail_vacuum["dbUser"],
                                         usePassword_vacuum, configDetail_vacuum["dbHost"],
                                         configDetail_vacuum["dbPort"],
                                         configDetail_vacuum["schemaName"], configDetail_vacuum["tableName"],
