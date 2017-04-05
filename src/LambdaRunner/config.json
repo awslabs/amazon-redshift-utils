@@ -40,9 +40,10 @@
     "analyzeFlag": true,
     "vacuumFlag": true,
     "vacuumParameter": "FULL",
-    "min_unsorted_pct": 0.05,
-    "max_unsorted_pct": 0.5,
-    "deleted_pct": 0.1,
+    "minUnsortedPct": 0.05,
+    "maxUnsortedPct": 0.5,
+    "deletedPct": 0.1,
+    "statsOffPct": 0.1,
     "outputFile": "/tmp/analyze-vacuum.sql",
     "debug": false
   }

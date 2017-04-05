@@ -90,7 +90,7 @@ def event_handler(event, context):
                                              configDetail_encoding["ssl-option"]
 
                                              )
-    encoding_result.append(analyze_schema_compression.run())
+        encoding_result.append(analyze_schema_compression.run())
 
     print "Processing Complete for Encoding"
     #run the analyze vacuum utility, if requested
@@ -103,9 +103,10 @@ def event_handler(event, context):
                                         configDetail_vacuum["schemaName"], configDetail_vacuum["tableName"],
                                         configDetail_vacuum["querySlotCount"], configDetail_vacuum["ignoreErrors"],
                                         configDetail_vacuum["analyzeFlag"], configDetail_vacuum["vacuumFlag"],
-                                        configDetail_vacuum["vacuumParameter"], 0.05, 0.5, 0.1,
+                                        configDetail_vacuum["vacuumParameter"], configDetail_vacuum["minUnsortedPct"], configDetail_vacuum["maxUnsortedPct"],
+                                        configDetail_vacuum["deletedPct"],
                                         configDetail_vacuum["queryGroup"],
-                                        configDetail_vacuum["debug"], 0.1, configDetail_vacuum["maxTableSize"])
+                                        configDetail_vacuum["debug"], configDetail_vacuum["statsOffPct"], configDetail_vacuum["maxTableSize"])
         encoding_result.append(analyze_vacuum_schema.run())
 
     print "Processing Complete for Vacuum"
