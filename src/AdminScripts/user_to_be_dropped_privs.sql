@@ -19,7 +19,7 @@ History:
 2017-03-24 adedotua created
 2017-03-27 adedotua updated prepared statement name
 2017-04-06 adedotua combined grantee,grantor and added a select to find empty default acls. 
-2017-04-06 adedotua significant reduction in statement from 217 to 97 lines. 
+2017-04-06 adedotua significant reduction in statement from 197 to 77 lines. 
 **********************************************************************************************/
 
 prepare find_drop_userprivs(varchar) as WITH 
