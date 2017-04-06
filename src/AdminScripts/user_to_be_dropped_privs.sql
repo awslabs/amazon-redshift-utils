@@ -18,199 +18,80 @@ Notes:          Create prepared statement. Run it i.e execute find_drop_userpriv
 History:
 2017-03-24 adedotua created
 2017-03-27 adedotua updated prepared statement name
+2017-04-06 adedotua combined grantee,grantor and added a select to find empty default acls. 
+2017-04-06 adedotua significant reduction in statement from 217 to 97 lines. 
 **********************************************************************************************/
 
 prepare find_drop_userprivs(varchar) as WITH 
-u as (select usesysid,usename from pg_user where usename= $1),
-sc as (select oid,nspname,nspacl,nspowner from pg_namespace),
-lang as (select lanname,lanacl from pg_language)
+grantor as (select usesysid,usename from pg_user),
+schemas as (select oid,nspname,nspacl,nspowner from pg_namespace),
+grantee as ((SELECT pg_user.usesysid as usesysid, 0 as grosysid, pg_user.usename as usename FROM pg_user
+UNION ALL 
+SELECT 0 as usesysid, pg_group.grosysid as grosysid, pg_group.groname as usename FROM pg_group)
+UNION ALL 
+SELECT 0 as usesysid, 0 as grosysid, 'PUBLIC'::name as usename)
 select privs.schemaname,privs.objname,privs.objtype,privs.objowner,privs.grantor,privs.grantee from (
--- Functions granted to this user
+-- Functions grants
 select sc.nspname,textin(regprocedureout(c.oid::regprocedure)),'Function',pg_get_userbyid(c.proowner),g.usename,u.usename
-from pg_proc c join sc on c.pronamespace=sc.oid,pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.proacl, makeaclitem(u.usesysid,0,g.usesysid,'EXECUTE',false))
-    )
+from pg_proc c join schemas sc on c.pronamespace=sc.oid,grantor g,grantee u
+where EXISTS (select 1 WHERE aclcontains(c.proacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'EXECUTE',false)))
 UNION ALL
--- Functions granted by this user
-select sc.nspname,textin(regprocedureout(c.oid::regprocedure)),'Function',pg_get_userbyid(c.proowner),u.usename,g.usename
-from pg_proc c join sc on c.pronamespace=sc.oid,pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.proacl, makeaclitem(g.usesysid,0,u.usesysid,'EXECUTE',false))
-    )
-UNION ALL
--- Functions granted by this user to a group
-select sc.nspname,textin(regprocedureout(c.oid::regprocedure)),'Function',pg_get_userbyid(c.proowner),u.usename,g.groname
-from pg_proc c join sc on c.pronamespace=sc.oid,pg_group g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.proacl, makeaclitem(0,g.grosysid,u.usesysid,'EXECUTE',false))
-    )
-UNION ALL
--- Language granted to this user
+-- Language grants
 select null,c.lanname,'Language',null,g.usename,u.usename
-from lang c, pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.lanacl, makeaclitem(u.usesysid,0,g.usesysid,'USAGE',false))
-    )
-UNION ALL
--- Language granted by this user
-select null,c.lanname,'Language',null,u.usename,g.usename
-from lang c, pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.lanacl, makeaclitem(g.usesysid,0,u.usesysid,'USAGE',false))
-    )
-UNION ALL
--- Language granted by this user to a group
-select null,c.lanname,'Language',null,u.usename,g.groname
-from lang c, pg_group g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.lanacl, makeaclitem(0,g.grosysid,u.usesysid,'USAGE',false))
-    )
-UNION ALL
---Tables granted to this user
+from pg_language c,grantor g,grantee u
+where EXISTS (select 1 WHERE aclcontains(c.lanacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'USAGE',false)))
+UNION ALL 
+--Tables grants
 select sc.nspname,c.relname,case c.relkind when 'r' then 'Table' when 'v' then 'View' end,pg_get_userbyid(c.relowner),g.usename,u.usename
-from pg_class c join sc on c.relnamespace=sc.oid, pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,0,g.usesysid,'SELECT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,0,g.usesysid,'DELETE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,0,g.usesysid,'INSERT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,0,g.usesysid,'UPDATE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,0,g.usesysid,'REFERENCES',false))
-        )
+from pg_class c join schemas sc on c.relnamespace=sc.oid, grantor g,grantee u
+where EXISTS (
+select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'SELECT',false))
 UNION ALL
---Tables granted by this user
-select sc.nspname,c.relname,case c.relkind when 'r' then 'Table' when 'v' then 'View' end,pg_get_userbyid(c.relowner),u.usename,g.usename
-from pg_class c join sc on c.relnamespace=sc.oid, pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(g.usesysid,0,u.usesysid,'SELECT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(g.usesysid,0,u.usesysid,'DELETE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(g.usesysid,0,u.usesysid,'INSERT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(g.usesysid,0,u.usesysid,'UPDATE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(g.usesysid,0,u.usesysid,'REFERENCES',false))
-        )
+select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'DELETE',false))
 UNION ALL
---Tables granted by this user to a group
-select sc.nspname,c.relname,case c.relkind when 'r' then 'Table' when 'v' then 'View' end,pg_get_userbyid(c.relowner),u.usename,g.groname
-from pg_class c join sc on c.relnamespace=sc.oid, pg_group g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(0,g.grosysid,u.usesysid,'SELECT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(0,g.grosysid,u.usesysid,'DELETE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(0,g.grosysid,u.usesysid,'INSERT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(0,g.grosysid,u.usesysid,'UPDATE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.relacl, makeaclitem(0,g.grosysid,u.usesysid,'REFERENCES',false))
-        )
+select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'INSERT',false))
 UNION ALL
--- Schemas granted to this user
+select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'UPDATE',false))
+UNION ALL
+select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'REFERENCES',false)))
+UNION ALL
+-- Schema grants
 select null,c.nspname,'Schema',pg_get_userbyid(c.nspowner),g.usename,u.usename
-from sc c, pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.nspacl, makeaclitem(u.usesysid,0,g.usesysid,'USAGE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.nspacl, makeaclitem(u.usesysid,0,g.usesysid,'CREATE',false))
-    )
+from pg_namespace c, grantor g,grantee u
+where EXISTS (
+select 1 WHERE aclcontains(c.nspacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'USAGE',false))
 UNION ALL
--- Schemas granted by this user
-select null,c.nspname,'Schema',pg_get_userbyid(c.nspowner),u.usename,g.usename
-from sc c, pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.nspacl, makeaclitem(g.usesysid,0,u.usesysid,'USAGE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.nspacl, makeaclitem(g.usesysid,0,u.usesysid,'CREATE',false))
-    )
+select 1 WHERE aclcontains(c.nspacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'CREATE',false)))
 UNION ALL
--- Schemas granted by this user to a group
-select null,c.nspname,'Schema',pg_get_userbyid(c.nspowner),u.usename,g.groname
-from sc c, pg_group g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.nspacl, makeaclitem(0,g.grosysid,u.usesysid,'USAGE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.nspacl, makeaclitem(0,g.grosysid,u.usesysid,'CREATE',false))
-    )
-UNION ALL
--- Databases granted to this user
+-- Database grants
 select null,c.datname,'Database',pg_get_userbyid(c.datdba),g.usename,u.usename
-from pg_database c, pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.datacl, makeaclitem(u.usesysid,0,g.usesysid,'CREATE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.datacl, makeaclitem(u.usesysid,0,g.usesysid,'TEMP',false))
-    )
+from pg_database c, grantor g,grantee u
+where EXISTS (
+select 1 WHERE aclcontains(c.datacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'CREATE',false))
 UNION ALL
--- Databases granted by this user
-select null,c.datname,'Database',pg_get_userbyid(c.datdba),u.usename,g.usename
-from pg_database c, pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.datacl, makeaclitem(g.usesysid,0,u.usesysid,'CREATE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.datacl, makeaclitem(g.usesysid,0,u.usesysid,'TEMP',false))
-    )
+select 1 WHERE aclcontains(c.datacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'TEMP',false)))
 UNION ALL
--- Databases granted by this user to a group
-select null,c.datname,'Database',pg_get_userbyid(c.datdba),u.usename,g.groname
-from pg_database c, pg_group g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.datacl, makeaclitem(0,g.grosysid,u.usesysid,'CREATE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.datacl, makeaclitem(0,g.grosysid,u.usesysid,'TEMP',false))
-    )
+--Default ACL grants
+select sc.nspname,decode(c.defaclobjtype,'r','Tables','f','Functions'),
+'Default ACL '||decode(c.defaclnamespace,0,'User','Schema'),pg_get_userbyid(c.defacluser),g.usename, u.usename
+from pg_default_acl c left join schemas sc on c.defaclnamespace=sc.oid, grantor g,grantee u
+where EXISTS (
+select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'SELECT',false))
 UNION ALL
---Default ACL granted to this user
-select sc.nspname,case c.defaclobjtype when 'r' then 'Table/View' when 'f' then 'Function' end,'Default ACL',null,g.usename, u.usename
-    from pg_default_acl c join sc on c.defaclnamespace=sc.oid, pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,0,g.usesysid,'SELECT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,0,g.usesysid,'DELETE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,0,g.usesysid,'INSERT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,0,g.usesysid,'UPDATE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,0,g.usesysid,'REFERENCES',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,0,g.usesysid,'EXECUTE',false))) 
+select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'DELETE',false))
 UNION ALL
---Default ACL granted by this user
-select sc.nspname,case c.defaclobjtype when 'r' then 'Table/View' when 'f' then 'Function' end,'Default ACL',null,u.usename, g.usename
-    from pg_default_acl c join sc on c.defaclnamespace=sc.oid, pg_user g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(g.usesysid,0,u.usesysid,'SELECT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(g.usesysid,0,u.usesysid,'DELETE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(g.usesysid,0,u.usesysid,'INSERT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(g.usesysid,0,u.usesysid,'UPDATE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(g.usesysid,0,u.usesysid,'REFERENCES',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(g.usesysid,0,u.usesysid,'EXECUTE',false)))
+select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'INSERT',false))
 UNION ALL
---Default ACL granted by this user to a group
-select sc.nspname,case c.defaclobjtype when 'r' then 'Table/View' when 'f' then 'Function' end,'Default ACL',null,u.usename, g.groname
-    from pg_default_acl c join sc on c.defaclnamespace=sc.oid, pg_group g,u
-    where EXISTS (
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(0,g.grosysid,u.usesysid,'SELECT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(0,g.grosysid,u.usesysid,'DELETE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(0,g.grosysid,u.usesysid,'INSERT',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(0,g.grosysid,u.usesysid,'UPDATE',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(0,g.grosysid,u.usesysid,'REFERENCES',false))
-            UNION ALL
-            select 1 WHERE aclcontains(c.defaclacl, makeaclitem(0,g.grosysid,u.usesysid,'EXECUTE',false))))
-privs("schemaname","objname","objtype","objowner","grantor","grantee");
+select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'UPDATE',false))
+UNION ALL
+select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'REFERENCES',false))
+UNION ALL
+select 1 WHERE aclcontains(c.defaclacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'EXECUTE',false))) 
+UNION ALL
+--Default ACL grants with empty acl
+select sc.nspname,decode(c.defaclobjtype,'r','Tables','f','Functions'),
+'Default ACL '||decode(c.defaclnamespace,0,'User','Schema'),pg_get_userbyid(c.defacluser),null,
+decode(c.defaclobjtype,'r','Regrant privileges on tables to owner','f','Regrant privileges on Functions to owner and PUBLIC')
+from pg_default_acl c left join schemas sc on c.defaclnamespace=sc.oid
+where EXISTS (select 1 where defaclacl='{}'::aclitem[])
+) privs("schemaname","objname","objtype","objowner","grantor","grantee") where privs.grantor = $1 or privs.grantee = $1 or privs.objowner = $1;
