@@ -59,7 +59,7 @@ def event_handler(event, context):
         
     # run the column encoding utility, if requested
     if "ColumnEncodingUtility" in config["utilities"]:
-        analyze_schema_compression.configure(configDetail["outputFile"], configDetail["db"], configDetail["dbUser"], usePassword, configDetail["dbHost"], configDetail["dbPort"], configDetail["analyzeSchema"], configDetail["targetSchema"], configDetail["analyzeTable"], 1, True, configDetail["querySlotCount"], configDetail["ignoreErrors"], configDetail["force"], configDetail["dropOldData"], configDetail["comprows"], configDetail["queryGroup"], configDetail["debug"])
+        analyze_schema_compression.configure(configDetail["outputFile"], configDetail["db"], configDetail["dbUser"], usePassword, configDetail["dbHost"], configDetail["dbPort"], configDetail["analyzeSchema"], configDetail["targetSchema"], configDetail["analyzeTable"],configDetail["analyze_col_width"],configDetail["threads"], configDetail["do-execute"], configDetail["querySlotCount"], configDetail["ignoreErrors"], configDetail["force"], configDetail["dropOldData"], configDetail["comprows"], configDetail["queryGroup"], configDetail["debug"], configDetail["ssl-option"])
         encoding_result = analyze_schema_compression.run()
         
     print "Processing Complete"
