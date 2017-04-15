@@ -40,14 +40,15 @@ Srinikri Amazon Web Services (2015)
 
 '''
 
+import sys
+import pg
 import getopt
 import os
 import re
-import sys
+import getpass
 import traceback
-
 import datetime
-import pg
+from string import uppercase
 
 __version__ = ".9.1.3.4"
 
@@ -58,7 +59,8 @@ TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
 # timeout for retries - 100ms
-RETRY_TIMEOUT = 100 / 1000
+RETRY_TIMEOUT = 100/1000
+
 
 master_conn = None
 db_connections = {}
@@ -76,18 +78,18 @@ query_slot_count = 1
 ignore_errors = False
 query_group = None
 
-# set default values to vacuum, analyze variables
+#set default values to vacuum, analyze variables
 
-analyze_flag = True
-vacuum_flag = True
-vacuum_parameter = 'FULL'
-min_unsorted_pct = 05
-max_unsorted_pct = 50
-deleted_pct = 05
-stats_off_pct = 10
-max_table_size_mb = (700 * 1024)
-goback_no_of_days = 1
-query_rank = 25
+analyze_flag       = True
+vacuum_flag        = True
+vacuum_parameter   = 'FULL'
+min_unsorted_pct   = 05
+max_unsorted_pct   = 50
+deleted_pct        = 05
+stats_off_pct      = 10
+max_table_size_mb  = (700*1024)
+goback_no_of_days  = 1
+query_rank         = 25
 
 def execute_query(str):
     conn = get_pg_conn()
@@ -103,14 +105,11 @@ def execute_query(str):
 
     return result
 
-
 def commit():
     execute_query('commit')
 
-
 def rollback():
     execute_query('rollback')
-
 
 def close_conn(conn):
     try:
@@ -118,7 +117,6 @@ def close_conn(conn):
     except Exception as e:
         if debug:
             print(e)
-
 
 def cleanup():
     # close all connections and close the output file
@@ -132,15 +130,13 @@ def cleanup():
     if output_file_handle != None:
         output_file_handle.close()
 
-
 def comment(string):
     datetime_str = str(datetime.datetime.now())
     if (string != None):
-        if re.match('.*\\n.*', string) != None:
-            write('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string))
+        if re.match('.*\\n.*',string) != None:
+            write('/* [%s]\n%s\n*/\n' % (str(os.getpid()),string))
         else:
-            write('-- %s [%s] %s' % (datetime_str, str(os.getpid()), string))
-
+            write('-- %s [%s] %s' % (datetime_str,str(os.getpid()),string))
 
 def print_statements(statements):
     if statements != None:
@@ -148,14 +144,12 @@ def print_statements(statements):
             if s != None:
                 write(s)
 
-
 def write(s):
     # write output to all the places we want it
     print(s)
     if output_file_handle != None:
-        output_file_handle.write(str(s) + "\n")
+        output_file_handle.write( str(s) + "\n")
         output_file_handle.flush()
-
 
 def get_pg_conn():
     global db_connections
@@ -172,12 +166,11 @@ def get_pg_conn():
     if conn == None:
         # connect to the database
         if debug:
-            comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
+            comment('Connect [%s] %s:%s:%s:%s' % (pid,db_host,db_port,db,db_user))
 
         try:
             options = 'keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=5'
-            connection_string = "host=%s port=%s dbname=%s user=%s password=%s %s" % (
-            db_host, db_port, db, db_user, db_pwd, options)
+            connection_string = "host=%s port=%s dbname=%s user=%s password=%s %s" % (db_host, db_port, db, db_user, db_pwd, options)
 
             conn = pg.connect(dbname=connection_string)
         except Exception as e:
@@ -195,7 +188,7 @@ def get_pg_conn():
         try:
             conn.query(search_path)
         except pg.ProgrammingError as e:
-            if re.match('schema "%s" does not exist' % (schema_name,), e.message) != None:
+            if re.match('schema "%s" does not exist' % (schema_name,),e.message) != None:
                 write('Schema %s does not exist' % (schema_name,))
             else:
                 write(e.message)
@@ -231,10 +224,10 @@ def get_pg_conn():
 
 
 def run_commands(conn, commands):
-    for idx, c in enumerate(commands, start=1):
+    for idx,c in enumerate(commands,start=1):
         if c != None:
 
-            comment('[%s] Running %s out of %s commands: %s' % (str(os.getpid()), idx, len(commands), c))
+            comment('[%s] Running %s out of %s commands: %s' % (str(os.getpid()),idx,len(commands),c))
             try:
                 conn.query(c)
                 comment('Success.')
@@ -246,118 +239,9 @@ def run_commands(conn, commands):
 
     return True
 
-
-def run():
-    global master_conn
-    global output_file_handle
-
-    # open the output file
-    output_file_handle = open(output_file, 'w')
-
-    # get a connection for the controlling processes
-    master_conn = get_pg_conn()
-
-    if master_conn == None or master_conn == ERROR:
-        return NO_CONNECTION
-
-    # get a connection for the controlling processes
-    master_conn = get_pg_conn()
-
-    if master_conn == None:
-        sys.exit(NO_CONNECTION)
-
-    # setup the configuration
-    configure(output_file, db, db_user, db_pwd, db_host, db_port, schema_name, table_name, query_slot_count,
-              ignore_errors, analyze_flag, vacuum_flag, vacuum_parameter, min_unsorted_pct, max_unsorted_pct,
-              deleted_pct, query_group, debug, stats_off_pct, max_table_size_mb)
-
-    comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
-
-    if vacuum_flag != False:
-        # Run vacuum based on the Unsorted , Stats off and Size of the table
-        run_vacuum(master_conn)
-    else:
-        comment("vacuum flag arg is set as %s.Vacuum is not performed." % (vacuum_flag))
-
-    if analyze_flag != False:
-        # Run Analyze based on the  Stats off Metrics table
-        run_analyze(master_conn)
-    else:
-        comment("analyze flag arg is set as %s.Analyze is not performed." % (analyze_flag))
-
-    comment('Processing Complete')
-    cleanup()
-
-
-# new method used to configure global variables, so that we can call the run_analyze and run_vacuum methods
-def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _schema_name, _table_name, _query_slot_count,
-              _ignore_errors, _analyze_flag, _vacuum_flag, _vacuum_parameter, _min_unsorted_pct, _max_unsorted_pct,
-              _deleted_pct, _query_group, _debug, _stats_off_pct, _max_table_size_mb):
-
-    # setup globals
-    global master_conn
-    global db
-    global db_user
-    global db_pwd
-    global db_host
-    global db_port
-    global schema_name
-    global table_name
-    global debug
-    global query_slot_count
-    global ignore_errors
-    global query_group
-    global analyze_flag
-    global vacuum_flag
-    global vacuum_parameter
-    global min_unsorted_pct
-    global max_unsorted_pct
-    global deleted_pct
-    global stats_off_pct
-    global max_table_size_mb
-    global output_file
-
-    # set global variable values
-    output_file = _output_file
-    db = None if _db == "" else _db
-    db_user = _db_user
-    db_pwd = _db_pwd
-    db_host = _db_host
-    db_port = _db_port
-    schema_name = 'Public' if _schema_name == "" else _schema_name
-    table_name = 'Schema' if _table_name == "" else _table_name
-    debug = False if _debug == None else _debug
-    ignore_errors = False if _ignore_errors == None else _ignore_errors
-    query_group = None if _query_group == "" else _query_group
-    analyze_flag = True if _analyze_flag == None else _analyze_flag
-    vacuum_flag = True if _vacuum_flag == None else _vacuum_flag
-    vacuum_parameter = 'FULL' if _vacuum_parameter == "" else _vacuum_parameter
-    min_unsorted_pct = 0.05 if _min_unsorted_pct == "" else _min_unsorted_pct
-    max_unsorted_pct = 0.5 if _max_unsorted_pct == "" else _max_unsorted_pct
-    deleted_pct = 0.05 if _deleted_pct == "" else _deleted_pct
-    stats_off_pct = 0.1 if _stats_off_pct == "" else _stats_off_pct
-    max_table_size_mb = (700 * 1024) if _max_table_size_mb == "" else _max_table_size_mb
-
-    query_slot_count = None if _query_slot_count == -1 or _query_slot_count == None else int(_query_slot_count)
-
-    if debug == True:
-        comment("Redshift Analyze Vacuum Utility Configuration")
-        comment("output_file: %s " % output_file)
-        comment("db: %s " % db)
-        comment("db_user: %s " % db_user)
-        comment("db_host: %s " % db_host)
-        comment("db_port: %s " % db_port)
-        comment("table: %s " % table_name)
-        comment("schema: %s " % schema_name)
-        comment("debug: %s " % debug)
-        comment("do_execute: %s " % do_execute)
-        comment("query_slot_count: %s " % query_slot_count)
-        comment("ignore_errors: %s " % ignore_errors)
-        comment("query_group: %s " % query_group)
-
-
 def run_vacuum(conn):
-    statements = []
+
+    statements =[]
 
     if table_name != None:
 
@@ -371,8 +255,7 @@ def run_vacuum(conn):
                                             AND   size < %s
                                             AND  "schema" = '%s'
                                             AND  "table" = '%s';
-                                        ''' % (
-        vacuum_parameter, min_unsorted_pct, deleted_pct, max_table_size_mb, schema_name, table_name)
+                                        ''' % (vacuum_parameter,min_unsorted_pct,deleted_pct,max_table_size_mb,schema_name,table_name)
     else:
 
         # query for all tables in the schema ordered by size descending
@@ -415,8 +298,7 @@ def run_vacuum(conn):
                         AND   TRIM(info_tbl.schema) = '%s'
                         AND   (sortkey1 not ilike  'INTERLEAVED%%' OR sortkey1 IS NULL)
                     ORDER BY info_tbl.size ASC, info_tbl.skew_rows ASC;
-                            ''' % (
-        vacuum_parameter, goback_no_of_days, query_rank, min_unsorted_pct, deleted_pct, max_table_size_mb, schema_name,)
+                            ''' %(vacuum_parameter,goback_no_of_days,query_rank,min_unsorted_pct,deleted_pct,max_table_size_mb,schema_name,)
 
     if debug:
         comment(get_vacuum_statement)
@@ -427,12 +309,12 @@ def run_vacuum(conn):
         statements.append(vs[0])
 
     if not run_commands(conn, statements):
-        if not ignore_errors:
-            if debug:
-                write("Error running statements: %s" % (str(statements),))
-            return ERROR
+                    if not ignore_errors:
+                        if debug:
+                            write("Error running statements: %s" % (str(statements),))
+                        return ERROR
 
-    statements = []
+    statements =[]
     if table_name == None:
 
         # query for all tables in the schema ordered by size descending
@@ -458,8 +340,8 @@ def run_vacuum(conn):
                                                 AND (sortkey1 not ilike  'INTERLEAVED%%' OR sortkey1 IS NULL)
                                         ORDER BY "size" ASC ,skew_rows ASC;
 
-                                        ''' % (vacuum_parameter, schema_name, max_table_size_mb, min_unsorted_pct,
-                                               deleted_pct, max_table_size_mb, min_unsorted_pct, max_unsorted_pct)
+                                        ''' %(vacuum_parameter,schema_name,max_table_size_mb,min_unsorted_pct,
+                                              deleted_pct,max_table_size_mb,min_unsorted_pct,max_unsorted_pct)
 
         if debug:
             comment(get_vacuum_statement)
@@ -475,7 +357,7 @@ def run_vacuum(conn):
                     write("Error running statements: %s" % (str(statements),))
                 return ERROR
 
-    statements = []
+    statements =[]
     if table_name == None:
 
         # query for all tables in the schema for vacuum reindex
@@ -502,7 +384,7 @@ def run_vacuum(conn):
                                             GROUP BY 1, 2)
                                 WHERE reindex_flag = 'Yes'
                                     AND schema_name = '%s'
-                                        ''' % (schema_name)
+                                        ''' %(schema_name)
 
         if debug:
             comment(get_vacuum_statement)
@@ -520,9 +402,9 @@ def run_vacuum(conn):
 
     return True
 
-
 def run_analyze(conn):
-    statements = []
+
+    statements =[]
 
     if table_name != None:
 
@@ -535,7 +417,7 @@ def run_analyze(conn):
                                                 WHERE   stats_off::DECIMAL (32,4) > %s ::DECIMAL (32,4)
                                                 AND  trim("schema") = '%s'
                                                 AND  trim("table") = '%s';
-                                                ''' % (stats_off_pct, schema_name, table_name,)
+                                                ''' % (stats_off_pct,schema_name,table_name,)
     else:
 
         # query for all tables in the schema
@@ -596,10 +478,9 @@ def run_analyze(conn):
                             WHERE info_tbl.stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
                             AND   TRIM(info_tbl.schema) = '%s'
                             ORDER BY info_tbl.size ASC  ;
-                            ''' % (
-        goback_no_of_days, query_rank, goback_no_of_days, query_rank, stats_off_pct, schema_name)
+                            ''' % (goback_no_of_days,query_rank,goback_no_of_days,query_rank,stats_off_pct,schema_name)
 
-        # print(get_analyze_statement_feedback)
+        #print(get_analyze_statement_feedback)
     if debug:
         comment(get_analyze_statement_feedback)
 
@@ -609,10 +490,10 @@ def run_analyze(conn):
         statements.append(vs[0])
 
     if not run_commands(conn, statements):
-        if not ignore_errors:
-            if debug:
-                write("Error running statements: %s" % (str(statements),))
-            return ERROR
+                    if not ignore_errors:
+                        if debug:
+                            write("Error running statements: %s" % (str(statements),))
+                        return ERROR
 
     if table_name == None:
 
@@ -625,24 +506,23 @@ def run_analyze(conn):
                                         WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
                                         AND  trim("schema") = '%s'
                                         ORDER BY "size" ASC ;
-                                        ''' % (stats_off_pct, schema_name)
+                                        ''' % (stats_off_pct,schema_name)
 
         if debug:
             comment(get_analyze_statement)
 
         analyze_statements = execute_query(get_analyze_statement)
 
-        statements = []
+        statements =[]
         for vs in analyze_statements:
             statements.append(vs[0])
 
         if not run_commands(conn, statements):
-            if not ignore_errors:
-                if debug:
-                    write("Error running statements: %s" % (str(statements),))
-                    return ERROR
+                if not ignore_errors:
+                    if debug:
+                        write("Error running statements: %s" % (str(statements),))
+                        return ERROR
     return True
-
 
 def usage(with_message):
     write('Usage: analyze-vacuum-schema.py')
@@ -657,27 +537,19 @@ def usage(with_message):
     write('           --db-host            - The Cluster endpoint')
     write('           --db-port            - The Cluster endpoint port : Default = 5439')
     write('           --schema-name        - The Schema to be Analyzed or Vacuumed : Default = public')
-    write(
-        '           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
+    write('           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
     write('           --output-file        - The full path to the output file to be generated')
     write('           --debug              - Generate Debug Output including SQL Statements being run')
     write('           --slot-count         - Modify the wlm_query_slot_count : Default = 1')
     write('           --ignore-errors      - Ignore errors raised when running and continue processing')
     write('           --query_group        - Set the query_group for all queries')
-    write(
-        '           --analyze-flag       - Flag to turn ON/OFF ANALYZE functionality (True or False) : Default = True ')
-    write(
-        '           --vacuum-flag        - Flag to turn ON/OFF VACUUM functionality (True or False) :  Default = True')
-    write(
-        '           --vacuum-parameter   - Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL')
-    write(
-        '           --min-unsorted-pct   - Minimum unsorted percentage(%) to consider a table for vacuum : Default = 05%')
-    write(
-        '           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
-    write(
-        '           --deleted-pct        - Minimum deleted percentage (%) to consider a table for vacuum: Default = 05%')
-    write(
-        '           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
+    write('           --analyze-flag       - Flag to turn ON/OFF ANALYZE functionality (True or False) : Default = True ' )
+    write('           --vacuum-flag        - Flag to turn ON/OFF VACUUM functionality (True or False) :  Default = True')
+    write('           --vacuum-parameter   - Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL')
+    write('           --min-unsorted-pct   - Minimum unsorted percentage(%) to consider a table for vacuum : Default = 05%')
+    write('           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
+    write('           --deleted-pct        - Minimum deleted percentage (%) to consider a table for vacuum: Default = 05%')
+    write('           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
     write('           --max-table-size-mb  - Maximum table size in MB : Default = 700*1024 MB')
 
     sys.exit(INVALID_ARGS)
@@ -690,7 +562,7 @@ def main(argv):
     try:
         optlist, remaining = getopt.getopt(argv[1:], "", supported_args.split())
     except getopt.GetoptError as err:
-        print(str(err))
+        print str(err)
         usage(None)
 
     # setup globals
@@ -715,6 +587,7 @@ def main(argv):
     global deleted_pct
     global stats_off_pct
     global max_table_size_mb
+
 
     output_file = None
 
@@ -773,10 +646,10 @@ def main(argv):
             if value.upper() == 'FALSE':
                 vacuum_flag = False
         elif arg == "--analyze-flag":
-            if value.upper() == 'FALSE':
+            if value.upper()  == 'FALSE':
                 analyze_flag = False
         elif arg == "--vacuum-parameter":
-            if value.upper() == 'SORT ONLY' or value.upper() == 'DELETE ONLY' or value.upper() == 'REINDEX':
+            if value.upper() == 'SORT ONLY' or value.upper() == 'DELETE ONLY' or value.upper() == 'REINDEX' :
                 vacuum_parameter = value
             else:
                 vacuum_parameter = 'FULL'
@@ -813,11 +686,12 @@ def main(argv):
     if output_file == None:
         usage("Missing Parameter 'output-file'")
 
+
     # get the database password
-    # db_pwd = getpass.getpass("Password <%s>: " % db_user)
+    #db_pwd = getpass.getpass("Password <%s>: " % db_user)
 
     # open the output file
-    output_file_handle = open(output_file, 'w')
+    output_file_handle = open(output_file,'w')
 
     # get a connection for the controlling processes
     master_conn = get_pg_conn()
@@ -841,7 +715,6 @@ def main(argv):
 
     comment('Processing Complete')
     cleanup()
-
 
 if __name__ == "__main__":
     main(sys.argv)

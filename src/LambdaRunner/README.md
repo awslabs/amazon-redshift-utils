@@ -29,10 +29,13 @@ Copy the value after ```Encrypted Password: ``` an use it for the creation of th
 
 ## Configuration
 
-This lambda function uses an included ```config.json``` file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. You configure which utility to run in the ```'utilities'``` array - currently only the value ```ColumnEncodingUtility``` is supported
+This lambda function uses an included ```config.json``` file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. You configure which utility to run in the ```'utilities'``` array - ```ColumnEncodingUtility``` and ```'AnalyzeVacuumUtility'``` are supported
 
-The required configuration items are placed into the ```configuration``` part of the config file, and include:
+The required configuration items are placed as following:
+=> For setting up the details of ColumnEncodingUtility, populate ```configuration``` part of the config file,
+=> For setting up the details of AnalyzeVacuumUtility, populate ```configuration2``` part of the config file, and include:
 
+```configuration```
 ```
 {
   "analyzeTable": "The name of a specific table to analyze",
@@ -51,6 +54,30 @@ The required configuration items are placed into the ```configuration``` part of
   "force": Boolean - do you want to force the utility to run even if there are no likely changes?,
   "outputFile":"The path of the file to create on the filesystem. AWS Lambda can only write to /tmp",
   "debug":Boolean - turn on debug logging of actions and SQL run on the cluster
+  }
+```
+```configuration2```
+```
+{
+   "tableName": "The name of a specific table to analyze and vacuum",
+    "schemaName": "The name of the schema to be analyzed. If "tableName" not provided, runs for the complete schema",
+    "db": "master",
+    "dbHost": "Hostname of the Redshift Cluster master node to connect to",
+    "dbPassword": "your base64 encoded encrypted password here (generated with encrypt_password.py)",
+    "dbPort": Int - the database port,
+    "dbUser": "The Database Username to connect to",
+    "ignoreErrors": Boolean - should the system keep running even if errors are encountered?,
+    "queryGroup": "The database query group setting to use for WLM",
+    "querySlotCount": "Int - the number of WLM slots to request for the given queryGroup",
+    "maxTableSize": "Maximum table size in MB",
+    "analyzeFlag": Boolean - set to 'true' if you want run the script to perform ANALYZE on a schema or table,
+    "vacuumFlag": Boolean - set to 'true' if you want run the script to perform VACUUM on a schema or table,,
+    "minUnsortedPct": Float - Minimum unsorted percentage (%) to consider a table for vacuum,
+    "maxUnsortedPct": Float - Maximum unsorted percentage(%) to consider a table for vacuum,
+    "deletedPct": Flost - Minimum deleted percentage (%) to consider a table for vacuum,
+    "statsOffPct": Float - Minimum deleted percentage (%) to consider a table for vacuum,
+    "outputFile": "The path of the file to create on the filesystem. AWS Lambda can only write to /tmp",
+    "debug": Boolean - turn on debug logging of actions and SQL run on the cluster
   }
 ```
 
