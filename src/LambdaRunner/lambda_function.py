@@ -75,6 +75,7 @@ def event_handler(event, context):
     encoding_result = []
     #run the column encoding utility, if requested
     if "ColumnEncodingUtility" in config["utilities"]:
+
         analyze_schema_compression.configure(configDetail_encoding["outputFile"], configDetail_encoding["db"],
                                              configDetail_encoding["dbUser"], usePassword_encoding,
                                              configDetail_encoding["dbHost"], configDetail_encoding["dbPort"],
@@ -110,6 +111,7 @@ def event_handler(event, context):
         encoding_result.append(analyze_vacuum_schema.run())
 
     print "Processing Complete for Vacuum"
+
     return encoding_result
 
 

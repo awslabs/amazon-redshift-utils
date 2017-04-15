@@ -52,6 +52,8 @@ Arguments: --db             - The Database to Use (or $PGDATABASE)
            --force          - Force table migration even if the table already has Column Encoding applied
            --drop-old-data  - Drop the old version of the data table, rather than renaming
            --comprows       - Set the number of rows to use for Compression Encoding Analysis
+           --report-file    - The full path to the file which will store the difference of suggested/current encoding
+
 ```
 
 ## Specific Usage Notes
