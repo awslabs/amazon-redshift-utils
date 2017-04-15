@@ -1,4 +1,4 @@
-#Multiple Table restore utility
+# Multiple Table restore utility
 This utility enables the end user to automate the restore of multiple tables using a list of tables in json format. In order to restore several tables you would need to create a list of tables to restore as a json list. See the example json below:
 
 {
