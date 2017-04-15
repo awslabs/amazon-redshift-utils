@@ -36,6 +36,7 @@ The required configuration items are placed as following:
 => For setting up the details of AnalyzeVacuumUtility, populate ```configuration2``` part of the config file, and include:
 
 ```configuration```
+```
 {
   "analyzeTable": "The name of a specific table to analyze",
   "analyzeSchema": "The name of the schema to be analyzed. Either analyzeSchema or analyzeTable must be provided",
@@ -56,6 +57,7 @@ The required configuration items are placed as following:
   }
 ```
 ```configuration2```
+```
 {
    "tableName": "The name of a specific table to analyze and vacuum",
     "schemaName": "The name of the schema to be analyzed. If "tableName" not provided, runs for the complete schema",
