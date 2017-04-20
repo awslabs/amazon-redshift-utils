@@ -60,14 +60,16 @@ NO_CONNECTION = 5
 # timeout for retries - 100ms
 RETRY_TIMEOUT = 100/1000
 
+def get_env_var(name, defaultVal):
+    return os.environ[name] if name in os.environ else defaultVal
 
 master_conn = None
 db_connections = {}
-db = None
-db_user = None
-db_pwd = None
-db_host = None
-db_port = 5439
+db = get_env_var('PGDATABASE', None)
+db_user = get_env_var('PGUSER', None)
+db_pwd = get_env_var('PGPASSWORD', None)
+db_host = get_env_var('PGHOST', None)
+db_port = get_env_var('PGPORT', 5439)
 schema_name = 'public'
 table_name = None
 debug = False
