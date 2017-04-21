@@ -60,14 +60,16 @@ NO_CONNECTION = 5
 # timeout for retries - 100ms
 RETRY_TIMEOUT = 100/1000
 
+def get_env_var(name, defaultVal):
+    return os.environ[name] if name in os.environ else defaultVal
 
 master_conn = None
 db_connections = {}
-db = None
-db_user = None
-db_pwd = None
-db_host = None
-db_port = 5439
+db = get_env_var('PGDATABASE', None)
+db_user = get_env_var('PGUSER', None)
+db_pwd = get_env_var('PGPASSWORD', None)
+db_host = get_env_var('PGHOST', None)
+db_port = get_env_var('PGPORT', 5439)
 schema_name = 'public'
 table_name = None
 debug = False
@@ -97,7 +99,6 @@ def execute_query(str):
 
     if query_result is not None:
         result = query_result.getresult()
-        query_count = len(result)
 
         if debug:
             comment('Query Execution returned %s Results' % (len(result)))
@@ -151,7 +152,6 @@ def write(s):
         output_file_handle.flush()
 
 def get_pg_conn():
-    global db_connections
     pid = str(os.getpid())
 
     conn = None
@@ -230,7 +230,7 @@ def run_commands(conn, commands):
             try:
                 conn.query(c)
                 comment('Success.')
-            except Exception as e:
+            except Exception:
                 # cowardly bail on errors
                 rollback()
                 write(traceback.format_exc())
@@ -523,7 +523,7 @@ def run_analyze(conn):
                         return ERROR
     return True
 
-def usage(with_message):
+def usage(with_message=None):
     write('Usage: analyze-vacuum-schema.py')
     write('       Runs vacuum AND/OR analyze on table(s) in a schema\n')
 
@@ -562,7 +562,7 @@ def main(argv):
         optlist, remaining = getopt.getopt(argv[1:], "", supported_args.split())
     except getopt.GetoptError as err:
         print(str(err))
-        usage(None)
+        usage()
 
     # setup globals
     global master_conn
