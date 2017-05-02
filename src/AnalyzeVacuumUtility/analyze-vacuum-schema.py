@@ -78,6 +78,7 @@ do_execute = False
 query_slot_count = 1
 ignore_errors = False
 query_group = None
+stats_threshold = 10
 
 #set default values to vacuum, analyze variables
 
@@ -215,9 +216,18 @@ def get_pg_conn():
             comment(set_timeout)
 
         conn.query(set_timeout)
+        
+        # set Threshold
+        if stats_threshold != 10:
+            set_threshold = 'set analyze_threshold_percent to %s' % (stats_threshold)
+            if debug:
+                 comment(set_threshold)
+
+            conn.query(set_threshold)
 
         # cache the connection
         db_connections[pid] = conn
+    
 
     return conn
 
@@ -538,7 +548,7 @@ def usage(with_message=None):
     write('           --schema-name        - The Schema to be Analyzed or Vacuumed : Default = public')
     write('           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
     write('           --output-file        - The full path to the output file to be generated')
-    write('           --debug              - Generate Debug Output including SQL Statements being run')
+    write('           --debug              - Generate Debug Output including SQL Statements being run  : Default = True ')
     write('           --slot-count         - Modify the wlm_query_slot_count : Default = 1')
     write('           --ignore-errors      - Ignore errors raised when running and continue processing')
     write('           --query_group        - Set the query_group for all queries')
@@ -549,13 +559,14 @@ def usage(with_message=None):
     write('           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
     write('           --deleted-pct        - Minimum deleted percentage (%) to consider a table for vacuum: Default = 05%')
     write('           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
+    write('           --stats-threshold    - Sets analyze_threshold_percent for the session : Default = 10%')
     write('           --max-table-size-mb  - Maximum table size in MB : Default = 700*1024 MB')
 
     sys.exit(INVALID_ARGS)
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= max-table-size-mb="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= stats-threshold= max-table-size-mb="""
 
     # extract the command line arguments
     try:
@@ -586,12 +597,14 @@ def main(argv):
     global deleted_pct
     global stats_off_pct
     global max_table_size_mb
+    global stats_threshold
 
 
     output_file = None
 
     # parse command line arguments
     for arg, value in optlist:
+        print(arg,value )
         if arg == "--db":
             if value == '' or value == None:
                 usage()
@@ -667,6 +680,9 @@ def main(argv):
         elif arg == "--max-table-size-mb":
             if value != '' and value != None:
                 max_table_size_mb = value
+        elif arg == "--stats-threshold":
+            if value != '' and value != None:
+                stats_threshold = value
         else:
             assert False, "Unsupported Argument " + arg
             usage()
