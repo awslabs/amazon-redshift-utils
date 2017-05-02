@@ -19,4 +19,6 @@ If you are using psql, you can use ``` psql [option] -f &lt;script.sql&gt;``` to
 | unscanned_table_summary.sql | Summarizes storage consumed by unscanned tables |
 | wlm_apex.sql | Returns overall high water-mark for WLM query queues and time queuing last occurred |
 | wlm_apex_hourly.sql | Returns hourly high water-mark for WLM query queues |
+| user_to_be_dropped_objs.sql | Find objects owned by a user that cannot be dropped |
+| user_to_be_dropped_privs.sql | Find privileges granted to a user that cannot be dropped |
 
