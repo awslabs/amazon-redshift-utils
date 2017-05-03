@@ -14,12 +14,32 @@ Notes:   The view orders output automatically such that foreign keys are only cr
            where tablename in ('t1', 't2')     -- only get DDL for specific tables
            where schemaname in ('s1', 's2')    -- only get DDL for specific schemas
 
+         So for example if you want to order DDL on tablename and only want the tables 't1', 't2'
+         and 't4' you can do so by using a query like:
+           select ddl from (
+             (
+               select
+                 *
+               from admin.v_generate_tbl_ddl
+               where ddl not like 'ALTER TABLE %'
+               order by tablename
+             )
+             UNION ALL
+             (
+               select
+                 *
+               from admin.v_generate_tbl_ddl
+               where ddl like 'ALTER TABLE %'
+               order by tablename
+             )
+           ) where tablename in ('t1', 't2', 't4');
+
 History:
 2014-02-10 jjschmit Created
 2015-05-18 ericfe Added support for Interleaved sortkey
 2015-10-31 ericfe Added cast tp increase size of returning constraint name
 2016-05-24 chriz-bigdata Added support for BACKUP NO tables
-2016-12-30 pvbouwel Change table & schemaname of Foreign key constraints to allow for filters
+2017-05-03 pvbouwel Change table & schemaname of Foreign key constraints to allow for filters
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
