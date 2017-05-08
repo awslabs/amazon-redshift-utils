@@ -1,6 +1,6 @@
 # Redshift Admin Scripts
 Scripts objective is to help on tuning and troubleshooting.
-If you are using psql, you can use ``` psql [option] -f &lt;script.sql&gt;``` to run.
+If you are using psql, you can use `psql [option] -f <script.sql>` to run.
 
 | Script | Purpose |
 | ------------- | ------------- |
