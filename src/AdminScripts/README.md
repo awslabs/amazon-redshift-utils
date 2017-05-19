@@ -15,6 +15,7 @@ If you are using psql, you can use ``` psql [option] -f &lt;script.sql&gt;``` to
 | table_info.sql | Return Table storage information (size, skew, etc) |
 | table_inspector.sql | Table Analysis based on content in [Analyzing Table Design](http://docs.aws.amazon.com/redshift/latest/dg/c_analyzing-table-design.html). Complements table_info.sql |
 | top_queries.sql | Return the top 50 most time consuming statements in the last 7 days |
+| top_queries_and_cursors.sql | Return the top 50 most time consuming statements in the last 7 days - include cursor text |
 | unscanned_table_summary.sql | Summarizes storage consumed by unscanned tables |
 | wlm_apex.sql | Returns overall high water-mark for WLM query queues and time queuing last occurred |
 | wlm_apex_hourly.sql | Returns hourly high water-mark for WLM query queues |
