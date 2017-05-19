@@ -14,64 +14,27 @@ alert:          Alert event related to the query
 
 History:
 2017-04-07 thiyagu created
+2017-05-19 ericfe removed listagg
 **********************************************************************************************/
+select trim(database) as DB, count(query) as n_qry, max(substring (qrytext ,1,120)) as qrytext, min(run_minutes) as "min" , max(run_minutes) as "max", avg(run_minutes) as "avg", sum(run_minutes) as total,  
+       max(query) as max_query_id, max(starttime)::date as last_run, aborted, max(mylabel),
+       trim(decode(event&1,1,'Sortkey ','') || decode(event&2,2,'Deletes ','') || decode(event&4,4,'NL ','') ||  decode(event&8,8,'Dist ','') || decode(event&16,16,'Broacast ','') || decode(event&32,32,'Stats ','')) as Alert
+from (
+select userid, label, stl_query.query, trim(database) as database, nvl(qrytext_cur.text,trim(querytxt) ) as qrytext, md5(nvl(qrytext_cur.text,trim(querytxt))) as qry_md5, starttime, endtime, datediff(seconds, starttime,endtime)::numeric(12,2) as run_minutes, aborted, event, stl_query.label as mylabel
+from stl_query 
+left outer join ( select query,sum(decode(trim(split_part(event,':',1)),'Very selective query filter',1,'Scanned a large number of deleted rows',2,'Nested Loop Join in the query plan',4,'Distributed a large number of rows across the network',8,'Broadcasted a large number of rows across the network',16,'Missing query planner statistics',32,0)) as event from STL_ALERT_EVENT_LOG 
+     where event_time >=  dateadd(day, -7, current_Date) group by query  ) as alrt on alrt.query = stl_query.query
+LEFT OUTER JOIN (SELECT ut.xid,TRIM( substring ( TEXT from strpos(upper(TEXT),'SELECT') )) as TEXT
+                   FROM stl_utilitytext ut  
+                   WHERE sequence = 0 AND upper(TEXT) like 'DECLARE%'
+                   GROUP BY text, ut.xid) qrytext_cur ON (stl_query.xid = qrytext_cur.xid)
+where userid <> 1 
+-- and (querytxt like 'SELECT%' or querytxt like 'select%' ) 
+-- and querytxt ilike 'COPY%'  
+-- and database = ''
+-- and aborted = 1
+and starttime >=  dateadd(day, -2, current_Date)
 
-SELECT qry.pid,
-       TRIM(DATABASE) AS DB,
-       COUNT(query) AS n_qry,
-       MAX(SUBSTRING(qrytext,1,80)) AS qrytext,
-       MAX(SUBSTRING(qrytext_cur.listagg,1,80)) AS qrytext_cur,
-       MIN(run_seconds) AS "min",
-       MAX(run_seconds) AS "max",
-       AVG(run_seconds) AS "avg",
-       SUM(run_seconds) AS total,
-       MAX(query) AS max_query_id,
-       MAX(starttime)::DATE AS last_run,
-       aborted,
-       event
-FROM (SELECT pid,
-             userid,
-             label,
-             stl_query.query,
-             TRIM(DATABASE) AS DATABASE,
-             TRIM(querytxt) AS qrytext,
-             MD5(TRIM(querytxt)) AS qry_md5,
-             starttime,
-             endtime,
-             datediff(seconds,starttime,endtime)::NUMERIC(12,2) AS run_seconds,
-             aborted,
-             decode(alrt.event,
-                   'Very selective query filter','Filter',
-                   'Scanned a large number of deleted rows','Deleted',
-                   'Nested Loop Join in the query plan','Nested Loop',
-                   'Distributed a large number of rows across the network','Distributed',
-                   'Broadcasted a large number of rows across the network','Broadcast',
-                   'Missing query planner statistics','Stats',
-                   alrt.event
-             ) AS event
-      FROM stl_query
-        LEFT OUTER JOIN (SELECT query,
-                                TRIM(SPLIT_PART(event,':',1)) AS event
-                         FROM STL_ALERT_EVENT_LOG
-                         WHERE event_time >= dateadd(DAY,-7,CURRENT_DATE)
-                         GROUP BY query,
-                                  TRIM(SPLIT_PART(event,':',1))) AS alrt ON alrt.query = stl_query.query
-      WHERE userid <> 1
-      -- and (querytxt like 'SELECT%' or querytxt like 'select%' )
-      -- and database = ''
-      AND   starttime >= dateadd(DAY,-7,CURRENT_DATE)) qry
-  LEFT OUTER JOIN (SELECT ut.pid,
-                          listagg(TEXT) within GROUP (ORDER BY SEQUENCE)
-                   FROM stl_utilitytext ut,
-                        stl_query q
-                   WHERE ut.pid = q.pid
-                   AND   q.starttime >= dateadd(DAY,-7,CURRENT_DATE)
-                   AND   q.userid <> 1
-                   GROUP BY ut.pid) qrytext_cur ON (qry.pid = qrytext_cur.pid)
-GROUP BY qry.pid,
-         DATABASE,
-         label,
-         qry_md5,
-         aborted,
-         event
-ORDER BY total DESC LIMIT 50;
+ ) 
+group by database, userid, label, qry_md5, aborted, event
+order by total desc limit 50;
