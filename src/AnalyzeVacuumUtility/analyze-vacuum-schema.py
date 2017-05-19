@@ -374,7 +374,7 @@ def run_vacuum(conn):
         comment("Extracting Candidate Tables for vacuum reindex ...")
         get_vacuum_statement = ''' SELECT DISTINCT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" ; ' + '/* ' + ' Table Name : '
                                     + schema_name + '."' + table_name + '",  Rows : ' + CAST("rows" AS VARCHAR(10))
-                                    + ',  Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10))
+                                    + ',  Interleaved_skew : ' + COALESCE(CAST("max_skew" AS VARCHAR(10)),'N/A')
                                     + ' ,  Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;'
 
                                 FROM (SELECT TRIM(n.nspname) schema_name, t.relname table_name,
