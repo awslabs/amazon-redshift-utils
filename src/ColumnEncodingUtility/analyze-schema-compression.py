@@ -88,7 +88,8 @@ drop_old_data = False
 comprows = None
 query_group = None
 ssl_option = False
-
+report_file = None 
+report_file_handle = None
 
 def execute_query(str):
     conn = get_pg_conn()
@@ -779,6 +780,7 @@ def usage(with_message):
     write('           --comprows       - Set the number of rows to use for Compression Encoding Analysis')
     write('           --query_group    - Set the query_group for all queries')
     write('           --ssl-option     - Set SSL to True or False (default False)')
+    write('           --report-file    - The full path to the report file to be generated')
     sys.exit(INVALID_ARGS)
 
 
@@ -863,7 +865,8 @@ def run():
     output_file_handle = open(output_file, 'w')
 
     # open the file to store report
-    report_file_handle = open(report_file, 'w')
+    if report_file:
+        report_file_handle = open(report_file, 'w')
     
     # get a connection for the controlling processes
     master_conn = get_pg_conn()
