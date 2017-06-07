@@ -59,6 +59,10 @@ copy_stmt = """copy %s.%s
                gzip
                delimiter '^' removequotes escape"""
 
+get_table_stmt = """
+                 set search_path = '%s'; SELECT DISTINCT tablename FROM pg_table_def WHERE schemaname = '%s';
+                 """
+
 
 def conn_to_rs(host, port, db, usr, pwd, opt=options, timeout=set_timeout_stmt):
     rs_conn_string = """host=%s port=%s dbname=%s user=%s password=%s 
@@ -68,6 +72,8 @@ def conn_to_rs(host, port, db, usr, pwd, opt=options, timeout=set_timeout_stmt):
     rs_conn.query(timeout)
     return rs_conn
 
+def get_tables(conn, schema_name):
+    return map(lambda tup: tup[0], conn.query(get_table_stmt % (schema, schema)).getresult())
 
 def unload_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPath, schema_name, table_name):
     print "Exporting %s.%s to %s" % (schema_name, table_name, dataStagingPath)
@@ -186,10 +192,11 @@ def main(args):
     src_host = srcConfig['clusterEndpoint']
     src_port = srcConfig['clusterPort']
     src_db = srcConfig['db']
-    src_schema = srcConfig['schemaName']
-    src_table = srcConfig['tableName']
+    src_schema = srcConfig['schemaName'] 
     src_user = srcConfig['connectUser']
     
+    table_names = srcConfig['tableNames']
+
     # target to which we'll import data
     destConfig = config['copyTarget']
     
@@ -197,7 +204,6 @@ def main(args):
     dest_port = destConfig['clusterPort']
     dest_db = destConfig['db']
     dest_schema = destConfig['schemaName']
-    dest_table = destConfig['tableName']
     dest_user = destConfig['connectUser']
     
     # create a new data key for the unload operation        
@@ -209,17 +215,22 @@ def main(args):
     src_pwd = decrypt(srcConfig["connectPwd"])
     dest_pwd = decrypt(destConfig["connectPwd"])
 
-    print "Exporting from Source"
+    
     src_conn = conn_to_rs(src_host, src_port, src_db, src_user,
                           src_pwd) 
-    unload_data(src_conn, s3_access_credentials, master_symmetric_key, dataStagingPath,
-                src_schema, src_table) 
 
-    print "Importing to Target"
-    dest_conn = conn_to_rs(dest_host, dest_port, dest_db, dest_user,
-                          dest_pwd) 
-    copy_data(dest_conn, s3_access_credentials, master_symmetric_key, dataStagingPath, dataStagingRegion,
-              dest_schema, dest_table)
+    table_names = table_names or get_tables(src_conn, src_schema)
+
+    for table_name in table_names: 
+        print "Exporting table '%s' from Source" % (table_name)
+        unload_data(src_conn, s3_access_credentials, master_symmetric_key, dataStagingPath,
+                    src_schema, table_name) 
+
+        print "Importing table '%s' to Target" % (table_name)
+        dest_conn = conn_to_rs(dest_host, dest_port, dest_db, dest_user,
+                              dest_pwd) 
+        copy_data(dest_conn, s3_access_credentials, master_symmetric_key, dataStagingPath, dataStagingRegion,
+                  dest_schema, table_name)
 
     src_conn.close()
     dest_conn.close()
