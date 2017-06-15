@@ -5,7 +5,7 @@ Columns:
 database: database name
 table_id: table oid
 tablename: Schema qualified table name
-columns: encoded columns / unencoded columns
+columns: encoded columns / total columns
 pk: Y if PK constraint exists, otherwise N
 fk: Y if FK constraint exists, otherwise N
 max_varchar: Size of the largest column that uses a VARCHAR data type. 

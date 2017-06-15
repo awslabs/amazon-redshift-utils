@@ -46,8 +46,9 @@ import pg8000
 import shortuuid
 import datetime
 from _curses import OK
+import math
 
-__version__ = ".9.2.1"
+__version__ = ".9.2.5"
 
 OK = 0
 ERROR = 1
@@ -60,7 +61,7 @@ NO_CONNECTION = 5
 RETRY_TIMEOUT = 100. / 1000
     
 # compiled regular expressions
-IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
+IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \(?\'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
 
 def get_env_var(name, defaultVal):
     return os.environ[name] if name in os.environ else defaultVal
@@ -125,6 +126,8 @@ def cleanup():
     if output_file_handle != None:
         output_file_handle.close()
 
+    if report_file_handle != None:
+        report_file_handle.close()
 
 def comment(string):
     if (string != None):
@@ -132,6 +135,13 @@ def comment(string):
             write('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string))
         else:
             write('-- [%s] %s' % (str(os.getpid()), string))
+
+def comment_report(string):
+    if (string != None):
+        if re.match('.*\\n.*', string) != None:
+            write_report('/* \n%s\n*/\n' % (string))
+        else:
+            write_report('%s' % (string))
 
 
 def print_statements(statements):
@@ -147,6 +157,14 @@ def write(s):
     if output_file_handle != None:
         output_file_handle.write(str(s) + "\n")
         output_file_handle.flush()
+
+
+def write_report(s):
+    # write output to generate a report
+    print(s)
+    if report_file_handle != None:
+        report_file_handle.write(str(s) + "\n")
+        report_file_handle.flush()
         
         
 def get_pg_conn():
@@ -315,7 +333,7 @@ def get_table_desc(table_name):
  from pg_table_def de, pg_attribute at LEFT JOIN pg_attrdef ad ON (at.attrelid, at.attnum) = (ad.adrelid, ad.adnum)
  where de.schemaname = '%s'
  and de.tablename = '%s'
- and at.attrelid = '%s.%s'::regclass
+ and at.attrelid = '%s."%s"'::regclass
  and de.column = at.attname
 ''' % (analyze_schema, table_name, analyze_schema, table_name)
 
@@ -384,7 +402,6 @@ def analyze(table_info):
     count_unoptimised = 0
     encodings_modified = False    
     output = get_count_raw_columns(table_name)
-    
     if output == None:
         write("Unable to determine potential RAW column encoding for %s" % table_name)
         return ERROR
@@ -402,7 +419,7 @@ def analyze(table_info):
         if force:
             comment("Using Force Override Option")
     
-        statement = 'analyze compression %s.%s' % (analyze_schema, table_name)
+        statement = 'analyze compression %s."%s"' % (analyze_schema, table_name)
         
         if comprows != None:
             statement = statement + (" comprows %s" % int(comprows))
@@ -445,7 +462,7 @@ def analyze(table_info):
             else:
                 target_table = table_name
             
-            create_table = 'begin;\nlock table %s.%s;\ncreate table %s.%s(' % (analyze_schema, table_name, target_schema, target_table,)
+            create_table = 'begin;\nlock table %s."%s";\ncreate table %s."%s"(' % (analyze_schema, table_name, target_schema, target_table,)
             
             # query the table column definition
             descr = get_table_desc(table_name)
@@ -457,7 +474,9 @@ def analyze(table_info):
             has_identity = False
             non_identity_columns = []
             fks = []
-            
+
+            # count of suggested optimizations
+            count_optimized = 0
             # process each item given back by the analyze request
             for row in analyze_compression_result:
                 if debug:
@@ -470,13 +489,126 @@ def analyze(table_info):
                 old_encoding = 'raw' if old_encoding == 'none' else old_encoding
                 if new_encoding != old_encoding:
                     encodings_modified = True
+                    count_optimized += 1
+
+                    if report_file is not None:
+                        if count_optimized ==1:
+                            comment_report("\nTable %s could be optimised" % (table_name))
+                        comment_report("Column %s should be modified from %s encoding to %s encoding" % (col, old_encoding, new_encoding))
+
                     if debug:
                         comment("Column %s will be modified from %s encoding to %s encoding" % (col, old_encoding, new_encoding))
                 
                 # fix datatypesj from the description type to the create type
-                col_type = descr[col][1]                
-                col_type = col_type.replace('character varying', 'varchar').replace('without time zone', '')
+                col_type = descr[col][1]
                 
+                # check whether varchars columns are too wide
+                if analyze_col_width and "character varying" in col_type:                 
+                    curr_col_length = int(re.search(r'\d+', col_type).group())
+                    if curr_col_length > 255:
+                        col_len_statement = 'select /* computing max column length */ max(len(%s)) from %s."%s"' % (descr[col][0], analyze_schema, table_name)
+                        try:
+                            if debug:
+                                comment(col_len_statement)
+                
+                            comment("Analyzing max length of character column '%s' for table '%s.%s' " % (col, analyze_schema, table_name))
+        
+                            # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
+                            col_len_result = None
+                            col_len_retry = 10
+                            col_len_attempt_count = 0
+                            col_len_last_exception = None
+                            while col_len_attempt_count < col_len_retry and col_len_result == None:
+                                try:
+                                    col_len_result = execute_query(col_len_statement)
+                                except KeyboardInterrupt:
+                                    # To handle Ctrl-C from user
+                                    cleanup()
+                                    return TERMINATED_BY_USER
+                                except Exception as e:
+                                    write(e)
+                                    col_len_attempt_count += 1
+                                    col_len_last_exception = e
+                    
+                                    # Exponential Backoff
+                                    time.sleep(2 ** col_len_attempt_count * RETRY_TIMEOUT)
+                                    
+                            if col_len_result == None:
+                                if col_len_last_exception != None:
+                                    write("Unable to determine length of %s for table %s due to Exception %s" % (col, table_name, last_exception.message))
+                                else:
+                                    write("Unknown Error")
+                                return ERROR
+
+                            if debug:
+                                comment("Max width of character column '%s' for table '%s.%s' is %d. Current width is %d." % (descr[col][0],  analyze_schema, table_name, col_len_result[0][0], curr_col_length))
+        
+                            if col_len_result[0][0] < curr_col_length: 
+                                col_type = re.sub(str(curr_col_length), str(col_len_result[0][0]), col_type)
+                                encodings_modified = True 
+                    
+                        except Exception as e:
+                            write('Exception %s during analysis of %s' % (e.message, table_name))
+                            write(traceback.format_exc())
+                            return ERROR
+                            
+                col_type = col_type.replace('character varying', 'varchar').replace('without time zone', '')    
+                
+                # check whether number columns are too wide
+                if analyze_col_width and "int" in col_type:  
+                    col_len_statement = 'select max(%s) from %s."%s"' % (descr[col][0], analyze_schema, table_name)
+                    try:
+                        if debug:
+                            comment(col_len_statement)
+                
+                        comment("Analyzing max column '%s' for table '%s.%s' " % (col, analyze_schema, table_name))
+        
+                        # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
+                        col_len_result = None
+                        col_len_retry = 10
+                        col_len_attempt_count = 0
+                        col_len_last_exception = None
+                        while col_len_attempt_count < col_len_retry and col_len_result == None:
+                            try:
+                                col_len_result = execute_query(col_len_statement)
+                            except KeyboardInterrupt:
+                                # To handle Ctrl-C from user
+                                cleanup()
+                                return TERMINATED_BY_USER
+                            except Exception as e:
+                                write(e)
+                                col_len_attempt_count += 1
+                                col_len_last_exception = e
+                    
+                                # Exponential Backoff
+                                time.sleep(2 ** col_len_attempt_count * RETRY_TIMEOUT)
+                                    
+                        if col_len_result == None:
+                            if col_len_last_exception != None:
+                                write("Unable to determine length of %s for table %s due to Exception %s" % (col, table_name, last_exception.message))
+                            else:
+                                write("Unknown Error")
+                            return ERROR
+
+                        if debug:
+                            comment("Max of column '%s' for table '%s.%s' is %d. Current column type is %s." % (descr[col][0],  analyze_schema, table_name, col_len_result[0][0], col_type))
+                        
+                        # Test to see if largest value is smaller than largest value of smallint (2 bytes)
+                        if col_len_result[0][0] <= int(math.pow(2, 15)-1) and col_type != "smallint": 
+                            col_type = re.sub(col_type, "smallint", col_type)
+                            encodings_modified = True 
+                        
+                        # Test to see if largest value is smaller than largest value of smallint (4 bytes)    
+                        elif col_len_result[0][0] <= int(math.pow(2, 31)-1) and col_type != "integer":
+                            col_type = re.sub(col_type, "integer", col_type)
+                            encodings_modified = True 
+
+                    except Exception as e:
+                        write('Exception %s during analysis of %s' % (e.message, table_name))
+                        write(traceback.format_exc())
+                        return ERROR    
+                
+                            
                 # is this the dist key?
                 distkey = descr[col][3]
                 if str(distkey).upper()[0] == 'T':
@@ -571,7 +703,7 @@ def analyze(table_info):
                     source_columns = '*'
                     mig_columns = ''
     
-                insert = 'insert into %s.%s %s select %s from %s.%s;' % (target_schema,
+                insert = 'insert into %s."%s" %s select %s from %s."%s";' % (target_schema,
                                                                          target_table,
                                                                          mig_columns,
                                                                          source_columns,
@@ -580,21 +712,21 @@ def analyze(table_info):
                 statements.extend([insert])
                         
                 # analyze the new table
-                analyze = 'analyze %s.%s;' % (target_schema, target_table)
+                analyze = 'analyze %s."%s";' % (target_schema, target_table)
                 statements.extend([analyze])
                         
                 if (target_schema == analyze_schema):
                     # rename the old table to _$old or drop
                     if drop_old_data:
-                        drop = 'drop table %s.%s cascade;' % (target_schema, table_name)
+                        drop = 'drop table %s."%s" cascade;' % (target_schema, table_name)
                     else:
                         # the alter table statement for the current data will use the first 104 characters of the original table name, the current datetime as YYYYMMDD and a 10 digit random string
-                        drop = 'alter table %s.%s rename to %s_%s_%s_$old;' % (target_schema, table_name, table_name[0:104] , datetime.date.today().strftime("%Y%m%d") , shortuuid.ShortUUID().random(length=10))
+                        drop = 'alter table %s."%s" rename to "%s_%s_%s_$old";' % (target_schema, table_name, table_name[0:104] , datetime.date.today().strftime("%Y%m%d") , shortuuid.ShortUUID().random(length=10))
                     
                     statements.extend([drop])
                             
                     # rename the migrate table to the old table name
-                    rename = 'alter table %s.%s rename to %s;' % (target_schema, target_table, table_name)
+                    rename = 'alter table %s."%s" rename to "%s";' % (target_schema, target_table, table_name)
                     statements.extend([rename])
                 
                 # add foreign keys
@@ -634,6 +766,7 @@ def usage(with_message):
     write('           --db-port        - The Cluster endpoint port (default 5439)')
     write('           --analyze-schema - The Schema to be Analyzed (default public)')
     write('           --analyze-table  - A specific table to be Analyzed, if --analyze-schema is not desired')
+    write('           --analyze-cols   - Analyze column width and reduce the column width if needed')
     write('           --target-schema  - Name of a Schema into which the newly optimised tables and data should be created, rather than in place')
     write('           --threads        - The number of concurrent connections to use during analysis (default 2)')
     write('           --output-file    - The full path to the output file to be generated')
@@ -650,7 +783,7 @@ def usage(with_message):
 
 
 # method used to configure global variables, so that we can call the run method
-def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze_schema, _target_schema, _analyze_table, _threads, _do_execute, _query_slot_count, _ignore_errors, _force, _drop_old_data, _comprows, _query_group, _debug, _ssl_option):
+def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze_schema, _target_schema, _analyze_table, _analyze_col_width, _threads, _do_execute, _query_slot_count, _ignore_errors, _force, _drop_old_data, _comprows, _query_group, _debug, _ssl_option, _report_file):
     # setup globals
     global db
     global db_user
@@ -660,6 +793,7 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     global threads
     global analyze_schema
     global analyze_table
+    global analyze_col_width
     global target_schema
     global debug
     global do_execute
@@ -671,6 +805,7 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     global query_group
     global output_file
     global ssl_option
+    global report_file
 
     # set global variable values
     output_file = _output_file    
@@ -682,6 +817,7 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     analyze_schema = None if _analyze_schema == "" else _analyze_schema
     analyze_table = None if _analyze_table == "" else _analyze_table
     target_schema = _analyze_schema if _target_schema == "" or _target_schema == None else _target_schema
+    analyze_col_width = False if _analyze_col_width == None else _analyze_col_width
     debug = False if _debug == None else _debug    
     do_execute = False if _do_execute == None else _do_execute
     ignore_errors = False if _ignore_errors == None else _ignore_errors
@@ -692,7 +828,8 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     comprows = None if _comprows == -1 or _comprows == None else int(_comprows)
     query_slot_count = None if _query_slot_count == -1 or _query_slot_count == None else int(_query_slot_count)
     ssl_option = False if _ssl_option == None else _ssl_option
-    
+    report_file = False if _report_file == None else _report_file
+
     if (debug == True):
         comment("Redshift Column Encoding Utility Configuration")
         comment("output_file: %s " % (output_file))
@@ -703,6 +840,7 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
         comment("threads: %s " % (threads))
         comment("analyze_schema: %s " % (analyze_schema))
         comment("analyze_table: %s " % (analyze_table))
+        comment("analyze_col: %s " % (analyze_col_width))
         comment("target_schema: %s " % (target_schema))
         comment("debug: %s " % (debug))
         comment("do_execute: %s " % (do_execute))
@@ -713,14 +851,19 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
         comment("comprows: %s " % (comprows))
         comment("query_group: %s " % (query_group))
         comment("ssl_option: %s " % (ssl_option))
+        comment("report_file: %s " % (report_file))
     
     
 def run():
     global master_conn
     global output_file_handle
-    
+    global report_file_handle
+
     # open the output file
     output_file_handle = open(output_file, 'w')
+
+    # open the file to store report
+    report_file_handle = open(report_file, 'w')
     
     # get a connection for the controlling processes
     master_conn = get_pg_conn()
@@ -768,7 +911,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
 where pgn.nspname = '%s'
-  and a.name::text SIMILAR TO '[A-Za-z_][A-Za-z0-9_]*'
+  and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
 order by 2;
         ''' % (analyze_schema,)
     
@@ -867,6 +1010,7 @@ def main(argv):
     threads = None
     analyze_schema = None
     analyze_table = None
+    analyze_col_width = None
     target_schema = None
     debug = None
     do_execute = None
@@ -877,12 +1021,13 @@ def main(argv):
     comprows = None
     query_group = None
     ssl_option = None
+    report_file = None
     
-    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= report-file="""
     
     # extract the command line arguments
     try:
-        optlist, remaining = getopt.getopt(sys.argv[1:], "", supported_args.split())
+        optlist, remaining = getopt.getopt(argv[1:], "", supported_args.split())
     except getopt.GetoptError as err:
         print str(err)
         usage(None)
@@ -916,6 +1061,10 @@ def main(argv):
         elif arg == "--analyze-table":
             if value != '' and value != None:
                 analyze_table = value
+        elif arg == "--analyze-cols":
+            if value != '' and value != None:
+                analyze_col_width = value
+                
         elif arg == "--target-schema":
             if value != '' and value != None:
                 target_schema = value
@@ -964,6 +1113,11 @@ def main(argv):
                 ssl_option = True
             else:
                 ssl_option = False
+        elif arg == "--report-file":
+            if value == '' or value == None:
+                report_file = False
+            else:
+                report_file = value
         else:
             assert False, "Unsupported Argument " + arg
             usage()
@@ -993,7 +1147,7 @@ def main(argv):
         db_pwd = getpass.getpass("Password <%s>: " % db_user)
     
     # setup the configuration
-    configure(output_file, db, db_user, db_pwd, db_host, db_port, analyze_schema, target_schema, analyze_table, threads, do_execute, query_slot_count, ignore_errors, force, drop_old_data, comprows, query_group, debug, ssl_option)
+    configure(output_file, db, db_user, db_pwd, db_host, db_port, analyze_schema, target_schema, analyze_table, analyze_col_width, threads, do_execute, query_slot_count, ignore_errors, force, drop_old_data, comprows, query_group, debug, ssl_option, report_file)
     
     # run the analyser
     result_code = run()
