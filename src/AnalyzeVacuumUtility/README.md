@@ -50,7 +50,7 @@ FROM   (SELECT TRIM(n.nspname)             schema_name,
                JOIN PG_CATALOG.pg_namespace n 
                  ON n.oid = c.relnamespace 
         WHERE  l.userid > 1 
-               AND l.event_time >= DATEADD(DAY, $(goback_no_of_days)  , CURRENT_DATE) 
+               AND l.event_time >= DATEADD(DAY, -$(goback_no_of_days)  , CURRENT_DATE) 
                AND l.Solution LIKE '%VACUUM command%' 
         GROUP  BY TRIM(n.nspname), 
                   c.relname) anlyz_tbl 
