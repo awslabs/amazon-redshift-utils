@@ -60,21 +60,21 @@ aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.4.zip s3://yourbucket/
 
 ```bash
 aws cloudformation create-stack \
---stack-name qmr-action-notification-utility \ # A name for the CloudFormation stack you're creating from a template
---template-body file://./cloudformation/qmr-action-notification-utility.yaml \ # The local yaml CloudFormation template
+--stack-name qmr-action-notification-utility \
+--template-body file://./cloudformation/qmr-action-notification-utility.yaml \
 --parameters \
-  ParameterKey=S3Bucket,ParameterValue=yourbucket \ # Name of bucket hosting the Lambda Deployment Package from step 2
-  ParameterKey=S3Key,ParameterValue=qmr-action-notification-utility-1.4.zip \ # Key of the Lambda Deployment Package from step 2
-  ParameterKey=SNSEmailParameter,ParameterValue=test@email.com \ # Email address to be notified of WLM actions
-  ParameterKey=VPC,ParameterValue=vpc-abcd1234 \ # VPC ID noted from above
-  ParameterKey=SubnetIds,ParameterValue=subnet-abcd1234 \ # Subnet ID 
-  ParameterKey=SecurityGroupIds,ParameterValue=sg-abcd1234 \ # Security Group ID 
-  ParameterKey=RedshiftMonitoringUser,ParameterValue=monitoring_user \ # Cluster username 
-  ParameterKey=RedshiftClusterPort,ParameterValue=cluster_port \ # Cluster port
-  ParameterKey=RedshiftClusterEndpoint,ParameterValue=examplecluster.abcd12340987.us-east-1.redshift.amazonaws.com \ # Cluster endpoint
-  ParameterKey=RedshiftClusterDatabase,ParameterValue=db_name \ # Cluster database
-  ParameterKey=MonitoringDBPasswordCiphertext,ParameterValue= \ # Leave this blank/as-is for now
---capabilities CAPABILITY_IAM # Acknowledge that this stack template can create IAM resources within the account
+  ParameterKey=S3Bucket,ParameterValue=yourbucket \
+  ParameterKey=S3Key,ParameterValue=qmr-action-notification-utility-1.4.zip \
+  ParameterKey=SNSEmailParameter,ParameterValue=test@email.com \
+  ParameterKey=VPC,ParameterValue=vpc-abcd1234 \
+  ParameterKey=SubnetIds,ParameterValue=subnet-abcd1234 \
+  ParameterKey=SecurityGroupIds,ParameterValue=sg-abcd1234 \
+  ParameterKey=RedshiftMonitoringUser,ParameterValue=monitoring_user \
+  ParameterKey=RedshiftClusterPort,ParameterValue=cluster_port \
+  ParameterKey=RedshiftClusterEndpoint,ParameterValue=examplecluster.abcd12340987.us-east-1.redshift.amazonaws.com \
+  ParameterKey=RedshiftClusterDatabase,ParameterValue=db_name \
+  ParameterKey=MonitoringDBPasswordCiphertext,ParameterValue= \
+--capabilities CAPABILITY_IAM
 ```
 
 1. It may take a few mintues for the stack's resources to be provisioned. Verify creation is complete when the following command returns "CREATE_COMPLETE":
