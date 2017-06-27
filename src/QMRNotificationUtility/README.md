@@ -38,13 +38,13 @@ The quickest way to get up and running with the QMRNotificationUtility is by lev
 cd amazon-redshift-utils/src/QMRNotificationUtility
 ```
 
-1. Copy the zipped python Deployment Package for the Lambda function to a location of your choosing in S3:
+2. Copy the zipped python Deployment Package for the Lambda function to a location of your choosing in S3:
 
 ```bash
 aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.4.zip s3://yourbucket/qmr-action-notification-utility-1.4.zip
 ```
 
-1. Gather the necessary identifiers noted in the prerequistes section above:
+3. Gather the necessary identifiers noted in the prerequistes section above:
 
 * VPC ID
 * Subnet ID(s)
@@ -56,7 +56,7 @@ aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.4.zip s3://yourbucket/
 * Bucket to host the Lambda Deployment Package
 * Email address to be notified of WLM actions
 
-1. Use the AWS CLI to create a stack containing the necessary dependencies and Lambda function:
+4. Use the AWS CLI to create a stack containing the necessary dependencies and Lambda function:
 
 ```bash
 aws cloudformation create-stack \
@@ -77,13 +77,13 @@ aws cloudformation create-stack \
 --capabilities CAPABILITY_IAM
 ```
 
-1. It may take a few mintues for the stack's resources to be provisioned. Verify creation is complete when the following command returns "CREATE_COMPLETE":
+5. It may take a few mintues for the stack's resources to be provisioned. Verify creation is complete when the following command returns "CREATE_COMPLETE":
 
 ```bash
 aws cloudformation describe-stacks --stack-name qmr-action-notification-utility --query 'Stacks[0].StackStatus' --output text
 ```
 
-1. From the completed stack creation, extract the KMS Key ID, and use that Key to process your plaintext database password to ciphertext:
+6. From the completed stack creation, extract the KMS Key ID, and use that Key to process your plaintext database password to ciphertext:
 
 ```bash
 # Extract KMS Key ID
@@ -98,7 +98,7 @@ CIPHERTEXT=`aws kms encrypt --key-id $KMSKEYID --plaintext file://./passwd.txt -
 rm passwd.txt
 ```
 
-1. Update your CloudFormation stack with the MonitoringDBPasswordCiphertext parameter with the ciphertext generated from the previous step, leaving all other parameters unchanged:
+7. Update your CloudFormation stack with the MonitoringDBPasswordCiphertext parameter with the ciphertext generated from the previous step, leaving all other parameters unchanged:
 
 ```bash
 aws cloudformation update-stack \
@@ -119,15 +119,15 @@ aws cloudformation update-stack \
 --capabilities CAPABILITY_IAM
 ```
 
-1. It may take a moment for the stack's resources to be updated. Verify the modification is complete when the following command returns "UPDATE_COMPLETE":
+8. It may take a moment for the stack's resources to be updated. Verify the modification is complete when the following command returns "UPDATE_COMPLETE":
 
 ```bash
 aws cloudformation describe-stacks --stack-name qmr-action-notification-utility --query 'Stacks[0].StackStatus' --output text
 ```
 
-1. Check the inbox of the email address you included for SNSEmailParameter. There should be an "AWS Notification - Subscription Confirmation" from no-reply@sns.amazonaws.com asking that you confirm your subscription. Click the link if you wish to receive updates on this email address.  
+9. Check the inbox of the email address you included for SNSEmailParameter. There should be an "AWS Notification - Subscription Confirmation" from no-reply@sns.amazonaws.com asking that you confirm your subscription. Click the link if you wish to receive updates on this email address.  
 
-1. Verify the email address receives an email notification within 5 minutes of purposely triggering a QMR action by manually running SQL that is known to violate a rule defined in your active WLM configuration. Below is one example SNS notification email message:
+10. Verify the email address receives an email notification within 5 minutes of purposely triggering a QMR action by manually running SQL that is known to violate a rule defined in your active WLM configuration. Below is one example SNS notification email message:
 
 ```json
 [
@@ -156,5 +156,4 @@ aws cloudformation describe-stacks --stack-name qmr-action-notification-utility 
 
 ### Rebuilding Lambda Function
 
-If you wish to rebuild the Lambda function yourself, you can use `lambda/build.sh` to create a zipped Deployment Package to upload to your S3 bucket. This utility requires `pip` and `virtualenv` python dependencies. With these dependencies you can simply run `./build.sh` to generate a transient virtual environment, download python dependencies from `requirements.txt`, and zip the lambda function source code with dependencies into a versioned archive for uploading to S3.
-
+If you wish to rebuild the Lambda function yourself, you can use `lambda/build.sh` to create a zipped Deployment Package to upload to your S3 bucket. This utility requires `pip` and `virtualenv` python dependencies. This script will initialize a transient virtual environment, download python dependencies from `requirements.txt`, and zip the lambda function source code with dependencies into a versioned archive for uploading to S3.
