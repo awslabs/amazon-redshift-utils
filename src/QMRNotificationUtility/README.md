@@ -62,7 +62,7 @@ aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.4.zip s3://yourbucket/
 aws cloudformation create-stack \
 --stack-name qmr-action-notification-utility \ # A name for the CloudFormation stack you're creating from a template
 --template-body file://./cloudformation/qmr-action-notification-utility.yaml \ # The local yaml CloudFormation template
---parameters 
+--parameters \
   ParameterKey=S3Bucket,ParameterValue=yourbucket \ # Name of bucket hosting the Lambda Deployment Package from step 2
   ParameterKey=S3Key,ParameterValue=qmr-action-notification-utility-1.4.zip \ # Key of the Lambda Deployment Package from step 2
   ParameterKey=SNSEmailParameter,ParameterValue=test@email.com \ # Email address to be notified of WLM actions
