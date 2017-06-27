@@ -90,8 +90,8 @@ aws cloudformation describe-stacks --stack-name qmr-action-notification-utility 
 KMSKEYID=`aws cloudformation describe-stack-resource --stack-name qmr-action-notification-utility --logical-resource-id RedshiftKMSKey --query 'StackResourceDetail.PhysicalResourceId' --output text`
 # Generate a read restricted local file to store your plaintext password
 (umask 077; touch passwd.txt)
-# Insert your plaintext password into file
-vi passwd.txt
+# Insert your plaintext password into file. If using vi ensure binary mode and no automatic EOL
+vi -b -c 'set noeol' passwd.txt
 # Read plaintext password file contents into kms encrypt to generate ciphertext
 CIPHERTEXT=`aws kms encrypt --key-id $KMSKEYID --plaintext file://./passwd.txt --query 'CiphertextBlob' --output text`
 # Cleanup password file
