@@ -40,7 +40,7 @@ def get_env_var(name):
 user = get_env_var('user')
 enc_password = get_env_var('enc_password')
 host = get_env_var('host')
-port = get_env_var('port')
+port = int(get_env_var('port'))
 database = get_env_var('database')
 sns_arn = get_env_var('sns_arn')
 
