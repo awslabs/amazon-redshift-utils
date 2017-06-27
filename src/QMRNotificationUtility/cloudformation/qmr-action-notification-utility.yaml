@@ -5,6 +5,10 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
     - Label:
+        default: SNS
+      Parameters:
+      - SNSEmailParameter
+    - Label:
         default: Network Configuration for Lambda Function
       Parameters:
       - VPC
@@ -15,6 +19,17 @@ Metadata:
       Parameters:
       - S3Bucket
       - S3Key
+    - Label:
+        default: Redshift cluster Configuration
+      Parameters:
+      - RedshiftMonitoringUser
+      - RedshiftClusterPort
+      - RedshiftClusterEndpoint
+      - RedshiftClusterDatabase
+    - Label:
+        default: Monitoring user ciphertext (blank on initial create)
+      Parameters:
+      - MonitoringDBPasswordCiphertext
 Parameters:
   SNSEmailParameter:
     Type: String
@@ -35,14 +50,22 @@ Parameters:
   S3Key:
     Description: String of S3 path to the Lambda Function Deployment Package(.zip file).
     Type: String
-  SNSArn:
-    Description:
+  RedshiftMonitoringUser:
+    Description: Username of Amazon Redshift monitoring user to poll STL_WLM_QUERY_ACTIONS as.
+    Type: String
+  RedshiftClusterPort:
+    Description: Port of Amazon Redshift cluster to attempt connection from Lambda on.
+    Type: Number
+  RedshiftClusterEndpoint:
+    Description: Amazon Redshift cluster endpoint to attempt connection from Lambda on.
+    Type: String
+  RedshiftClusterDatabase: 
+    Description: Amazon Redshift cluster database to attempt connection from Lambda on.
     Type: String
   MonitoringDBPasswordCiphertext:
-    Description: The ciphertext of a KMS encrypted password for your MonitoringDBUser to connect with.
+    Description: LEAVE BLANK during initial creation. The ciphertext of a KMS encrypted password for your MonitoringDBUser to connect with.
     Type: String
 Conditions:
-  HasSNSArn: !Not [!Equals [!Ref SNSArn, '']]
   HasCipher: !Not [!Equals [!Ref MonitoringDBPasswordCiphertext, '']]
 Resources:
   RedshiftKMSKey:
@@ -153,6 +176,7 @@ Resources:
   RedshiftQMRLambdaFunction:
     Type: AWS::Lambda::Function
     Description: 'Lambda function to enable QMR notifications'
+    DependsOn: LambdaSNSTopic
     DependsOn: LambdaRedshiftRole
     Properties:
       Handler: lambda_function.lambda_handler
@@ -175,8 +199,13 @@ Resources:
         Fn::Sub: "${AWS::StackName}-RedshiftQMRLambda"
       Environment:
         Variables:
-          sns_arn: !If [HasSNSArn, !Ref SNSArn, !Ref 'AWS::NoValue']
+          sns_arn: !Ref 'LambdaSNSTopic'
           enc_password: !If [HasCipher, !Ref MonitoringDBPasswordCiphertext, !Ref 'AWS::NoValue']
+          user: !Ref 'RedshiftMonitoringUser' 
+          host: !Ref 'RedshiftClusterEndpoint'
+          port: !Ref 'RedshiftClusterPort'
+          database: !Ref 'RedshiftClusterDatabase'
+
   ScheduledRule:
     Type: "AWS::Events::Rule"
     DependsOn: RedshiftQMRLambdaFunction
