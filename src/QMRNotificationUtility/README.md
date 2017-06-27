@@ -156,5 +156,4 @@ aws cloudformation describe-stacks --stack-name qmr-action-notification-utility 
 
 ### Rebuilding Lambda Function
 
-If you wish to rebuild the Lambda function yourself, you can use `lambda/build.sh` to create a zipped Deployment Package to upload to your S3 bucket. This utility requires `pip` and `virtualenv` python dependencies. With these dependencies you can simply run `./build.sh` to generate a transient virtual environment, download python dependencies from `requirements.txt`, and zip the lambda function source code with dependencies into a versioned archive for uploading to S3.
-
+If you wish to rebuild the Lambda function yourself, you can use `lambda/build.sh` to create a zipped Deployment Package to upload to your S3 bucket. This utility requires `pip` and `virtualenv` python dependencies. This script will initialize a transient virtual environment, download python dependencies from `requirements.txt`, and zip the lambda function source code with dependencies into a versioned archive for uploading to S3.
