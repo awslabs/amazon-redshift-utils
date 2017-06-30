@@ -107,7 +107,12 @@ Resources:
             - Sid: Allow access for all principals in the account that are authorized to use KMS
               Effect: Allow
               Principal:
-                AWS: "*"
+                AWS:
+                  Fn::Join:
+                  - ":"
+                  - - 'arn:aws:iam:'
+                    - Ref: AWS::AccountId
+                    - root
               Action:
               - kms:Encrypt
               - kms:Decrypt
