@@ -24,17 +24,23 @@ class rsrestore:
     # Restore the table
     def restoretable(self, srcTable, tgtTable):
         try:
-            self.requestId = self.rsclient.restore_table_from_cluster_snapshot(ClusterIdentifier=self.clusterId, SnapshotIdentifier=self.snapshotId,
-                                                                               SourceDatabaseName=self.srcDatabase, SourceSchemaName=self.srcSchema,
-                                                                               SourceTableName=srcTable, TargetDatabaseName=self.tgtDatabase,
-                                                                               TargetSchemaName=self.tgtSchema, NewTableName=tgtTable)
+            self.requestId = self.rsclient.restore_table_from_cluster_snapshot(ClusterIdentifier=self.clusterId,
+                                                                               SnapshotIdentifier=self.snapshotId,
+                                                                               SourceDatabaseName=self.srcDatabase,
+                                                                               SourceSchemaName=self.srcSchema,
+                                                                               SourceTableName=srcTable,
+                                                                               TargetDatabaseName=self.tgtDatabase,
+                                                                               TargetSchemaName=self.tgtSchema,
+                                                                               NewTableName=tgtTable)
         except ClientError as e:
             print e.response['Error']['Message']
             exit()
 
     # Get the status of the table restore
     def restorestatus(self, output):
-        rstatus = self.rsclient.describe_table_restore_status(ClusterIdentifier=self.clusterId, TableRestoreRequestId=self.requestId['TableRestoreStatus']['TableRestoreRequestId'])
+        rstatus = self.rsclient.describe_table_restore_status(ClusterIdentifier=self.clusterId,
+                                                              TableRestoreRequestId=self.requestId[
+                                                                  'TableRestoreStatus']['TableRestoreRequestId'])
         try:
             return rstatus['TableRestoreStatusDetails'][0][output]
         except:
@@ -68,7 +74,8 @@ def tablerestore(tgtdbname, srcdbname, snapshotid, clusterid, filename):
             datac = json.load(data_file)
             #  Check json for valid key
             if 'TableRestoreList' not in datac:
-                print 'ERROR: \'%s\' key in %s list is an invalid key. Valid key is \'TableRestoreList\'.' % (datac.keys()[0], filename)
+                print 'ERROR: \'%s\' key in %s list is an invalid key. Valid key is \'TableRestoreList\'.' % (datac.keys()[0],
+                                                                                                              filename)
                 exit()
     #  Check restore list file exists
     except IOError:
@@ -91,7 +98,9 @@ def tablerestore(tgtdbname, srcdbname, snapshotid, clusterid, filename):
         tlr = rsrestore(clusterid, snapshotid, srcdbname, srcschema, tgtdbname, tgtschema)
 
         tlr.restoretable(srctable, trgttable)
-        print "INFO: Starting restore of %s to schema %s in database %s. Requestid: %s " % (trgttable, tgtschema, tgtdbname, tlr.restorestatus('TableRestoreRequestId'))
+        print "INFO: Starting restore of %s to schema %s in database %s. Requestid: %s " % (trgttable, tgtschema, tgtdbname,
+                                                                                            tlr.restorestatus(
+                                                                                                'TableRestoreRequestId'))
         while tlr.restorestatus('Status') != 'SUCCEEDED' and tlr.restorestatus('Status') != 'FAILED':
             tlr.monitorRestore()
             sleep(2)
@@ -107,7 +116,8 @@ def main(input_args):
     filename = None
 
     try:
-        optlist,  remaining = getopt.getopt(input_args[1:], "", ['target-database-name=', 'source-database-name=', 'snapshot-identifier=', 'cluster-identifier=', 'listfile='])
+        optlist,  remaining = getopt.getopt(input_args[1:], "", ['target-database-name=', 'source-database-name=',
+                                                                 'snapshot-identifier=', 'cluster-identifier=', 'listfile='])
     except getopt.GetoptError as err:
         print str(err)
         exit()
