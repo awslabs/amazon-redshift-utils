@@ -3,9 +3,10 @@
 Purpose: View to get the DDL for a table.  This will contain the distkey, sortkey, constraints,
          not null, defaults, etc.
 
-Notes:   The view orders output automatically such that foreign keys are only created at the end.
+Notes:   Default view ordering causes foreign keys to be created at the end.
          This is needed due to dependencies of the foreign key constraint and the tables it
-         links.  Due to this one should not manually order the output.  It is still possible to
+         links.  Due to this one should not manually order the output if you are expecting to
+         be able to replay the SQL directly from the VIEW query result. It is still possible to
          order if you filter out the FOREIGN KEYS and then apply them later.
 
          The following filters are useful:
