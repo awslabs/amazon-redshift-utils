@@ -58,15 +58,20 @@ TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
 # timeout for retries - 100ms
-RETRY_TIMEOUT = 100 / 1000
+
+RETRY_TIMEOUT = 100/1000
+
+def get_env_var(name, defaultVal):
+    return os.environ[name] if name in os.environ else defaultVal
+
 
 master_conn = None
 db_connections = {}
-db = None
-db_user = None
-db_pwd = None
-db_host = None
-db_port = 5439
+db = get_env_var('PGDATABASE', None)
+db_user = get_env_var('PGUSER', None)
+db_pwd = get_env_var('PGPASSWORD', None)
+db_host = get_env_var('PGHOST', None)
+db_port = get_env_var('PGPORT', 5439)
 schema_name = 'public'
 table_name = None
 debug = False
@@ -75,6 +80,7 @@ do_execute = False
 query_slot_count = 1
 ignore_errors = False
 query_group = None
+stats_threshold = 10
 
 # set default values to vacuum, analyze variables
 
@@ -96,7 +102,6 @@ def execute_query(str):
 
     if query_result is not None:
         result = query_result.getresult()
-        query_count = len(result)
 
         if debug:
             comment('Query Execution returned %s Results' % (len(result)))
@@ -158,7 +163,6 @@ def write(s):
 
 
 def get_pg_conn():
-    global db_connections
     pid = str(os.getpid())
 
     conn = None
@@ -223,9 +227,18 @@ def get_pg_conn():
             comment(set_timeout)
 
         conn.query(set_timeout)
+        
+        # set Threshold
+        if stats_threshold != 10:
+            set_threshold = 'set analyze_threshold_percent to %s' % (stats_threshold)
+            if debug:
+                 comment(set_threshold)
+
+            conn.query(set_threshold)
 
         # cache the connection
         db_connections[pid] = conn
+    
 
     return conn
 
@@ -238,7 +251,7 @@ def run_commands(conn, commands):
             try:
                 conn.query(c)
                 comment('Success.')
-            except Exception as e:
+            except Exception:
                 # cowardly bail on errors
                 rollback()
                 write(traceback.format_exc())
@@ -483,7 +496,7 @@ def run_vacuum(conn):
         comment("Extracting Candidate Tables for vacuum reindex ...")
         get_vacuum_statement = ''' SELECT DISTINCT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" ; ' + '/* ' + ' Table Name : '
                                     + schema_name + '."' + table_name + '",  Rows : ' + CAST("rows" AS VARCHAR(10))
-                                    + ',  Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10))
+                                    + ',  Interleaved_skew : ' + COALESCE(CAST("max_skew" AS VARCHAR(10)),'N/A')
                                     + ' ,  Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;'
 
                                 FROM (SELECT TRIM(n.nspname) schema_name, t.relname table_name,
@@ -644,7 +657,8 @@ def run_analyze(conn):
     return True
 
 
-def usage(with_message):
+def usage(with_message=None):
+
     write('Usage: analyze-vacuum-schema.py')
     write('       Runs vacuum AND/OR analyze on table(s) in a schema\n')
 
@@ -660,38 +674,34 @@ def usage(with_message):
     write(
         '           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
     write('           --output-file        - The full path to the output file to be generated')
-    write('           --debug              - Generate Debug Output including SQL Statements being run')
+    write('           --debug              - Generate Debug Output including SQL Statements being run  : Default = True ')
     write('           --slot-count         - Modify the wlm_query_slot_count : Default = 1')
     write('           --ignore-errors      - Ignore errors raised when running and continue processing')
     write('           --query_group        - Set the query_group for all queries')
-    write(
-        '           --analyze-flag       - Flag to turn ON/OFF ANALYZE functionality (True or False) : Default = True ')
-    write(
-        '           --vacuum-flag        - Flag to turn ON/OFF VACUUM functionality (True or False) :  Default = True')
-    write(
-        '           --vacuum-parameter   - Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL')
-    write(
-        '           --min-unsorted-pct   - Minimum unsorted percentage(%) to consider a table for vacuum : Default = 05%')
-    write(
-        '           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
-    write(
-        '           --deleted-pct        - Minimum deleted percentage (%) to consider a table for vacuum: Default = 05%')
-    write(
-        '           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
+
+    write('           --analyze-flag       - Flag to turn ON/OFF ANALYZE functionality (True or False) : Default = True ' )
+    write('           --vacuum-flag        - Flag to turn ON/OFF VACUUM functionality (True or False) :  Default = True')
+    write('           --vacuum-parameter   - Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL')
+    write('           --min-unsorted-pct   - Minimum unsorted percentage(%) to consider a table for vacuum : Default = 05%')
+    write('           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
+    write('           --deleted-pct        - Minimum deleted percentage (%) to consider a table for vacuum: Default = 05%')
+    write('           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
+    write('           --stats-threshold    - Sets analyze_threshold_percent for the session : Default = 10%')
+
     write('           --max-table-size-mb  - Maximum table size in MB : Default = 700*1024 MB')
 
     sys.exit(INVALID_ARGS)
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= max-table-size-mb="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= stats-threshold= max-table-size-mb="""
 
     # extract the command line arguments
     try:
         optlist, remaining = getopt.getopt(argv[1:], "", supported_args.split())
     except getopt.GetoptError as err:
         print(str(err))
-        usage(None)
+        usage()
 
     # setup globals
     global master_conn
@@ -715,11 +725,13 @@ def main(argv):
     global deleted_pct
     global stats_off_pct
     global max_table_size_mb
+    global stats_threshold
 
     output_file = None
 
     # parse command line arguments
     for arg, value in optlist:
+        print(arg,value )
         if arg == "--db":
             if value == '' or value == None:
                 usage()
@@ -795,6 +807,9 @@ def main(argv):
         elif arg == "--max-table-size-mb":
             if value != '' and value != None:
                 max_table_size_mb = value
+        elif arg == "--stats-threshold":
+            if value != '' and value != None:
+                stats_threshold = value
         else:
             assert False, "Unsupported Argument " + arg
             usage()
