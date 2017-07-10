@@ -299,12 +299,7 @@ WHERE
   AND att.attrelid = cl.oid
   and cl.relnamespace = pgn.oid
   and pgn.nspname = '%s'
-  and (ind.indkey[0] = att.attnum or 
-       ind.indkey[1] = att.attnum or
-       ind.indkey[2] = att.attnum or
-       ind.indkey[3] = att.attnum or
-       ind.indkey[4] = att.attnum
-      )
+  and att.attnum = ANY(string_to_array(textin(int2vectorout(ind.indkey)), ' '))
   and attnum > 0
   AND ind.indisprimary
 order by att.attnum;
