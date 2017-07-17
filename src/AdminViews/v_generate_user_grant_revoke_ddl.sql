@@ -1,4 +1,23 @@
-create or replace view v_generate_user_grant_revoke_ddl as
+/**********************************************************************************************
+Purpose:        View to help find all objects where the user to be dropped is the grantor or 
+				grantee 
+Columns -
+objowner:       Object owner 
+grantor:        User that granted the privilege
+username:       User/Group the privilege is granted to
+objtype:        Type of object user has privilege on. Object types are Function,Schema,
+                Table or View, Database, Language or Default ACL
+ddltype:        Type of ddl generated i.e grant or revoke
+ddl:            DDL text
+
+Notes:           
+                
+History:
+2017-07-11 adedotua created
+2017-07-17 adedotua added comments to account for difference between grantor and owner of object 
+**********************************************************************************************/
+
+CREATE OR REPLACE VIEW v_generate_user_grant_revoke_ddl as
 WITH 
 grantor as (select usesysid,usename from pg_user),
 schemas as (select oid,nspname,nspacl,nspowner from pg_namespace),
