@@ -1,10 +1,12 @@
-/**********************************************************************************************
+/****************************************************************************************************
 Purpose:        View to generate grant or revoke ddl for users and groups. This is useful for 
 		recreating users or group privileges or for revoking privileges before dropping 
 		a user or group
 		
 Columns -
 objowner:       Object owner 
+schemaname:	Object schema if applicable
+objname:	Name of the object the privilege is granted on
 grantor:        User that granted the privilege
 username:       User/Group the privilege is granted to
 objtype:        Type of object user has privilege on. Object types are Function,Schema,
@@ -15,9 +17,11 @@ ddl:            DDL text
 Notes:           
                 
 History:
-2017-07-11 adedotua created
-2017-07-17 adedotua added comments to account for difference between grantor and owner of object 
-**********************************************************************************************/
+2017-07-11 	adedotua created
+2017-07-17 	adedotua added comments to account for difference between grantor and owner of 
+		object. Also added schemaname and objname columns.
+ 		
+***************************************************************************************************/
 
 CREATE OR REPLACE VIEW v_generate_user_grant_revoke_ddl as
 WITH 
