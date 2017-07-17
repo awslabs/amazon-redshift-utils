@@ -1,6 +1,8 @@
 /**********************************************************************************************
-Purpose:        View to help find all objects where the user to be dropped is the grantor or 
-				grantee 
+Purpose:        View to generate grant or revoke ddl for users and groups. This is useful for 
+		recreating users or group privileges or for revoking privileges before dropping 
+		a user or group
+		
 Columns -
 objowner:       Object owner 
 grantor:        User that granted the privilege
