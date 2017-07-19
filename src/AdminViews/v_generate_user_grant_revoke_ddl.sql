@@ -89,7 +89,7 @@ from pg_class c join schemas sc on c.relnamespace=sc.oid, grantor g,grantee u,ta
 where aclcontains(c.relacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,t.type,false)) 
 UNION ALL
 --Tables revokes
-select distinct pg_get_userbyid(c.relowner),sc.nspname,c.relname,g.usename,u.usename,'Table/View','revoke',
+select distinct pg_get_userbyid(c.relowner),sc.nspname,null,g.usename,u.usename,'Table/View','revoke',
 'revoke all on all tables in schema '||sc.nspname||
 CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||CASE WHEN g.usename <> pg_get_userbyid(c.relowner) THEN ' -- revoke this object as '||g.usename ELSE '' END::text
 from pg_class c join schemas sc on c.relnamespace=sc.oid, grantor g,grantee u
