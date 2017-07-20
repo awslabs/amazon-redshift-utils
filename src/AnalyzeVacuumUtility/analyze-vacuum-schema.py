@@ -604,7 +604,6 @@ def main(argv):
 
     # parse command line arguments
     for arg, value in optlist:
-        print(arg,value )
         if arg == "--db":
             if value == '' or value == None:
                 usage()
