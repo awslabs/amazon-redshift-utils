@@ -1,4 +1,4 @@
-/****************************************************************************************************
+/*************************************************************************************************************************
 Purpose:        View to generate grant or revoke ddl for users and groups. This is useful for 
 		recreating users or group privileges or for revoking privileges before dropping 
 		a user or group
@@ -29,7 +29,7 @@ select ddl from v_generate_user_grant_revoke_ddl where grantor='<username>' and 
 
 2. Find all grants granted to user to drop and revoke them.
 select ddl from v_generate_user_grant_revoke_ddl where ddltype='revoke' and (username='<username>' or grantor='<username>');		
-***************************************************************************************************/
+************************************************************************************************************************/
 
 CREATE OR REPLACE VIEW v_generate_user_grant_revoke_ddl as
 WITH 
