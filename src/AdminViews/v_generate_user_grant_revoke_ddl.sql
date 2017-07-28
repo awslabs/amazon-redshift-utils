@@ -20,7 +20,15 @@ History:
 2017-07-11 	adedotua created
 2017-07-17 	adedotua added comments to account for difference between grantor and owner of 
 		object. Also added schemaname and objname columns.
- 		
+		
+		
+Steps to revoking grants before dropping a user:
+
+1. Find all grants by granted by user to drop and regrant them as another user (superuser preferably).
+select ddl from v_generate_user_grant_revoke_ddl where grantor='testuser' and ddltype='grant' and objtype <>'Default ACL';
+
+2. Find all grants granted to user to drop and revoke them.
+select ddl from v_generate_user_grant_revoke_ddl where ddltype='revoke' and (username='testuser' or grantor='testuser');		
 ***************************************************************************************************/
 
 CREATE OR REPLACE VIEW v_generate_user_grant_revoke_ddl as
