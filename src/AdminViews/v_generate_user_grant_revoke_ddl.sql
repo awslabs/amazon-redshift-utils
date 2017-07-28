@@ -25,10 +25,10 @@ History:
 Steps to revoking grants before dropping a user:
 
 1. Find all grants by granted by user to drop and regrant them as another user (superuser preferably).
-select ddl from v_generate_user_grant_revoke_ddl where grantor='testuser' and ddltype='grant' and objtype <>'Default ACL';
+select ddl from v_generate_user_grant_revoke_ddl where grantor='<username>' and ddltype='grant' and objtype <>'Default ACL';
 
 2. Find all grants granted to user to drop and revoke them.
-select ddl from v_generate_user_grant_revoke_ddl where ddltype='revoke' and (username='testuser' or grantor='testuser');		
+select ddl from v_generate_user_grant_revoke_ddl where ddltype='revoke' and (username='<username>' or grantor='<username>');		
 ***************************************************************************************************/
 
 CREATE OR REPLACE VIEW v_generate_user_grant_revoke_ddl as
