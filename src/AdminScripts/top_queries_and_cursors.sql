@@ -24,9 +24,10 @@ select userid, label, stl_query.query, trim(database) as database, nvl(qrytext_c
 from stl_query 
 left outer join ( select query,sum(decode(trim(split_part(event,':',1)),'Very selective query filter',1,'Scanned a large number of deleted rows',2,'Nested Loop Join in the query plan',4,'Distributed a large number of rows across the network',8,'Broadcasted a large number of rows across the network',16,'Missing query planner statistics',32,0)) as event from STL_ALERT_EVENT_LOG 
      where event_time >=  dateadd(day, -7, current_Date) group by query  ) as alrt on alrt.query = stl_query.query
-LEFT OUTER JOIN (SELECT ut.xid,TRIM( substring ( TEXT from strpos(upper(TEXT),'SELECT') )) as TEXT
-                   FROM stl_utilitytext ut  
-                   WHERE sequence = 0 AND upper(TEXT) like 'DECLARE%'
+LEFT OUTER JOIN (SELECT ut.xid,'CURSOR ' || TRIM( substring ( TEXT from strpos(upper(TEXT),'SELECT') )) as TEXT
+                   FROM stl_utilitytext ut
+		           WHERE sequence = 0
+		           AND upper(TEXT) like 'DECLARE%'
                    GROUP BY text, ut.xid) qrytext_cur ON (stl_query.xid = qrytext_cur.xid)
 where userid <> 1 
 -- and (querytxt like 'SELECT%' or querytxt like 'select%' ) 
