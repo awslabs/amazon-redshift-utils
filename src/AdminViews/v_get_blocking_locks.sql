@@ -36,7 +36,8 @@ WITH locks AS (
         ON    rct.pid = l.pid
        WHERE  l.pid <> pg_backend_pid()
 )
-select distinct * from (
+select distinct * 
+FROM  (
        SELECT l.xid
        ,      l.pid
        ,      l.username
@@ -56,26 +57,25 @@ select distinct * from (
        ,      b.num_blocking
        ,      b.pidlist
        FROM   locks l
-       LEFT OUTER JOIN
-             (
-                     SELECT relation
-                     ,      mode
-                     ,      listagg(b.pid, ',') as pidlist
-                     ,      MIN(block_sec) as min_sec_blocking
-                     ,      MAX(waiting) as max_sec_blocking
-                     ,      COUNT(*) as num_blocking
-                     FROM   locks b
-                     WHERE  granted is false
-                     GROUP BY relation
-                     ,      mode
-                    ) b
-               ON    l.relation = b.relation
-              AND    l.granted is true
-              AND   (l.mode like '%Exclusive%'
-               OR   (l.mode like '%Share%' AND b.mode like '%ExclusiveLock' and b.mode not like '%Share%'))
-       )
-       ORDER BY granted DESC
-       ,      max_sec_blocking desc nulls last
-       ,      block_sec DESC,
-       waiting desc nulls last
-       ;
+       LEFT OUTER JOIN (
+              SELECT relation
+              ,      mode
+              ,      listagg(b.pid, ',') as pidlist
+              ,      MIN(block_sec) as min_sec_blocking
+              ,      MAX(waiting) as max_sec_blocking
+              ,      COUNT(*) as num_blocking
+              FROM   locks b
+              WHERE  granted is false
+              GROUP BY relation
+              ,      mode
+       ) b
+        ON    l.relation = b.relation
+       AND    l.granted is true
+       AND   (l.mode like '%Exclusive%'
+       OR   (l.mode like '%Share%' AND b.mode LIKE '%ExclusiveLock' AND b.mode NOT LIKE '%Share%'))
+)
+ORDER BY granted DESC
+,      max_sec_blocking desc nulls last
+,      block_sec DESC
+,      waiting desc nulls last
+;
