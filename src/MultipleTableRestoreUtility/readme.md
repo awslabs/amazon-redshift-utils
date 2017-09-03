@@ -26,4 +26,5 @@ python multitablerestore.py --target-database-name <target database> --source-da
 The source and target databases can be the same. 
 
 ## Limitations
-The table cannot be restored to a different schema
+The table cannot be restored to a different schema.
+The table can only be restored to the same cluster the snapshot was taken from.
