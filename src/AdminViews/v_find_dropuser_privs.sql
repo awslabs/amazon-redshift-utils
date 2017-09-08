@@ -17,9 +17,8 @@ History:
 2017-04-06 adedotua combined grantee,grantor and added a select to find empty default acls. 
 2017-04-06 adedotua significant reduction in statement from 197 to 77 lines.
 **********************************************************************************************/
-
-WITH 
 CREATE OR REPLACE VIEW admin.v_find_dropuser_privs as
+WITH
 grantor as (select usesysid,usename from pg_user),
 schemas as (select oid,nspname,nspacl,nspowner from pg_namespace),
 grantee as ((SELECT pg_user.usesysid as usesysid, 0 as grosysid, pg_user.usename as usename FROM pg_user
