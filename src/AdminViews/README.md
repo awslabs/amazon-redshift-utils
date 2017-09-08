@@ -18,6 +18,7 @@ All views assume you have a schema called admin.
 | v_generate_terminate_session.sql | View to get pg_terminate_backend() statements |
 | v_generate_udf_ddl.sql | View to get the DDL for a UDF.
 | v_generate_unload_copy_cmd.sql |   View to get that will generate unload and copy commands for an object.  After running | 
+|v_generate_user_grant_revoke_ddl.sql| View to gengerate grant or revoke ddl for users and groups in the database|
 | v_generate_user_object_permissions.sql |   View to get the DDL for a users permissions to tables and views. | 
 | v_generate_view_ddl.sql |   View to get the DDL for a view. | 
 | v_get_blocking_locks.sql | View to identify blocking locks as well as determine what/who is blocking a query |
