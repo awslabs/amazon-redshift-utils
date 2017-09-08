@@ -18,7 +18,7 @@ History:
 2017-04-06 adedotua significant reduction in statement from 197 to 77 lines.
 **********************************************************************************************/
 
-CREATE VIEW v_find_dropuser_privs as 
+CREATE VIEW admin.v_find_dropuser_privs as 
 WITH 
 grantor as (select usesysid,usename from pg_user),
 schemas as (select oid,nspname,nspacl,nspowner from pg_namespace),
