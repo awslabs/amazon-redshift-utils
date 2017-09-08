@@ -17,7 +17,7 @@ History:
 2017-04-06 adedotua improvements
 **********************************************************************************************/
 
-CREATE OR REPLACE VIEW admin.v_find_dropuser_objs as 
+CREATE OR REPLACE VIEW admin.v_find_dropuser_objs as
 select owner.objtype,owner.objowner,owner.userid,owner.schemaname,owner.objname from(
 -- Functions owned by the user
 select 'Function',pgu.usename,pgu.usesysid,nc.nspname,textin(regprocedureout(pproc.oid::regprocedure))

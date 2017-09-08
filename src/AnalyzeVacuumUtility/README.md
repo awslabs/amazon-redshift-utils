@@ -158,7 +158,7 @@ WHERE stats_off> $(stats_off_pct)
 AND  "schema" = $(schema_name);
 ```
 
-If table has a stats_off_pct > 10 %, then the script runs ALALYZE command to update the statistics.
+If table has a stats_off_pct > 10 %, then the script runs ANALYZE command to update the statistics.
 
 ## Summary of Parameters:
 
