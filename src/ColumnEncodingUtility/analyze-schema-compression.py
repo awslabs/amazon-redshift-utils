@@ -122,10 +122,12 @@ def cleanup():
     for key in db_connections:
         if db_connections[key] != None:            
             close_conn(db_connections[key]) 
-    
+
+    global output_file_handle    
     if output_file_handle != None:
         output_file_handle.close()
 
+    global report_file_handle
     if report_file_handle != None:
         report_file_handle.close()
 
@@ -185,7 +187,7 @@ def get_pg_conn():
             comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
         
         try:
-            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd, ssl=ssl_option, timeout=None, keepalives=1, keepalives_idle=200, keepalives_interval=200, keepalives_count=5)
+            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd, ssl=ssl_option, timeout=None)
         except Exception as e:
             write(e)
             write('Unable to connect to Cluster Endpoint')
@@ -299,12 +301,7 @@ WHERE
   AND att.attrelid = cl.oid
   and cl.relnamespace = pgn.oid
   and pgn.nspname = '%s'
-  and (ind.indkey[0] = att.attnum or 
-       ind.indkey[1] = att.attnum or
-       ind.indkey[2] = att.attnum or
-       ind.indkey[3] = att.attnum or
-       ind.indkey[4] = att.attnum
-      )
+  and att.attnum = ANY(string_to_array(textin(int2vectorout(ind.indkey)), ' '))
   and attnum > 0
   AND ind.indisprimary
 order by att.attnum;
@@ -863,7 +860,8 @@ def run():
     output_file_handle = open(output_file, 'w')
 
     # open the file to store report
-    report_file_handle = open(report_file, 'w')
+    if (report_file):
+        report_file_handle = open(report_file, 'w')
     
     # get a connection for the controlling processes
     master_conn = get_pg_conn()
