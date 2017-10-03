@@ -65,6 +65,7 @@ db_user = get_env_var('PGUSER', None)
 db_pwd = get_env_var('PGPASSWORD', None)
 db_host = get_env_var('PGHOST', None)
 db_port = get_env_var('PGPORT', 5439)
+db_conn_opts = get_env_var('PGCONNOPTS', None)
 schema_name = 'public'
 table_name = None
 debug = False
@@ -167,6 +168,9 @@ def get_pg_conn():
 
         try:
             options = 'keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=5'
+            if db_conn_opts is not None:
+                options = options + ' ' + db_conn_opts
+
             connection_string = "host=%s port=%s dbname=%s user=%s password=%s %s" % (db_host, db_port, db, db_user, db_pwd, options)
 
             conn = pg.connect(dbname=connection_string)
@@ -530,6 +534,7 @@ def usage(with_message=None):
     write('           --db-pwd             - The Password for the Database User to connect to')
     write('           --db-host            - The Cluster endpoint')
     write('           --db-port            - The Cluster endpoint port : Default = 5439')
+    write('           --db-conn-opts       - Additional connection options. "name1=opt1[ name2=opt2].."')
     write('           --schema-name        - The Schema to be Analyzed or Vacuumed : Default = public')
     write('           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
     write('           --output-file        - The full path to the output file to be generated')
@@ -553,7 +558,8 @@ def usage(with_message=None):
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= predicate-cols= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
+
+    supported_args = """db= db-user= db-pwd= db-host= db-port=  db-conn-opts= schema-name= table-name= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= predicate-cols= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
 
     # extract the command line arguments
     try:
@@ -616,6 +622,9 @@ def main(argv):
         elif arg == "--db-port":
             if value != '' and value is not None:
                 db_port = value
+        elif arg == "--db-conn-opts":
+             if value != '' and value != None:
+                db_conn_opts = value
         elif arg == "--schema-name":
             if value != '' and value is not None:
                 schema_name = value
