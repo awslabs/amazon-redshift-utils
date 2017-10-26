@@ -20,6 +20,7 @@ Notes:
 History:
 2015-02-16 ericfe created
 2017-03-23 thiyagu Added percentage encoded column metric (pct_enc) and fixes  
+2017-10-01 mscaer Fixed columns "rows", pct_stats_off, and pct_unsorted to be correct for DISTSTYLE ALL.
 **********************************************************************************************/
 
 SELECT TRIM(pgn.nspname) AS SCHEMA,
@@ -36,7 +37,7 @@ SELECT TRIM(pgn.nspname) AS SCHEMA,
        ) AS Skew,
        det.head_sort AS "SortKey",
        det.n_sortkeys AS "#SKs",
-       a.rows,
+       CASE WHEN pgc.reldiststyle = 8 THEN a.rows_all_dist ELSE a.rows END AS rows,
        b.mbytes,
        decode(det.max_enc,
              0,'N',
@@ -47,16 +48,21 @@ SELECT TRIM(pgn.nspname) AS SCHEMA,
              0,0,
              ((b.mbytes/part.total::DECIMAL)*100)::DECIMAL(20,2)
        ) AS pct_of_total,
-       (CASE WHEN a.rows = 0 THEN NULL ELSE ((a.rows - pgc.reltuples)::DECIMAL(20,3) / a.rows::DECIMAL(20,3)*100)::DECIMAL(20,2) END) AS pct_stats_off,
-       decode( det.n_sortkeys,
-              0, NULL ,
-              DECODE( a.rows,0,0, (a.unsorted_rows::DECIMAL(32)/a.rows)*100) 
-       ) ::DECIMAL(20,2) AS pct_unsorted
+       (CASE WHEN a.rows = 0 THEN NULL ELSE 
+          CASE WHEN pgc.reldiststyle = 8 THEN ((a.rows_all_dist - pgc.reltuples)::DECIMAL(20,3) / a.rows_all_dist::DECIMAL(20,3)*100)::DECIMAL(20,2)
+                ELSE ((a.rows - pgc.reltuples)::DECIMAL(20,3) / a.rows::DECIMAL(20,3)*100)::DECIMAL(20,2) END END
+       ) AS pct_stats_off,
+       CASE WHEN pgc.reldiststyle = 8 
+          THEN decode( det.n_sortkeys,0, NULL,DECODE( a.rows_all_dist,0,0, (a.unsorted_rows_all_dist::DECIMAL(32)/a.rows_all_dist)*100))::DECIMAL(20,2)
+          ELSE decode( det.n_sortkeys,0, NULL,DECODE( a.rows,0,0, (a.unsorted_rows::DECIMAL(32)/a.rows)*100))::DECIMAL(20,2) END
+        AS pct_unsorted
 FROM (SELECT db_id,
              id,
              name,
              SUM(ROWS) AS ROWS,
-             SUM(ROWS) - SUM(sorted_rows) AS unsorted_rows
+             MAX(ROWS) AS rows_all_dist,
+             SUM(ROWS) - SUM(sorted_rows) AS unsorted_rows,
+             MAX(ROWS) - MAX(sorted_rows) AS unsorted_rows_all_dist
       FROM stv_tbl_perm a
       GROUP BY db_id,
                id,

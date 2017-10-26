@@ -122,10 +122,12 @@ def cleanup():
     for key in db_connections:
         if db_connections[key] != None:            
             close_conn(db_connections[key]) 
-    
+
+    global output_file_handle    
     if output_file_handle != None:
         output_file_handle.close()
 
+    global report_file_handle
     if report_file_handle != None:
         report_file_handle.close()
 
@@ -858,7 +860,8 @@ def run():
     output_file_handle = open(output_file, 'w')
 
     # open the file to store report
-    report_file_handle = open(report_file, 'w')
+    if (report_file):
+        report_file_handle = open(report_file, 'w')
     
     # get a connection for the controlling processes
     master_conn = get_pg_conn()

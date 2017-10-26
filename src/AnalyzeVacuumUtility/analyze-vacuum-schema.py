@@ -65,6 +65,7 @@ db_user = get_env_var('PGUSER', None)
 db_pwd = get_env_var('PGPASSWORD', None)
 db_host = get_env_var('PGHOST', None)
 db_port = get_env_var('PGPORT', 5439)
+db_conn_opts = get_env_var('PGCONNOPTS', None)
 schema_name = 'public'
 table_name = None
 blacklisted_tables = None
@@ -84,6 +85,7 @@ min_unsorted_pct   = 5
 max_unsorted_pct   = 50
 deleted_pct        = 5
 stats_off_pct      = 10
+predicate_cols     = False
 max_table_size_mb  = (700*1024)
 goback_no_of_days  = 1
 query_rank         = 25
@@ -167,6 +169,9 @@ def get_pg_conn():
 
         try:
             options = 'keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=5'
+            if db_conn_opts is not None:
+                options = options + ' ' + db_conn_opts
+
             connection_string = "host=%s port=%s dbname=%s user=%s password=%s %s" % (db_host, db_port, db, db_user, db_pwd, options)
 
             conn = pg.connect(dbname=connection_string)
@@ -412,18 +417,23 @@ def run_analyze(conn):
 
     statements =[]
 
+    if predicate_cols:
+        predicate_cols_option = ' PREDICATE COLUMNS '
+    else:
+        predicate_cols_option = ' ALL COLUMNS '
+
     if table_name is not None:
 
         # If it is one table , just check if this needs to be analyzed and prepare analyze statements
 
-        get_analyze_statement_feedback = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '" ; '
+        get_analyze_statement_feedback = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '"' + '%s ; '
                                                    + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
                                                    + '",  stats_off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
                                                 FROM svv_table_info
                                                 WHERE   stats_off::DECIMAL (32,4) > %s ::DECIMAL (32,4)
                                                 AND  trim("schema") = '%s'
                                                 AND  trim("table") = '%s';
-                                                ''' % (stats_off_pct,schema_name,table_name,)
+                                                ''' % (predicate_cols_option,stats_off_pct,schema_name,table_name,)
     else:
 
         # query for all tables in the schema
@@ -431,7 +441,7 @@ def run_analyze(conn):
 
         get_analyze_statement_feedback = '''
                                  --Get top N rank tables based on the missing statistics alerts
-                                    SELECT DISTINCT 'analyze ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" ; '
+                                    SELECT DISTINCT 'analyze ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '"' + '%s ; '
                                     + '/* '+ ' Table Name : ' + info_tbl."schema" + '."' + info_tbl."table"
                                         + '", Stats_Off : ' + CAST(info_tbl."stats_off" AS VARCHAR(10)) + ' */ ;'
                                     FROM ((SELECT TRIM(n.nspname) schema_name,
@@ -481,7 +491,7 @@ def run_analyze(conn):
                             WHERE info_tbl.stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
                             AND   TRIM(info_tbl.schema) = '%s'
                             ORDER BY info_tbl.size ASC  ;
-                            ''' % (goback_no_of_days,query_rank,goback_no_of_days,query_rank,stats_off_pct,schema_name)
+                            ''' % (predicate_cols_option,goback_no_of_days,query_rank,goback_no_of_days,query_rank,stats_off_pct,schema_name)
 
         #print(get_analyze_statement_feedback)
     if debug:
@@ -502,14 +512,14 @@ def run_analyze(conn):
 
         comment("Extracting Candidate Tables for analyze based on stats off from system table info ...")
 
-        get_analyze_statement = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '" ; '
+        get_analyze_statement = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '" %s ; '
                                         + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
                                         + '", Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
                                         FROM svv_table_info
                                         WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
                                         AND  trim("schema") = '%s'
                                         ORDER BY "size" ASC ;
-                                        ''' % (stats_off_pct,schema_name)
+                                        ''' % (predicate_cols_option,stats_off_pct,schema_name)
 
         if debug:
             comment(get_analyze_statement)
@@ -539,6 +549,7 @@ def usage(with_message=None):
     write('           --db-pwd             - The Password for the Database User to connect to')
     write('           --db-host            - The Cluster endpoint')
     write('           --db-port            - The Cluster endpoint port : Default = 5439')
+    write('           --db-conn-opts       - Additional connection options. "name1=opt1[ name2=opt2].."')
     write('           --schema-name        - The Schema to be Analyzed or Vacuumed : Default = public')
     write('           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
     write('           --blacklisted-tables - The tables we do not want to Vacuum')
@@ -554,6 +565,7 @@ def usage(with_message=None):
     write('           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
     write('           --deleted-pct        - Minimum deleted percentage (%) to consider a table for vacuum: Default = 05%')
     write('           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
+    write('           --predicate-cols     - Analyze predicate columns only')
     write('           --max-table-size-mb  - Maximum table size in MB : Default = 700*1024 MB')
     write('           --min-interleaved-skew   - Minimum index skew to consider a table for vacuum reindex: Default = 1.4')
     write('           --min-interleaved-cnt   - Minimum stv_interleaved_counts records to consider a table for vacuum reindex: Default = 0')
@@ -562,7 +574,7 @@ def usage(with_message=None):
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= blacklisted-tables= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= db-conn-opts= schema-name= table-name= blacklisted-tables= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
 
     # extract the command line arguments
     try:
@@ -593,6 +605,7 @@ def main(argv):
     global max_unsorted_pct
     global deleted_pct
     global stats_off_pct
+    global predicate_cols
     global max_table_size_mb
     global min_interleaved_skew
     global min_interleaved_cnt
@@ -625,6 +638,9 @@ def main(argv):
         elif arg == "--db-port":
             if value != '' and value is not None:
                 db_port = value
+        elif arg == "--db-conn-opts":
+             if value != '' and value != None:
+                db_conn_opts = value
         elif arg == "--schema-name":
             if value != '' and value is not None:
                 schema_name = value
@@ -677,6 +693,11 @@ def main(argv):
         elif arg == "--stats-off-pct":
             if value != '' and value is not None:
                 stats_off_pct = value
+        elif arg == "--predicate-cols":
+            if value.upper() == 'TRUE':
+                predicate_cols = True
+            else:
+                predicate_cols = False
         elif arg == "--max-table-size-mb":
             if value != '' and value is not None:
                 max_table_size_mb = value

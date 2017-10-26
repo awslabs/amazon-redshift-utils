@@ -13,6 +13,7 @@ If you are using psql, you can use ``` psql [option] -f &lt;script.sql&gt;``` to
 | perf_alert.sql | Return top occurrences of alerts, join with table scans |
 | queuing_queries.sql | Query showing queries which are waiting on a WLM Query Slot |
 | queue_resources_hourly.sql | Returns hourly resources usage for WLM query queues |
+| running_queues.sql | Returns queries running and queueing and resources consumed |
 | table_info.sql | Return Table storage information (size, skew, etc) |
 | table_inspector.sql | Table Analysis based on content in [Analyzing Table Design](http://docs.aws.amazon.com/redshift/latest/dg/c_analyzing-table-design.html). Complements table_info.sql |
 | top_queries.sql | Return the top 50 most time consuming statements in the last 7 days |
