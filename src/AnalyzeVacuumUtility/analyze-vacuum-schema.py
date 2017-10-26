@@ -68,6 +68,7 @@ db_port = get_env_var('PGPORT', 5439)
 db_conn_opts = get_env_var('PGCONNOPTS', None)
 schema_name = 'public'
 table_name = None
+blacklisted_tables = None
 debug = False
 output_file_handle = None
 do_execute = False
@@ -256,6 +257,20 @@ def run_vacuum(conn):
                                             AND  "schema" = '%s'
                                             AND  "table" = '%s';
                                         ''' % (vacuum_parameter,min_unsorted_pct,deleted_pct,max_table_size_mb,schema_name,table_name)
+
+    elif blacklisted_tables is not None:
+        blacklisted_tables_array = blacklisted_tables.split(',')
+        get_vacuum_statement = '''SELECT DISTINCT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
+                                                   + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
+                                                   + '",  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + CAST("unsorted" AS VARCHAR(10))
+                                                   + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;'
+                                        FROM svv_table_info
+                                        WHERE (unsorted > %s OR empty > %s)
+                                            AND   size < %s
+                                            AND  "schema" = '%s'
+                                            AND  "table" NOT IN (%s);
+                                        ''' % (vacuum_parameter,min_unsorted_pct,deleted_pct,max_table_size_mb,schema_name,str(blacklisted_tables_array)[1:-1])
+
     else:
 
         # query for all tables in the schema ordered by size descending
@@ -314,7 +329,7 @@ def run_vacuum(conn):
                         return ERROR
 
     statements =[]
-    if table_name is None:
+    if table_name is None and blacklisted_tables is None:
 
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Tables for vacuum ...")
@@ -354,7 +369,7 @@ def run_vacuum(conn):
                 return ERROR
 
     statements =[]
-    if table_name is None:
+    if table_name is None and blacklisted_tables is None:
 
         # query for all tables in the schema for vacuum reindex
 
@@ -537,6 +552,7 @@ def usage(with_message=None):
     write('           --db-conn-opts       - Additional connection options. "name1=opt1[ name2=opt2].."')
     write('           --schema-name        - The Schema to be Analyzed or Vacuumed : Default = public')
     write('           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
+    write('           --blacklisted-tables - The tables we do not want to Vacuum')
     write('           --output-file        - The full path to the output file to be generated')
     write('           --debug              - Generate Debug Output including SQL Statements being run')
     write('           --slot-count         - Modify the wlm_query_slot_count : Default = 1')
@@ -558,8 +574,7 @@ def usage(with_message=None):
 
 
 def main(argv):
-
-    supported_args = """db= db-user= db-pwd= db-host= db-port=  db-conn-opts= schema-name= table-name= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= predicate-cols= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= db-conn-opts= schema-name= table-name= blacklisted-tables= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
 
     # extract the command line arguments
     try:
@@ -576,6 +591,7 @@ def main(argv):
     global db_host
     global db_port
     global schema_name
+    global blacklisted_tables
     global table_name
     global debug
     global output_file_handle
@@ -631,6 +647,9 @@ def main(argv):
         elif arg == "--table-name":
             if value != '' and value is not None:
                 table_name = value
+        elif arg == "--blacklisted-tables":
+            if value != '' and value is not None:
+                blacklisted_tables = value
         elif arg == "--debug":
             if value.upper() == 'TRUE':
                 debug = True
@@ -734,6 +753,7 @@ def main(argv):
         comment("anlayze flag arg is set as %s.Analyze is not performed." % (analyze_flag))
 
     comment('Processing Complete')
+    comment("The blacklisted tables are: %s" % (str(blacklisted_tables)))
     cleanup()
 
 if __name__ == "__main__":
