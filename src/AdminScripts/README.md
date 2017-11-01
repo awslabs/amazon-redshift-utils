@@ -11,6 +11,7 @@ If you are using psql, you can use ``` psql [option] -f &lt;script.sql&gt;``` to
 | generate_calendar.sql | Creates a calendar dimension table useful for star-schema joins |
 | missing_table_stats.sql | Query shows EXPLAIN plans which flagged "missing statistics" on the underlying tables |
 | perf_alert.sql | Return top occurrences of alerts, join with table scans |
+| predicate_columns.sql | Return Information about Predicate Columns on tables |_
 | queuing_queries.sql | Query showing queries which are waiting on a WLM Query Slot |
 | queue_resources_hourly.sql | Returns hourly resources usage for WLM query queues |
 | running_queues.sql | Returns queries running and queueing and resources consumed |
