@@ -186,6 +186,7 @@ Sl.No	Parameter				Mandatory	Default Value
 20.		--stats-off-pct			No			10%
 21.		--stats-threshold			No			10%
 22.		--max-table-size-mb		No			700*1024 MB
+23.		--predicate-cols		No			False
 ```
 
 The above parameter values depends on the cluster type, table size, available system resources and available ‘Time window’ etc. The default values provided here are based on ds2.8xlarge, 8 node cluster. It may take some trial and error to come up with correct parameter values to vacuum and analyze your table(s). If table size is greater than certain size (max_table_size_mb) and has a large unsorted region (deleted_pct  or max_unsorted_pct), consider deep copy, which would be much faster than a vacuum.
@@ -241,6 +242,10 @@ Minimum stats off percentage(%) to consider a table for analyze : Default = 10%
 #### max-table-size-mb 
 
 Maximum table size in MB : Default = 700*1024 MB
+
+#### predicate-cols
+
+Analyze predicate columns only. Default = False
 
 
 ## Sample Usage
