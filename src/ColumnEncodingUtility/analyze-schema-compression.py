@@ -80,6 +80,7 @@ debug = False
 threads = 2
 output_file = None
 output_file_handle = None
+report_file_handle = None
 do_execute = False
 query_slot_count = 1
 ignore_errors = False
@@ -767,6 +768,7 @@ def usage(with_message):
     write('           --target-schema  - Name of a Schema into which the newly optimised tables and data should be created, rather than in place')
     write('           --threads        - The number of concurrent connections to use during analysis (default 2)')
     write('           --output-file    - The full path to the output file to be generated')
+    write('           --report-file    - The full path to the report file to be generated')
     write('           --debug          - Generate Debug Output including SQL Statements being run')
     write('           --do-execute     - Run the compression encoding optimisation')
     write('           --slot-count     - Modify the wlm_query_slot_count from the default of 1')
