@@ -14,6 +14,10 @@ INVALID_ARGS = -2
 region_key = 'AWS_REGION'
 
 def encrypt_password(args):
+    if len(args) == 1:
+        print "You must supply the password to be encrypted"
+        sys.exit(-1)
+        
     try:
         currentRegion = os.environ[region_key]
         

@@ -4,7 +4,7 @@ This project includes code that is able to run a subset of the Amazon Redshift U
 
 ## Supported Utilities
 
-Currently only the [Column Encoding Utility](src/ColumnEncodingUtility) is supported, but in time we will also hope to support the [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility).
+Currently the [Column Encoding Utility](src/ColumnEncodingUtility) and [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility) are supported for automated invocation.
 
 ## Setup
 
@@ -29,12 +29,13 @@ Copy the value after ```Encrypted Password: ``` an use it for the creation of th
 
 ## Configuration
 
-This lambda function uses an included ```config.json``` file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. You configure which utility to run in the ```'utilities'``` array - currently only the value ```ColumnEncodingUtility``` is supported
+This lambda function uses an included ```config.json``` file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. You configure which utility to run in the ```'utilities'``` array - currently only the values ```ColumnEncodingUtility, AnalyzeVacuumUtility``` is supported
 
 The required configuration items are placed into the ```configuration``` part of the config file, and include:
 
 ```
-{
+{"utilities":[("ColumnEncodingUtility"|"AnalyzeVacuumUtility")], - list of utilities to run. Can provide multiple values
+"configuration": {
   "analyzeTable": "The name of a specific table to analyze",
   "analyzeSchema": "The name of the schema to be analyzed. Either analyzeSchema or analyzeTable must be provided",
   "comprows": Int - set to -1 for default. This is the number of rows that will be considered per slice for Column Encoding,
@@ -50,18 +51,55 @@ The required configuration items are placed into the ```configuration``` part of
   "targetSchema": "The schema name where newly encoded tables should be placed. Leave as "" for using the analyzeSchema",
   "force": Boolean - do you want to force the utility to run even if there are no likely changes?,
   "outputFile":"The path of the file to create on the filesystem. AWS Lambda can only write to /tmp",
-  "debug":Boolean - turn on debug logging of actions and SQL run on the cluster
+  "debug":Boolean - turn on debug logging of actions and SQL run on the cluster,
+  "analyze_col_width": 1 - analyze colums of this size or larger during AnalyzeVaccum,
+  "ssl-option":"" - whether ssl is required to connect to the cluster,
+  "doVacuum": "(true|false) Should the Analyze Vacuum utility run Vacuum?",
+  "doAnalyze":"(true|false) Should the Analyze Vacuum utility run Analyze?",
+  "tableBlacklist":"comma separated list of tables to suppress running the analyze vacuum utility against"  
   }
+}
 ```
+
+You can include the file in the distribution as 'config.json', which will automatically be imported if it is found during the build phase. However, we do not recommend using this configuration mechanism, and instead recommend that you supply the configuration location as part of the CloudWatch scheduled event.
 
 ## Building
 
-This module runs as an AWS Lambda function, and imports the required utilities from other parts of this GitHub project as required. It also imports its required dependencies and your ```config.json``` and builds a zipfile that is suitable for use by AWS Lambda. To build this module after customising your config file, just run ```build.sh```. This will result in zipfile ```lambda-redshift-util-runner.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python', and the timeout to a value long enough to accomodate running against all your tables.
+If you are using an S3 based configuration, then there should be no need to rebuild the project. You can just deploy from the `dist` directory, or use the following S3 locations (md5 checksum `49b2457b7760051598988b7872a7f1d0`):
 
-Also, because this function connects to a specific Redshift cluster with a specific configuration of username and password, we encourate you to use a Function Name that will be easy to understand which instance you have deployed. For instance, you might name it ```RedshiftUtilitiesMyClusterMyUser```
+| Region | Lambda Zip |
+| ------ | ---------- |
+| ap-northeast-1 | s3://awslabs-code-ap-northeast-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || ap-northeast-2 | s3://awslabs-code-ap-northeast-2/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || ap-south-1 | s3://awslabs-code-ap-south-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || ap-southeast-1 | s3://awslabs-code-ap-southeast-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || ap-southeast-2 | s3://awslabs-code-ap-southeast-2/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || ca-central-1 | s3://awslabs-code-ca-central-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || eu-central-1 | s3://awslabs-code-eu-central-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || eu-west-1 | s3://awslabs-code-eu-west-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || eu-west-2 | s3://awslabs-code-eu-west-2/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || sa-east-1 | s3://awslabs-code-sa-east-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || us-east-1 | s3://awslabs-code-us-east-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || us-east-2 | s3://awslabs-code-us-east-2/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || us-west-1 | s3://awslabs-code-us-west-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || us-west-2 | s3://awslabs-code-us-west-2/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip |
+
+If you do need to rebuild, this module imports the required utilities from other parts of this GitHub project as required. It also imports its required dependencies and your ```config.json``` and builds a zipfile that is suitable for use by AWS Lambda. To build this module after customising your config file or the code, just run ```build.sh```. This will result in zipfile ```lambda-redshift-util-runner-$version.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python(2.7|3.5)', and the timeout to a value long enough to accomodate running against all your tables.
+
+Also, when you include a config.json, this function connects to only one Redshift cluster. If you do this, we encourate you to use a Lambda function name that will be easy to understand which instance you have pointed to. For instance, you might name it ```RedshiftUtilitiesMyClusterMyUser```.
+
 
 ## Running the Modules
 
-These utilites are designed to be run via a schedule, and don't use any information from the incoming event. Given this, you can just press the 'Test' button on the AWS Lambda console to run the function and use CloudWatch Logs to determine that you are happy with the configuration, the level of debug output, and the timeout.
+These utilites are designed to be run via a schedule, and if you've included a local `config.json` file, don't use any information from the incoming event. However, if you have not included a local configuration file, then upload the `config.json` to S3, and we'll use it as part of the CloudWatch Scheduled Event.
 
-Once done, you can create a CloudWatch Events Event Source that will run your function on the required schedule. To do this, open the function in the AWS Lambda web console, and then select the 'Event Sources' tab. ```Add event source``` and then select Type = ```CloudWatch Events - Schedule ```. Select a rule name, and then enter a schedule expression that will cause your function to run when required. Enable it, and you are ready to go. You can review the function running over time using CloudWatch Logs for the function from the Monitoring tab.
+Next create a CloudWatch Events Schedule that will run your function on the required schedule. To do this, open the function in the AWS Lambda web console, and then select the 'Event Sources' tab. ```Add event source``` and then select Type = ```CloudWatch Events - Schedule ```. Select a rule name, and then enter a schedule expression that will cause your function to run when required. Under 'Targets', change the value for 'Configure Input' to 'Constant (JSON Text)', and add a value that runs the appropriate module, and points to the configuration file on S3. For example:
+
+__To run the Column Encoding Utility__
+
+```javascript
+{"ExecuteUtility":"ColumnEncodingUtility","ConfigLocation":"s3//mybucket/myprefix/config.json"}
+```
+
+__To run the Analyze/Vacuum Utility__
+
+```javascript
+{"ExecuteUtility":"AnalyzeVacuumUtility","ConfigLocation":"s3//mybucket/myprefix/config.json"}
+```
+
+Now you can enable the Scheduled Event, and you are ready to go. You can review the function running over time using CloudWatch Logs for the function from the Monitoring tab.
+
+----
+
+Amazon Redshift Utils - Lambda Runner
+
+Copyright 2017-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+Amazon Software License: https://aws.amazon.com/asl

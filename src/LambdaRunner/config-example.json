@@ -19,6 +19,9 @@
   "do-execute":false,
   "analyze_col_width": 1,
   "threads": 1,
-  "ssl-option":""
+  "ssl-option":"",
+  "doVacuum": "(true|false) Should the Analyze Vacuum utility run Vacuum?",
+  "doAnalyze":"(true|false) Should the Analyze Vacuum utility run Analyze?",
+  "tableBlacklist":"comma separated list of tables to suppress running the analyze vacuum utility against"
   }
 }
