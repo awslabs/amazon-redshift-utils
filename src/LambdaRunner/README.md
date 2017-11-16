@@ -29,7 +29,7 @@ Copy the value after ```Encrypted Password: ``` an use it for the creation of th
 
 ## Configuration
 
-This lambda function uses an included ```config.json``` file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. You configure which utility to run in the ```'utilities'``` array - currently only the values ```ColumnEncodingUtility, AnalyzeVacuumUtility``` is supported
+This lambda function uses a configuration file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. An example `config-example.json` is included to get you started. You configure which utility to run in the ```'utilities'``` array - currently the values ```ColumnEncodingUtility, AnalyzeVacuumUtility``` are supported
 
 The required configuration items are placed into the ```configuration``` part of the config file, and include:
 
@@ -61,7 +61,7 @@ The required configuration items are placed into the ```configuration``` part of
 }
 ```
 
-You can include the file in the distribution as 'config.json', which will automatically be imported if it is found during the build phase. However, we do not recommend using this configuration mechanism, and instead recommend that you supply the configuration location as part of the CloudWatch scheduled event.
+You can include the file in the distribution as 'config.json', which will automatically be imported if it is found during the build phase. However, we do not recommend using this configuration mechanism, and instead recommend that you supply the configuration location as part of the CloudWatch scheduled event (see section "Running the Modules").
 
 ## Building
 
@@ -78,7 +78,7 @@ Also, when you include a config.json, this function connects to only one Redshif
 
 ## Running the Modules
 
-These utilites are designed to be run via a schedule, and if you've included a local `config.json` file, don't use any information from the incoming event. However, if you have not included a local configuration file, then upload the `config.json` to S3, and we'll use it as part of the CloudWatch Scheduled Event.
+These utilites are designed to be run via a schedule, and if you've included a local `config.json` file, then they don't extract any information from the incoming event. However, our recommendation is to upload your `config.json` to S3, and we'll use it as part of the CloudWatch Scheduled Event.
 
 Next create a CloudWatch Events Schedule that will run your function on the required schedule. To do this, open the function in the AWS Lambda web console, and then select the 'Event Sources' tab. ```Add event source``` and then select Type = ```CloudWatch Events - Schedule ```. Select a rule name, and then enter a schedule expression that will cause your function to run when required. Under 'Targets', change the value for 'Configure Input' to 'Constant (JSON Text)', and add a value that runs the appropriate module, and points to the configuration file on S3. For example:
 
