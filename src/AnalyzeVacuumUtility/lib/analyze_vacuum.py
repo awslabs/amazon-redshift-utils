@@ -233,6 +233,8 @@ def run_vacuum(conn, schema_name, table_name, blacklisted_tables, ignore_errors)
     for vs in vacuum_statements:
         statements.append(vs[0])
 
+    comment("Found %s Tables requiring Vacuum and flagged by alert" % len(statements))
+
     if not run_commands(conn, statements):
         if not ignore_errors:
             if debug:
@@ -271,6 +273,8 @@ def run_vacuum(conn, schema_name, table_name, blacklisted_tables, ignore_errors)
 
         for vs in vacuum_statements:
             statements.append(vs[0])
+
+        comment("Found %s Tables requiring Vacuum due to stale statistics" % len(statements))
 
         if not run_commands(conn, statements):
             if not ignore_errors:
@@ -312,6 +316,8 @@ def run_vacuum(conn, schema_name, table_name, blacklisted_tables, ignore_errors)
 
         for vs in vacuum_statements:
             statements.append(vs[0])
+
+        comment("Found %s Tables with Interleaved Sort Keys requiring Vacuum" % len(statements))
 
         if not run_commands(conn, statements):
             if not ignore_errors:
@@ -410,6 +416,8 @@ def run_analyze(conn, schema_name, table_name, ignore_errors):
     for vs in analyze_statements:
         statements.append(vs[0])
 
+    comment("Found %s Tables requiring Analysis" % len(statements))
+
     if not run_commands(conn, statements):
         if not ignore_errors:
             if debug:
@@ -458,19 +466,20 @@ def run_analyze_vacuum(db_host, db_port, db_user, db_pwd, db, query_group, query
 
     comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
 
-    if (blacklisted_tables is not None):
+    if (blacklisted_tables is not None and len(blacklisted_tables) > 0):
         comment("The blacklisted tables are: %s" % (str(blacklisted_tables)))
-    if vacuum_flag != False:
+
+    if vacuum_flag is True:
         # Run vacuum based on the Unsorted , Stats off and Size of the table
         run_vacuum(master_conn, schema_name, table_name, blacklisted_tables, ignore_errors)
     else:
-        comment("vacuum flag arg is set as %s. Vacuum is not performed." % (vacuum_flag))
+        comment("Vacuum flag arg is set as %s. Vacuum is not performed." % (vacuum_flag))
 
-    if analyze_flag != False:
+    if analyze_flag is True:
         # Run Analyze based on the  Stats off Metrics table
         run_analyze(master_conn, schema_name, table_name, ignore_errors)
     else:
-        comment("analyze flag arg is set as %s. Analyze is not performed." % (analyze_flag))
+        comment("Analyze flag arg is set as %s. Analyze is not performed." % (analyze_flag))
 
     comment('Processing Complete')
     
