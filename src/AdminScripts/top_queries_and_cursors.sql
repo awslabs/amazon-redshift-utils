@@ -22,30 +22,32 @@ History:
 2017-04-07 thiyagu created
 2017-05-19 ericfe removed listagg
 2017-08-09 ericfe added QMR statistics columns
+2017-11-21 ericfe Fixed Event Alert Bug
 **********************************************************************************************/
-select trim(database) as DB, count(query) as n_qry, max(substring (qrytext ,1,120)) as qrytext, max(run_seconds) as "max", avg(run_seconds) as "avg", sum(run_seconds) as total, max(service_class) as queue,
-       avg(cpu) as cpu, avg(cpupct) as cpupct, avg(spill) as spill, avg(mb_read) as mb_Read, avg(rows_ret) as rows_ret,
-       max(query) as max_query, max(starttime)::date as last_run, aborted, -- max(mylabel),
-       trim(decode(event&1,1,'Sortkey ','') || decode(event&2,2,'Deletes ','') || decode(event&4,4,'NL ','') ||  decode(event&8,8,'Dist ','') || decode(event&16,16,'Broacast ','') || decode(event&32,32,'Stats ','')) as Alert
+select trim(database) as DB, count(query) as n_qry, max(substring (qrytext ,1,120)) as qrytext, max(run_seconds) as "max_s", avg(run_seconds) as "avg_s", sum(run_seconds) as total_s, max(service_class) as queue, avg(queue_sec) as avg_q_sec,
+       avg(cpu) as cpu_sec, avg(cpupct) as cpupct, avg(spill/1024) as spill_gb, avg(mb_read) as mb_Read, avg(rows_ret) as rows_ret, max(mem_bytes/(1024*1024)) as peak_mem_gb,
+       max(query) as max_query, to_char(max(starttime), 'YYYY-MM-DD HH24:MM:SS') as last_run, aborted, -- max(mylabel) as Label,
+       event as Alert
 from (
-select q.userid, q.query, trim(q.database) as database, nvl(qrytext_cur.text,trim(q.querytxt) ) as qrytext, md5(nvl(qrytext_cur.text,trim(q.querytxt))) as qry_md5, q.starttime, q.endtime, 
-datediff(seconds, q.starttime,q.endtime)::numeric(12,2) as run_seconds, q.aborted, event, q.label as mylabel, qs.service_Class, qs.query_cpu_time as cpu, qs.query_cpu_usage_percent as cpupct, qs.query_temp_blocks_to_disk as spill,
-qs.query_blocks_read as mb_read, qs.return_row_count as rows_ret
+select q.userid, q.query, trim(q.database) as database, trim(q.label) as label, nvl(qrytext_cur.text,trim(q.querytxt) ) as qrytext, md5(nvl(qrytext_cur.text,trim(q.querytxt))) as qry_md5, q.starttime, q.endtime, 
+datediff(seconds, greatest(q.starttime,nvl(w.exec_start_time,'2000-01-01')),q.endtime)::numeric(12) as run_seconds, q.aborted, alrt.event, q.label as mylabel, qs.service_Class, qs.query_cpu_time as cpu, qs.query_cpu_usage_percent as cpupct, qs.query_temp_blocks_to_disk as spill,
+qs.query_blocks_read as mb_read, qs.return_row_count as rows_ret, datediff('seconds',w.queue_Start_time, w.queue_end_time) as queue_sec, w.est_peak_mem as mem_bytes
 from stl_query q
+left outer join stl_wlm_query w on (q.query = w.query and q.userid = w.userid)
 left outer Join svl_Query_metrics_summary qs on ( q.userid = qs.userid and q.query = qs.query )
-left outer join ( select query,sum(decode(trim(split_part(event,':',1)),'Very selective query filter',1,'Scanned a large number of deleted rows',2,'Nested Loop Join in the query plan',4,'Distributed a large number of rows across the network',8,'Broadcasted a large number of rows across the network',16,'Missing query planner statistics',32,0)) as event from STL_ALERT_EVENT_LOG 
-     where event_time >=  dateadd(day, -7, current_Date) group by query  ) as alrt on alrt.query = q.query
+left outer join ( select query,listagg (distinct decode(trim(split_part(event,':',1)),'Very selective query filter','SK','Scanned a large number of deleted rows','Del','Nested Loop Join in the query plan','NL','Distributed a large number of rows across the network','Dist',
+'Broadcasted a large number of rows across the network','Bcast','Missing query planner statistics','Stats','DS_DIST_ALL_INNER for Hash Join in the query plan','InvAll', split_part(event,':',1)),' ' ) WITHIN GROUP (order by event)  as event from STL_ALERT_EVENT_LOG  where event_time >=  dateadd(day, -7, current_Date) group by query  ) as alrt on alrt.query = q.query
 LEFT OUTER JOIN (SELECT ut.xid,'CURSOR ' || TRIM( substring ( TEXT from strpos(upper(TEXT),'SELECT') )) as TEXT
                    FROM stl_utilitytext ut
 		           WHERE sequence = 0
 		           AND upper(TEXT) like 'DECLARE%'
                    GROUP BY text, ut.xid) qrytext_cur ON (q.xid = qrytext_cur.xid)
 where q.userid <> 1 
--- and (q.querytxt like 'SELECT%' or querytxt like 'select%' ) 
+-- and q.querytxt ilike 'SELECT%' 
 -- and q.querytxt ilike 'COPY%'  
 -- and q.database = ''
 -- and q.aborted = 1
-and q.starttime >=  dateadd(day, -2, current_Date)
+and q.starttime >=  dateadd(day, -7, current_Date)
  ) 
 group by database, userid, qry_md5, aborted, event
-order by total desc limit 50;
+order by total_s desc limit 50;
