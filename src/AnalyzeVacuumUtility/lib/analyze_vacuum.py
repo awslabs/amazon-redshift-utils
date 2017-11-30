@@ -88,7 +88,8 @@ def get_pg_conn(db_host, db_port, db, db_user, db_pwd, schema_name, query_group,
         comment('Connect %s:%s:%s:%s' % (db_host,db_port,db,db_user))
 
     try:
-        conn = pg8000.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd, ssl=ssl_option)        
+        conn = pg8000.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd, ssl=ssl_option)
+        conn.autocommit = True
     except Exception as e:
         print("Exception on Connect to Cluster: %s" % e)
         print('Unable to connect to Cluster Endpoint')
@@ -131,8 +132,10 @@ def get_pg_conn(db_host, db_port, db, db_user, db_pwd, schema_name, query_group,
 
     # set a long statement timeout
     set_timeout = "set statement_timeout = '36000000'"
+
     if debug:
         comment(set_timeout)
+
     run_commands(conn, [set_timeout])
 
     return conn
