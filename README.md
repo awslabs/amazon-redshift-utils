@@ -63,6 +63,34 @@ We included a presentation which describes main features of the Amazon-Redshift-
 # Investigations
 This project includes a number of detailed investigations into various types of Redshift edge cases, nuances, and workload scenarios. 
 
+# Docker executions
+The Dockerfile provides an environment to execute the following utilities without having to install any dependencies locally:
+* Analyze & Vacuum Utility
+* Unload/Copy Utility
+* Column Encoding Utility
+
+You can do this by building the image like so:
+```bash
+docker build -t amazon-redshift-utils .
+```
+
+And then executing any one of the 3 following commands (filling in the -e parameters as needed):
+```bash
+docker run --net host --rm -it -e DB=my-database .... amazon-redshift-utils analyze-vacuum
+docker run --net host --rm -it -e DB=my-database .... amazon-redshift-utils column-encoding
+docker run --net host --rm -it -e CONFIG_FILE=s3://.... amazon-redshift-utils unload-copy
+```
+
+The docker [entrypoint scripts](src/bin/) work off of environment variables, so you'd want to provide those in your run scripts above.
+
+For convenience, you can create a `.env` file locally and upload them to the docker container via the `--env-file` argument. E.g.:
+
+```bash
+docker run --net host --rm -it --env-file .env .... amazon-redshift-utils analyze-vacuum
+```
+
+Please see the [entrypoint scripts](src/bin/) for the environment variable configuration references that are needed.
+
 ----
 Copyright 2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
