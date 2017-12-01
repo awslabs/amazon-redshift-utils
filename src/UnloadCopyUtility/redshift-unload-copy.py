@@ -85,7 +85,12 @@ def copy_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPath
         copy_stmt = copy_stmt + ("\nREGION '%s'" % (dataStagingRegion))
         
     print "Importing %s.%s from %s" % (schema_name, table_name, dataStagingPath + (":%s" % (dataStagingRegion) if dataStagingRegion != None else ""))
-    conn.query(copy_stmt % (schema_name, table_name, table_columns, dataStagingPath, s3_access_credentials, master_symmetric_key))
+
+    if table_columns is not None:
+        query= copy_stmt % (schema_name, table_name, table_columns, dataStagingPath, s3_access_credentials, master_symmetric_key)
+    else:
+        query= copy_stmt % (schema_name, table_name, "", dataStagingPath, s3_access_credentials, master_symmetric_key)
+    conn.query(query)
 
 
 def decrypt(b64EncodedValue):
@@ -196,7 +201,7 @@ def main(args):
     src_user = srcConfig['connectUser']
 
     #Check if its present and that it is not empty
-    if 'columns' not in srcConfig and not srcConfig['columns'].strip():
+    if 'columns' not in srcConfig or not srcConfig['columns'].strip():
         src_columns=None
     else:
         src_columns = srcConfig['columns']
@@ -211,7 +216,7 @@ def main(args):
     dest_table = destConfig['tableName']
     dest_user = destConfig['connectUser']
     #Check if its present and that it is not empty
-    if 'columns' not in destConfig and not destConfig['columns'].strip():
+    if 'columns' not in destConfig or not destConfig['columns'].strip():
         destination_columns=None
     else:
         destination_columns = destConfig['columns']
