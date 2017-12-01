@@ -51,7 +51,7 @@ unload_stmt = """unload ('SELECT %s FROM %s.%s')
                  gzip
                  delimiter '^' addquotes escape allowoverwrite"""
 
-copy_stmt = """copy %s.%s
+copy_stmt = """copy %s.%s %s
                from '%smanifest' credentials 
                '%s;master_symmetric_key=%s'
                manifest 
@@ -79,13 +79,13 @@ def unload_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPa
     conn.query(query)
 
 
-def copy_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPath, dataStagingRegion, schema_name, table_name):
+def copy_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPath, dataStagingRegion, schema_name, table_name, table_columns=""):
     global copy_stmt
     if dataStagingRegion != None:
         copy_stmt = copy_stmt + ("\nREGION '%s'" % (dataStagingRegion))
         
     print "Importing %s.%s from %s" % (schema_name, table_name, dataStagingPath + (":%s" % (dataStagingRegion) if dataStagingRegion != None else ""))
-    conn.query(copy_stmt % (schema_name, table_name, dataStagingPath, s3_access_credentials, master_symmetric_key))
+    conn.query(copy_stmt % (schema_name, table_name, table_columns, dataStagingPath, s3_access_credentials, master_symmetric_key))
 
 
 def decrypt(b64EncodedValue):
@@ -210,6 +210,11 @@ def main(args):
     dest_schema = destConfig['schemaName']
     dest_table = destConfig['tableName']
     dest_user = destConfig['connectUser']
+    #Check if its present and that it is not empty
+    if 'columns' not in destConfig and not destConfig['columns'].strip():
+        destination_columns=None
+    else:
+        destination_columns = destConfig['columns']
     
     # create a new data key for the unload operation        
     dataKey = kmsClient.generate_data_key(encryptionKeyID, key_spec="AES_256")
@@ -230,7 +235,7 @@ def main(args):
     dest_conn = conn_to_rs(dest_host, dest_port, dest_db, dest_user,
                           dest_pwd) 
     copy_data(dest_conn, s3_access_credentials, master_symmetric_key, dataStagingPath, dataStagingRegion,
-              dest_schema, dest_table)
+              dest_schema, dest_table, table_columns=destination_columns)
 
     src_conn.close()
     dest_conn.close()

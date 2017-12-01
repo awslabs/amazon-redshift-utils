@@ -37,7 +37,9 @@
     "connectUser": "master",
     "db": "mydb",
     "schemaName": "public",
-    "tableName": "import_table"
+    "tableName": "import_table",
+    //Optional List of columns. Probably best used in conjunction with unloadSource.columns, unless the schemas are different and you know what you are doing
+    "columns" : "column1,column2"
   }
 }
         
