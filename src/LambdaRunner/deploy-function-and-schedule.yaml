@@ -8,6 +8,14 @@ Parameters:
     AllowedValues:
       - AnalyzeVacuumUtility
       - ColumnEncodingUtility
+  SecurityGroups:
+    Default: mygroup1, mygroup2
+    Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
+    Type: CommaDelimitedList
+  SubnetIds:
+    Default: subnet1, subnet2, subnet3
+    Description: List of private Subnets in VPC in which the function will egress network connections
+    Type: CommaDelimitedList
   S3ConfigPath:
     Default: s3://my-bucket/prefix/config-file.json
     Description: Configuration File for this Utility instance
@@ -19,7 +27,7 @@ Parameters:
     Type: String
     AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
 Resources:
-  ScheduledFunction:
+  LambdaRedshiftAutomation:
     Type: AWS::Serverless::Function
     Properties:
       Handler: lambda_function.event_handler
@@ -31,7 +39,12 @@ Resources:
       Timeout: 300
       Tags:
         Name: LambdaRedshiftRunner
-      Role: !GetAtt ScheduledServiceIAMRole.Arn
+      Role: !GetAtt RedshiftAutomationIAMRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          !Ref SecurityGroups
+        SubnetIds:
+          !Ref SubnetIds
       Events:
         Timer:
           Type: Schedule
@@ -43,7 +56,7 @@ Resources:
                   "ExecuteUtility":"${UtilityName}",
                   "ConfigLocation":"${S3ConfigPath}"
                 }
-  ScheduledServiceIAMRole:
+  RedshiftAutomationIAMRole:
     Type: "AWS::IAM::Role"
     Properties:
         RoleName: "LambdaRedshiftRunnerRole"

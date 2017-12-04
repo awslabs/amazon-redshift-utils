@@ -22,7 +22,7 @@ Parameters:
     Type: String
     AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
 Resources:
-  ScheduledEventRule:
+  UtilityEventRule:
     Type: "AWS::Events::Rule"
     Properties:
       Description: CloudWatch Events Rule to Invoke Lambda Runner
@@ -45,4 +45,4 @@ Resources:
       Action: 'lambda:InvokeFunction'
       Principal: events.amazonaws.com
       SourceAccount: !Ref 'AWS::AccountId'
-      SourceArn: !GetAtt ScheduledEventRule.Arn
+      SourceArn: !GetAtt UtilityEventRule.Arn
