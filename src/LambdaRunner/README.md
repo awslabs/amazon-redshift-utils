@@ -1,12 +1,14 @@
 # AWS Lambda Utility Runner
 
-This project includes code that is able to run a subset of the Amazon Redshift Utilities via AWS Lambda. By using a Lambda function scheduled via a CloudWatch Event (http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html), you can ensure that these valuable utilities run automatically and keep your Redshift cluster running well.
+This project includes code that is able to run a subset of the Amazon Redshift Utilities via AWS Lambda. By using a Lambda function scheduled via a [CloudWatch Event](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html), you can ensure that these valuable utilities run automatically and keep your Redshift cluster running well.
 
-## Supported Utilities
+![Architecture](Architecture.png)
+
+This utility creates a Lambda function which imports other Redshift Utils modules, and then invokes them against a cluster. It runs within your VPC, and should be configured to connect via a Subnet which is either the same, or can route to the subnet where your Redshift cluster is running. It should also be configured with a Security Group which is trusted by your [Redshift Cluster Security Configuration](http://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html).
 
 Currently the [Column Encoding Utility](src/ColumnEncodingUtility) and [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility) are supported for automated invocation.
 
-## Setup
+## Setup Pre-Tasks
 
 Because these utilities need to access your Redshift cluster, they require a username and password for authentication. This function reads these values from a configuration file, and expects that the database password is a base64 encoded string that has been encrypted by [AWS KMS](https://aws.amazon.com/kms). In order to authenticate when the utility is run by AWS Lambda, the IAM role granted to AWS Lambda must have rights to decrypt data using KMS, and must also include this application's internal encryption context (which you may change if you desire).
 
@@ -61,26 +63,33 @@ The required configuration items are placed into the ```configuration``` part of
 }
 ```
 
-You can include the file in the distribution as 'config.json', which will automatically be imported if it is found during the build phase. However, we do not recommend using this configuration mechanism, and instead recommend that you supply the configuration location as part of the CloudWatch scheduled event (see section "Running the Modules").
+Save this configuration to a json file, and place it on S3. We will refer to the file when we launch the SAM Template. Alternatively you can rebuild the project manually using filename 'config.json', and it will automatically be imported.
 
-## Building
+## Deploying
 
-If you are using an S3 based configuration, then there should be no need to rebuild the project. You can just deploy from the `dist` directory, or use the following S3 locations (md5 checksum `49b2457b7760051598988b7872a7f1d0`):
+We have provided the following AWS SAM templates so that you can deploy this function automatically (please note that we currently only support deploying into VPC):
 
-| Region | Lambda Zip |
+| Region | Template |
 | ------ | ---------- |
-| ap-northeast-1 | s3://awslabs-code-ap-northeast-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || ap-northeast-2 | s3://awslabs-code-ap-northeast-2/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || ap-south-1 | s3://awslabs-code-ap-south-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || ap-southeast-1 | s3://awslabs-code-ap-southeast-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || ap-southeast-2 | s3://awslabs-code-ap-southeast-2/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || ca-central-1 | s3://awslabs-code-ca-central-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || eu-central-1 | s3://awslabs-code-eu-central-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || eu-west-1 | s3://awslabs-code-eu-west-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || eu-west-2 | s3://awslabs-code-eu-west-2/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || sa-east-1 | s3://awslabs-code-sa-east-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || us-east-1 | s3://awslabs-code-us-east-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || us-east-2 | s3://awslabs-code-us-east-2/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || us-west-1 | s3://awslabs-code-us-west-1/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip || us-west-2 | s3://awslabs-code-us-west-2/LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip |
+|ap-northeast-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-ap-northeast-1.amazonaws.com/awslabs-code-ap-northeast-1/LambdaRedshiftRunner/deploy.yaml) ||ap-northeast-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-2#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-ap-northeast-2.amazonaws.com/awslabs-code-ap-northeast-2/LambdaRedshiftRunner/deploy.yaml) ||ap-south-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-south-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-ap-south-1.amazonaws.com/awslabs-code-ap-south-1/LambdaRedshiftRunner/deploy.yaml) ||ap-southeast-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-ap-southeast-1.amazonaws.com/awslabs-code-ap-southeast-1/LambdaRedshiftRunner/deploy.yaml) ||ap-southeast-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-ap-southeast-2.amazonaws.com/awslabs-code-ap-southeast-2/LambdaRedshiftRunner/deploy.yaml) ||ca-central-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ca-central-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-ca-central-1.amazonaws.com/awslabs-code-ca-central-1/LambdaRedshiftRunner/deploy.yaml) ||eu-central-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-eu-central-1.amazonaws.com/awslabs-code-eu-central-1/LambdaRedshiftRunner/deploy.yaml) ||eu-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-west-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-eu-west-1.amazonaws.com/awslabs-code-eu-west-1/LambdaRedshiftRunner/deploy.yaml) ||eu-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-west-2#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-eu-west-2.amazonaws.com/awslabs-code-eu-west-2/LambdaRedshiftRunner/deploy.yaml) ||sa-east-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=sa-east-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-sa-east-1.amazonaws.com/awslabs-code-sa-east-1/LambdaRedshiftRunner/deploy.yaml) ||us-east-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-east-1.amazonaws.com/awslabs-code-us-east-1/LambdaRedshiftRunner/deploy.yaml) ||us-east-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-2#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-east-2.amazonaws.com/awslabs-code-us-east-2/LambdaRedshiftRunner/deploy.yaml) ||us-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-west-1.amazonaws.com/awslabs-code-us-west-1/LambdaRedshiftRunner/deploy.yaml) ||us-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-west-2.amazonaws.com/awslabs-code-us-west-2/LambdaRedshiftRunner/deploy.yaml) |
 
-If you do need to rebuild, this module imports the required utilities from other parts of this GitHub project as required. It also imports its required dependencies and your ```config.json``` and builds a zipfile that is suitable for use by AWS Lambda. To build this module after customising your config file or the code, just run ```build.sh```. This will result in zipfile ```lambda-redshift-util-runner-$version.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python(2.7|3.5)', and the timeout to a value long enough to accomodate running against all your tables.
+Alternatively, you can manually upload the template from the `dist` directory. For both the package md5 is `a9503040ca46d013c15dfcade7bff022`. There are also separate templates to [just deploy a single utility](deploy-function-and-schedule.yaml) or just [create a scheduled event for an existing function](deploy-schedule.yaml). You must supply the following parameters
 
-Also, when you include a config.json, this function connects to only one Redshift cluster. If you do this, we encourate you to use a Lambda function name that will be easy to understand which instance you have pointed to. For instance, you might name it ```RedshiftUtilitiesMyClusterMyUser```.
+![parameters](parameters.png)
 
+When completed, it will deploy the following objects:
+
+![resources](resources.png)
+
+* `LambdaRedshiftAutomationRole`: IAM Role giving Lambda the rights to download the configuration from S3, and to decrypt the password using KMS
+* `RedshiftAutomation-LambdaRedshiftAutomation-**********`: The AWS Lambda Function which runs via the CloudWatch Scheduled Events
+* `InvokeLambdaRedshiftRunner-AnalyzeVacuumUtility`: The CloudWatch Scheduled Event which runs the [Analyze & Vacuum Utility](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/AnalyzeVacuumUtility)
+* `InvokeLambdaRedshiftRunner-ColumnEncodingUtility`: The CloudWatch Scheduled Event which runs the [Column Encoding Utility](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/ColumnEncodingUtility)
+* _2 AWS Lambda Permissions are also created so that CloudWatch Events can call the Lambda function_
 
 ## Running the Modules
 
-These utilites are designed to be run via a schedule, and if you've included a local `config.json` file, then they don't extract any information from the incoming event. However, our recommendation is to upload your `config.json` to S3, and we'll use it as part of the CloudWatch Scheduled Event.
-
-Next create a CloudWatch Events Schedule that will run your function on the required schedule. To do this, open the function in the AWS Lambda web console, and then select the 'Event Sources' tab. ```Add event source``` and then select Type = ```CloudWatch Events - Schedule ```. Select a rule name, and then enter a schedule expression that will cause your function to run when required. Under 'Targets', change the value for 'Configure Input' to 'Constant (JSON Text)', and add a value that runs the appropriate module, and points to the configuration file on S3. For example:
+These utilites are configured to run via CloudWatch Scheduled Events. You will see that each of the scheduled events includes a payload of input which enables the function to download the configuration and run the correct utility per-instance:
 
 __To run the Column Encoding Utility__
 
@@ -94,7 +103,13 @@ __To run the Analyze/Vacuum Utility__
 {"ExecuteUtility":"AnalyzeVacuumUtility","ConfigLocation":"s3//mybucket/myprefix/config.json"}
 ```
 
-Now you can enable the Scheduled Event, and you are ready to go. You can review the function running over time using CloudWatch Logs for the function from the Monitoring tab.
+You can change the CRON schedule for each event so they don't run at the same time, if you prefer.
+
+## Rebuilding the Project 
+
+If you do need to rebuild, this module imports the required utilities from other parts of this GitHub project as required. It also imports its required dependencies and your ```config.json``` and builds a zipfile that is suitable for use by AWS Lambda. To build this module after customising your config file or the code, just run ```build.sh```. This will result in zipfile ```lambda-redshift-util-runner-$version.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python(2.7|3.5)', and the timeout to a value long enough to accomodate running against all your tables.
+
+Also, when you include a config.json, this function connects to only one Redshift cluster. If you do this, we encourate you to use a Lambda function name that will be easy to understand which instance you have pointed to. For instance, you might name it ```RedshiftUtilitiesMyClusterMyUser```.
 
 ----
 

@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  S3ConfigPath:
+    Default: s3://my-bucket/prefix/config-file.json
+    Description: Configuration File for this Utility instance
+    Type: String
+    AllowedPattern: ^s3:\/\/([A-z\-]+)\/(.*)$
+  SecurityGroups:
+    Default: mygroup1, mygroup2
+    Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
+    Type: CommaDelimitedList
+  SubnetIds:
+    Default: subnet1, subnet2, subnet3
+    Description: List of private Subnets in VPC in which the function will egress network connections
+    Type: CommaDelimitedList
+  CronExpression:
+    Default: 0 0 * * ? *
+    Description: Cron expression indicating how frequently to run the specified utility (default is once a day at midnight)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+Resources:
+  LambdaRedshiftAutomation:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: lambda_function.event_handler
+      Runtime: python2.7
+      CodeUri:
+        Bucket: !Sub awslabs-code-${AWS::Region}
+        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip
+      MemorySize: 192
+      Timeout: 300
+      Tags:
+        Name: LambdaRedshiftRunner
+      Role: !GetAtt RedshiftAutomationIAMRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          !Ref SecurityGroups
+        SubnetIds:
+          !Ref SubnetIds
+  RedshiftAutomationIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+        RoleName: "LambdaRedshiftAutomationRole"
+        Path: "/"
+        ManagedPolicyArns:
+            - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            -
+              Sid: "AllowLambdaServiceToAssumeRole"
+              Effect: "Allow"
+              Action:
+                - "sts:AssumeRole"
+              Principal:
+                Service:
+                  - "lambda.amazonaws.com"
+        Policies:
+          -
+            PolicyName: "LambdaRedshiftRunnerPolicy"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                -
+                  Effect: "Allow"
+                  Action:
+                    - "s3:GetObject"
+                    - "kms:Decrypt"
+                  Resource: "*"
+  AnalyzeVacuumEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to Invoke Lambda Runner - Analyze Vacuum Utility
+      Name: InvokeLambdaRedshiftRunner-AnalyzeVacuumUtility
+      ScheduleExpression: !Sub cron(${CronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: RedshiftAnalyzeVacuumUtility
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"AnalyzeVacuumUtility",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeAnalyzeVacuumPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt AnalyzeVacuumEventRule.Arn
+  ColumnEncodingEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to Invoke Lambda Runner - Column Encoding Utility
+      Name: InvokeLambdaRedshiftRunner-ColumnEncodingUtility
+      ScheduleExpression: !Sub cron(${CronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: RedshiftColumnEncodingUtility
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"ColumnEncodingUtility",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeColumnEncodingPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt ColumnEncodingEventRule.Arn

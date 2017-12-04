@@ -1,5 +1,6 @@
 #!/usr/bin/env python27
 
+from __future__ import print_function
 import boto3
 import utils
 import os
@@ -15,7 +16,7 @@ region_key = 'AWS_REGION'
 
 def encrypt_password(args):
     if len(args) == 1:
-        print "You must supply the password to be encrypted"
+        print("You must supply the password to be encrypted")
         sys.exit(-1)
         
     try:
@@ -44,7 +45,7 @@ def encrypt_password(args):
         new_cmk = kmsConnection.create_key(Description='AWSLambdaRedshiftUtilsPasswordEncryption',
                                            KeyUsage='ENCRYPT_DECRYPT')
         if new_cmk == None:
-            print "Failed to create Customer Master Key"
+            print("Failed to create Customer Master Key")
             sys.exit(ERROR)
         alias = kmsConnection.create_alias(AliasName=utils.CMK,
                                            TargetKeyId=new_cmk['KeyMetadata']['KeyId'])
@@ -57,8 +58,8 @@ def encrypt_password(args):
                                       Plaintext=args[1],
                                       EncryptionContext=auth_context)
     
-    print "Encryption Complete"
-    print "Encrypted Password: %s" % base64.b64encode(encrypted['CiphertextBlob'])
+    print("Encryption Complete in %s" % (currentRegion))
+    print("Encrypted Password: %s" % base64.b64encode(encrypted['CiphertextBlob']))
         
 if __name__ == "__main__":
     encrypt_password(sys.argv)

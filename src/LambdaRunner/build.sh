@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+# set -x
 
 version=1.1
 ARCHIVE=dist/lambda-redshift-util-runner-$version.zip
