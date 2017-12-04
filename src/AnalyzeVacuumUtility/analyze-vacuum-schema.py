@@ -241,7 +241,7 @@ def main(argv):
         sys.stdout = open(output_file,'w')
 
     # invoke the main method of the utility
-    result = analyze_vacuum.run_analyze_vacuum(db_host, db_port, db_user, db_pwd, db, query_group, query_slot_count, vacuum_flag, analyze_flag, schema_name, table_name, blacklisted_tables, ignore_errors, require_ssl)
+    result = analyze_vacuum.run_analyze_vacuum(db_host, db_port, db_user, db_pwd, db, query_group, query_slot_count, vacuum_flag, analyze_flag, schema_name, table_name, blacklisted_tables, ignore_errors, require_ssl, debug)
 
     if (result is not None):
         sys.exit(result)
