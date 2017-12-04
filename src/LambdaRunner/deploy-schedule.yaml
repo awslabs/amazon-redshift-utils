@@ -1,0 +1,48 @@
+Parameters:
+  LambdaFunctionARN:
+    Default: arn:aws:lambda:myregion:123456789012:function:LambdaRedshiftRunner
+    Description: The ARN of the currently deployed LambdaRedshiftRunner function
+    Type: String
+    AllowedPattern: ^arn\:aws\:lambda\:([\w-])+\:[0-9]{12}\:function\:(.*)$
+  UtilityName:
+    Default: AnalyzeVacuumUtility
+    Description: Utility to run with this instance of the Scheduled Event
+    Type: String
+    AllowedValues:
+      - AnalyzeVacuumUtility
+      - ColumnEncodingUtility
+  S3ConfigPath:
+    Default: s3://my-bucket/prefix/config-file.json
+    Description: Configuration File for this Utility instance
+    Type: String
+    AllowedPattern: ^s3:\/\/([A-z\-]+)\/(.*)$
+  CronExpression:
+    Default: 0 0 * * ? *
+    Description: Cron expression indicating how frequently to run the specified utility (default is once a day at midnight)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+Resources:
+  ScheduledEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to Invoke Lambda Runner
+      Name: !Sub InvokeLambdaRedshiftRunner-${UtilityName}
+      ScheduleExpression: !Sub cron(${CronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !Ref LambdaFunctionARN
+          Id: LambdaRedshiftRunner
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"${UtilityName}",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  LambdaInvokePermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !Ref LambdaFunctionARN
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt ScheduledEventRule.Arn
