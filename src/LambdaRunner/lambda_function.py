@@ -103,7 +103,7 @@ def event_handler(event, context):
             results.append(encoding_result)
         elif util == ANALYZE_VACUUM:
             print("Running %s" % util)
-            analyze_result = analyze_vacuum.run_analyze_vacuum(configDetail["dbHost"], configDetail["dbPort"], configDetail["dbUser"], usePassword, configDetail["db"], configDetail["queryGroup"], configDetail["querySlotCount"], configDetail["doVacuum"], configDetail["doAnalyze"], configDetail["analyzeSchema"], configDetail["analyzeTable"], configDetail["tableBlacklist"], configDetail["ignoreErrors"], configDetail["ssl-option"])
+            analyze_result = analyze_vacuum.run_analyze_vacuum(configDetail["dbHost"], configDetail["dbPort"], configDetail["dbUser"], usePassword, configDetail["db"], configDetail["queryGroup"], configDetail["querySlotCount"], configDetail["doVacuum"], configDetail["doAnalyze"], configDetail["analyzeSchema"], configDetail["analyzeTable"], configDetail["tableBlacklist"], configDetail["ignoreErrors"], configDetail["ssl-option"], configDetail["debug"])
             if analyze_result == 0:
                 results.append("OK")
         
