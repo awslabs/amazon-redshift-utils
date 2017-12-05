@@ -293,7 +293,7 @@ def run_vacuum(conn, schema_name, table_name, blacklisted_tables, ignore_errors)
         get_vacuum_statement = ''' SELECT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" ; ' + '/* ' + ' Table Name : '
                                     + schema_name + '."' + table_name + '",  Rows : ' + CAST("rows" AS VARCHAR(10))
                                     + ',  Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10))
-                                    + ' ,  Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;'
+                                    + ' ,  Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;' AS statement, table_name
                                 FROM (SELECT TRIM(n.nspname) schema_name, t.relname table_name,
                                                  MAX(v.interleaved_skew) max_skew, MAX(c.count) AS rows,
                                                  CASE
