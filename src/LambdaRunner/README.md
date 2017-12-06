@@ -6,7 +6,9 @@ This project includes code that is able to run a subset of the Amazon Redshift U
 
 This utility creates a Lambda function which imports other Redshift Utils modules, and then invokes them against a cluster. It runs within your VPC, and should be configured to connect via a Subnet which is either the same, or can route to the subnet where your Redshift cluster is running. It should also be configured with a Security Group which is trusted by your [Redshift Cluster Security Configuration](http://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html).
 
-Currently the [Column Encoding Utility](src/ColumnEncodingUtility) and [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility) are supported for automated invocation.
+Currently the [Column Encoding Utility](src/ColumnEncodingUtility) and [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility) are supported for automated invocation:
+
+![what it does](WhatItDoes.png)
 
 ## Setup Pre-Tasks
 
