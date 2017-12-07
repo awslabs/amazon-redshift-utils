@@ -203,7 +203,7 @@ def run_vacuum(conn,
                 FROM (SELECT schema_name,
                              table_name
                       FROM (SELECT TRIM(n.nspname) schema_name,
-                                   c.relname table_name,
+                                   TRIM(c.relname) table_name,
                                    DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS qry_rnk,
                                    COUNT(*)
                             FROM stl_alert_event_log AS l
@@ -221,7 +221,7 @@ def run_vacuum(conn,
                             AND   l.event_time >= dateadd(DAY,%s,CURRENT_DATE)
                             AND   l.Solution LIKE '%%VACUUM command%%'
                             GROUP BY TRIM(n.nspname),
-                                     c.relname) anlyz_tbl
+                                     TRIM(c.relname)) anlyz_tbl
                       WHERE anlyz_tbl.qry_rnk <%s) feedback_tbl
                   JOIN svv_table_info info_tbl
                     ON info_tbl.schema = feedback_tbl.schema_name
@@ -306,7 +306,7 @@ def run_vacuum(conn,
                                     + schema_name + '."' + table_name + '",  Rows : ' + CAST("rows" AS VARCHAR(10))
                                     + ',  Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10))
                                     + ' ,  Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;' AS statement, table_name
-                                FROM (SELECT TRIM(n.nspname) schema_name, t.relname table_name,
+                                FROM (SELECT TRIM(n.nspname) schema_name, TRIM(t.relname) table_name,
                                                  MAX(v.interleaved_skew) max_skew, MAX(c.count) AS rows,
                                                  CASE
                                                    -- v.interleaved_skew can be null if the table has never been vacuumed so account for that
@@ -370,7 +370,7 @@ def run_analyze(conn, schema_name, table_name, ignore_errors, predicate_cols, st
                                     SELECT DISTINCT 'analyze ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '"' + '%s ; ' + '/* ' + ' Table Name : ' + info_tbl."schema" + '."' + info_tbl."table" + '", Stats_Off : ' + CAST(info_tbl."stats_off" AS VARCHAR(10)) + ' */ ;'
                                     FROM (/* Get top N rank tables based on the missing statistics alerts */  
                                          SELECT TRIM(n.nspname)::VARCHAR schema_name,
-                                                c.relname::VARCHAR table_name 
+                                                TRIM(c.relname)::VARCHAR table_name 
                                          FROM (SELECT TRIM(SPLIT_PART(SPLIT_PART(a.plannode,':',2),' ',2)) AS Table_Name,
                                                       COUNT(a.query),
                                                       DENSE_RANK() OVER (ORDER BY COUNT(a.query) DESC) AS qry_rnk
@@ -389,7 +389,7 @@ def run_analyze(conn, schema_name, table_name, ignore_errors, predicate_cols, st
                                                SELECT schema_name,
                                                       table_name
                                                FROM (SELECT TRIM(n.nspname)::VARCHAR schema_name,
-                                                            c.relname::VARCHAR table_name,
+                                                            TRIM(c.relname)::VARCHAR table_name,
                                                             DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS qry_rnk,
                                                             COUNT(*)
                                                      FROM stl_alert_event_log AS l
@@ -407,7 +407,7 @@ def run_analyze(conn, schema_name, table_name, ignore_errors, predicate_cols, st
                                                      AND   l.event_time >= dateadd(DAY,%s,CURRENT_DATE)
                                                      AND   l.Solution LIKE '%%ANALYZE command%%'
                                                      GROUP BY TRIM(n.nspname),
-                                                              c.relname) anlyz_tbl
+                                                              TRIM(c.relname)) anlyz_tbl
                                                WHERE anlyz_tbl.qry_rnk < %s 
                                                UNION
                                                /* just a base dump of svv_table_info to check the stats_off metric */ 
