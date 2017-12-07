@@ -38,29 +38,33 @@ This lambda function uses a configuration file to get information about which cl
 The required configuration items are placed into the ```configuration``` part of the config file, and include:
 
 ```
-{"utilities":[("ColumnEncodingUtility"|"AnalyzeVacuumUtility")], - list of utilities to run. Can provide multiple values
-"configuration": {
-  "analyzeTable": "The name of a specific table to analyze",
-  "analyzeSchema": "The name of the schema to be analyzed. Either analyzeSchema or analyzeTable must be provided",
-  "comprows": Int - set to -1 for default. This is the number of rows that will be considered per slice for Column Encoding,
-  "db": "master",
-  "dbHost": "Hostname of the Redshift Cluster master node to connect to",
-  "dbPassword": "base64 encoded password obtained by running encrypt_password.py",
-  "dbPort": Int - the database port,
-  "dbUser": "The Database Username to connect to",
-  "dropOldData": Boolean - should the current version of the table be dropped after operations complete?,
-  "ignoreErrors": Boolean - should the system keep running even if errors are encountered?,
-  "queryGroup": "The database query group setting to use for WLM",
-  "querySlotCount": Int - the number of WLM slots to request for the given queryGroup,
-  "targetSchema": "The schema name where newly encoded tables should be placed. Leave as "" for using the analyzeSchema",
-  "force": Boolean - do you want to force the utility to run even if there are no likely changes?,
-  "outputFile":"The path of the file to create on the filesystem. AWS Lambda can only write to /tmp",
-  "debug":Boolean - turn on debug logging of actions and SQL run on the cluster,
-  "analyze_col_width": 1 - analyze colums of this size or larger during AnalyzeVaccum,
-  "ssl-option":"" - whether ssl is required to connect to the cluster,
-  "doVacuum": "(true|false) Should the Analyze Vacuum utility run Vacuum?",
-  "doAnalyze":"(true|false) Should the Analyze Vacuum utility run Analyze?",
-  "tableBlacklist":"comma separated list of tables to suppress running the analyze vacuum utility against"  
+{"utilities":["ColumnEncodingUtility", "AnalyzeVacuumUtility"],
+"configuration":{
+  "analyzeTable": "Specific table names to operate on (string)",
+  "analyzeSchema": "Schema to be analyzed, vacuumed, or encoded (string)",
+  "comprows": "Rows to use in the analyze compression request (int | default -1 meaning unspecified)",
+  "db": "Database Name to connect to (string)",
+  "dbHost": "Your cluster DNS name (string)",
+  "dbPassword": "Your base64 encoded encrypted password here (string - generated with encrypt_password.py)",
+  "dbPort": "The database port number (int)",
+  "dbUser": "The database User to connect to (string)",
+  "dropOldData": "When column encoding is invoked, should the old database table be kept as XXX_$old? (boolean - true | false | default false)",
+  "ignoreErrors": "Should a given utility keep running if it encouters errors, and fail the Lambda function? (boolean - true | false | default false)",
+  "queryGroup": "Query group name to set for routing to a specific WLM queue (string)",
+  "querySlotCount": "Number of query slots to use - set to queue(max) for optimal performance (int - default 1)",
+  "targetSchema": "When column encoding is invoked, should it build new tables into a different schema? (string)",
+  "force": "Do you want to force the utility to run for each provided table or schema, even if changes are not required? (boolean - true | false | default false)",
+  "outputFile":"/tmp/analyze-schema-compression.sql",
+  "debug": "Should the utilities run in debug mode? (boolean - true | false | default false)",
+  "do-execute": "Should changes be made automatically, or just for reporting purposes (boolean - true |  false | default true)",
+  "analyze_col_width": "Analyze columns wider than this value (int)",
+  "threads": "How many threads should the column encoding utility use (can run in parallel - default 1 for Lambda)",
+  "ssl-option":"Should you connect to the cluster with SSL? (boolean true | false | default true)",
+  "doVacuum": "Should the Analyze Vacuum utility run Vacuum? (boolean true | false | default true)",
+  "doAnalyze":"Should the Analyze Vacuum utility run Analyze? (boolean true | false | default true)",
+  "tableBlacklist":"comma separated list of tables to suppress running the analyze vacuum utility against",
+  "aggregationInterval":"Interval on which to summarise database statistics (redshift interval literal: http://docs.aws.amazon.com/redshift/latest/dg/r_interval_literals.html | default '1 hour'",
+  "clusterName":"The cluster name that is the first part of the DNS name"
   }
 }
 ```
