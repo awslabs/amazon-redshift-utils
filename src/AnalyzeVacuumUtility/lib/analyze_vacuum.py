@@ -7,21 +7,10 @@ import datetime
 import pg8000
 import traceback
 
-#set default values to vacuum, analyze variables
-analyze_flag       = True
-vacuum_flag        = True
-vacuum_parameter   = 'FULL'
-min_unsorted_pct   = 5
-max_unsorted_pct   = 50
-deleted_pct        = 5
-stats_off_pct      = 10
-predicate_cols     = False
-max_table_size_mb  = (700*1024)
-goback_no_of_days  = 1
-query_rank         = 25
-min_interleaved_skew = 1.4
-min_interleaved_cnt = 0
-debug = False
+# set default values to vacuum, analyze variables
+goback_no_of_days = 1
+query_rank = 25
+
 
 # timeout for retries - 100ms
 RETRY_TIMEOUT = 100/1000
@@ -33,10 +22,10 @@ NO_WORK = 3
 TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
+
 def execute_query(conn, query):
     cursor = conn.cursor()
     cursor.execute(query)
-    results = None
     try:
         results = cursor.fetchall()
         
@@ -67,11 +56,11 @@ def cleanup(conn):
 
 def comment(string):
     datetime_str = str(datetime.datetime.now())
-    if (string is not None):
-        if re.match('.*\\n.*',string) is not None:
-            print('/* [%s]\n%s\n*/\n' % (str(os.getpid()),string))
+    if string is not None:
+        if re.match('.*\\n.*', string) is not None:
+            print('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string))
         else:
-            print('-- %s [%s] %s' % (datetime_str,str(os.getpid()),string))
+            print('-- %s [%s] %s' % (datetime_str, str(os.getpid()), string))
 
 
 def print_statements(statements):
@@ -85,10 +74,15 @@ def get_pg_conn(db_host, db_port, db, db_user, db_pwd, schema_name, query_group,
     conn = None
 
     if debug:
-        comment('Connect %s:%s:%s:%s' % (db_host,db_port,db,db_user))
+        comment('Connect %s:%s:%s:%s' % (db_host, db_port, db, db_user))
 
     try:
-        conn = pg8000.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd, ssl=ssl_option)
+        conn = pg8000.connect(user=db_user, 
+                              host=db_host, 
+                              port=int(db_port), 
+                              database=db, 
+                              password=db_pwd, 
+                              ssl=ssl_option)
         conn.autocommit = True
     except Exception as e:
         print("Exception on Connect to Cluster: %s" % e)
@@ -98,7 +92,7 @@ def get_pg_conn(db_host, db_port, db, db_user, db_pwd, schema_name, query_group,
         return None
 
     # set default search path
-    search_path = 'set search_path = \'$user\',public,%s' % (schema_name)
+    search_path = 'set search_path = \'$user\',public,%s' % schema_name
 
     if debug:
         comment(search_path)
@@ -106,14 +100,14 @@ def get_pg_conn(db_host, db_port, db, db_user, db_pwd, schema_name, query_group,
     try:
         run_commands(conn, [search_path])
     except pg8000.ProgrammingError as e:
-        if re.match('schema "%s" does not exist' % (schema_name,),e.message) is not None:
+        if re.match('schema "%s" does not exist' % (schema_name,), e.message) is not None:
             print('Schema %s does not exist' % (schema_name,))
         else:
             print(e.message)
         return None
 
     if query_group is not None and query_group != '':
-        set_query_group = 'set query_group to %s' % (query_group)
+        set_query_group = 'set query_group to %s' % query_group
 
         if debug:
             comment(set_query_group)
@@ -122,13 +116,12 @@ def get_pg_conn(db_host, db_port, db, db_user, db_pwd, schema_name, query_group,
 
     set_slot_count = None
     if query_slot_count is not None and query_slot_count > 1:
-        set_slot_count = 'set wlm_query_slot_count = %s' % (query_slot_count)
+        set_slot_count = 'set wlm_query_slot_count = %s' % query_slot_count
 
     if set_slot_count is not None:
         if debug:
             comment(set_slot_count)
         run_commands(conn, [set_slot_count])
-
 
     # set a long statement timeout
     set_timeout = "set statement_timeout = '36000000'"
@@ -142,9 +135,9 @@ def get_pg_conn(db_host, db_port, db, db_user, db_pwd, schema_name, query_group,
 
 
 def run_commands(conn, commands):
-    for idx,c in enumerate(commands,start=1):
+    for idx, c in enumerate(commands, start=1):
         if c is not None:
-            comment('[%s] Running %s out of %s commands: %s' % (str(os.getpid()),idx,len(commands),c))
+            comment('[%s] Running %s out of %s commands: %s' % (str(os.getpid()), idx, len(commands), c))
             try:
                 cursor = conn.cursor()
                 cursor.execute(c)
@@ -158,8 +151,20 @@ def run_commands(conn, commands):
     return True
 
 
-def run_vacuum(conn, schema_name, table_name, blacklisted_tables, ignore_errors):
-    statements =[]
+def run_vacuum(conn,
+               schema_name,
+               table_name,
+               blacklisted_tables,
+               ignore_errors,
+               vacuum_parameter,
+               min_unsorted_pct,
+               max_unsorted_pct,
+               deleted_pct,
+               stats_off_pct,
+               max_table_size_mb,
+               min_interleaved_skew,
+               min_interleaved_cnt):
+    statements = []
 
     if table_name is not None:
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
@@ -244,7 +249,7 @@ def run_vacuum(conn, schema_name, table_name, blacklisted_tables, ignore_errors)
                 print("Error running statements: %s" % (str(statements),))
             return ERROR
 
-    statements =[]
+    statements = []
     if table_name is None and blacklisted_tables is None:
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Tables for vacuum ...")
@@ -267,8 +272,15 @@ def run_vacuum(conn, schema_name, table_name, blacklisted_tables, ignore_errors)
                                                      ((size > %s) AND (unsorted > %s AND unsorted < %s ))
                                                  )
                                         ORDER BY "size" ASC ,skew_rows ASC;
-                                        ''' %(vacuum_parameter,schema_name,max_table_size_mb,min_unsorted_pct,
-                                              deleted_pct,stats_off_pct,max_table_size_mb,min_unsorted_pct,max_unsorted_pct)
+                                        ''' % (vacuum_parameter,
+                                               schema_name,
+                                               max_table_size_mb,
+                                               min_unsorted_pct,
+                                               deleted_pct,
+                                               stats_off_pct,
+                                               max_table_size_mb,
+                                               min_unsorted_pct,
+                                               max_unsorted_pct)
 
         if debug:
             comment(get_vacuum_statement)
@@ -286,7 +298,7 @@ def run_vacuum(conn, schema_name, table_name, blacklisted_tables, ignore_errors)
                     print("Error running statements: %s" % (str(statements),))
                 return ERROR
 
-    statements =[]
+    statements = []
     if table_name is None and blacklisted_tables is None:
         # query for all tables in the schema for vacuum reindex
         comment("Extracting Candidate Tables for vacuum reindex ...")
@@ -311,7 +323,7 @@ def run_vacuum(conn, schema_name, table_name, blacklisted_tables, ignore_errors)
                                             GROUP BY 1, 2)
                                 WHERE reindex_flag = 'Yes'
                                     AND schema_name = '%s'
-                                        ''' %(min_interleaved_skew,min_interleaved_cnt,schema_name)
+                                        ''' % (min_interleaved_skew, min_interleaved_cnt, schema_name)
 
         if debug:
             comment(get_vacuum_statement)
@@ -332,8 +344,8 @@ def run_vacuum(conn, schema_name, table_name, blacklisted_tables, ignore_errors)
     return True
 
 
-def run_analyze(conn, schema_name, table_name, ignore_errors):
-    statements =[]
+def run_analyze(conn, schema_name, table_name, ignore_errors, predicate_cols, stats_off_pct):
+    statements = []
 
     if predicate_cols:
         predicate_cols_option = ' PREDICATE COLUMNS '
@@ -408,7 +420,13 @@ def run_analyze(conn, schema_name, table_name, ignore_errors):
                                     WHERE info_tbl.stats_off::DECIMAL(32,4) > %s::DECIMAL(32,4)
                                     AND   TRIM(info_tbl.schema) = '%s' 
                                     ORDER BY info_tbl.size ASC
-                            ''' % (predicate_cols_option,goback_no_of_days,query_rank,goback_no_of_days,query_rank,stats_off_pct,schema_name)
+                            ''' % (predicate_cols_option,
+                                   goback_no_of_days,
+                                   query_rank,
+                                   goback_no_of_days,
+                                   query_rank,
+                                   stats_off_pct,
+                                   schema_name)
 
     if debug:
         comment(get_analyze_statement_feedback)
@@ -436,14 +454,14 @@ def run_analyze(conn, schema_name, table_name, ignore_errors):
                                         WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
                                         AND  trim("schema") = '%s'
                                         ORDER BY "size" ASC ;
-                                        ''' % (predicate_cols_option,stats_off_pct,schema_name)
+                                        ''' % (predicate_cols_option, stats_off_pct, schema_name)
 
         if debug:
             comment(get_analyze_statement)
 
         analyze_statements = execute_query(conn, get_analyze_statement)
 
-        statements =[]
+        statements = []
         for vs in analyze_statements:
             statements.append(vs[0])
 
@@ -455,7 +473,30 @@ def run_analyze(conn, schema_name, table_name, ignore_errors):
     return True
 
 
-def run_analyze_vacuum(db_host, db_port, db_user, db_pwd, db, query_group, query_slot_count, vacuum_flag, analyze_flag, schema_name, table_name, blacklisted_tables, ignore_errors, ssl_option, set_debug):
+def run_analyze_vacuum(db_host,
+                       db_port,
+                       db_user,
+                       db_pwd,
+                       db,
+                       query_group,
+                       query_slot_count,
+                       vacuum_flag,
+                       analyze_flag,
+                       schema_name,
+                       table_name,
+                       blacklisted_tables,
+                       ignore_errors,
+                       ssl_option,
+                       set_debug,
+                       vacuum_parameter,
+                       min_unsorted_pct,
+                       max_unsorted_pct,
+                       deleted_pct,
+                       stats_off_pct,
+                       predicate_cols,
+                       max_table_size_mb,
+                       min_interleaved_skew,
+                       min_interleaved_cnt):
     global debug
     debug = set_debug
 
@@ -463,30 +504,50 @@ def run_analyze_vacuum(db_host, db_port, db_user, db_pwd, db, query_group, query
         debug = os.environ['DEBUG']
 
     # get a connection for the controlling processes
-    master_conn = get_pg_conn(db_host, db_port, db,db_user, db_pwd, schema_name, query_group, query_slot_count, ssl_option)
+    master_conn = get_pg_conn(db_host,
+                              db_port,
+                              db,
+                              db_user,
+                              db_pwd,
+                              schema_name,
+                              query_group,
+                              query_slot_count,
+                              ssl_option)
 
     if master_conn is None:
         sys.exit(NO_CONNECTION)
 
     comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
 
-    if (blacklisted_tables is not None and len(blacklisted_tables) > 0):
+    if blacklisted_tables is not None and len(blacklisted_tables) > 0:
         comment("The blacklisted tables are: %s" % (str(blacklisted_tables)))
 
     if vacuum_flag is True:
         # Run vacuum based on the Unsorted , Stats off and Size of the table
-        run_vacuum(master_conn, schema_name, table_name, blacklisted_tables, ignore_errors)
+        run_vacuum(master_conn,
+                   schema_name,
+                   table_name,
+                   blacklisted_tables,
+                   ignore_errors,
+                   vacuum_parameter,
+                   min_unsorted_pct,
+                   max_unsorted_pct,
+                   deleted_pct,
+                   stats_off_pct,
+                   max_table_size_mb,
+                   min_interleaved_skew,
+                   min_interleaved_cnt)
     else:
-        comment("Vacuum flag arg is set as %s. Vacuum is not performed." % (vacuum_flag))
+        comment("Vacuum flag arg is set as %s. Vacuum is not performed." % vacuum_flag)
 
     if analyze_flag is True:
         if vacuum_flag is False:
             comment("Warning - Analyze without Vacuum may result in sub-optimal performance")
 
         # Run Analyze based on the  Stats off Metrics table
-        run_analyze(master_conn, schema_name, table_name, ignore_errors)
+        run_analyze(master_conn, schema_name, table_name, ignore_errors, predicate_cols, stats_off_pct)
     else:
-        comment("Analyze flag arg is set as %s. Analyze is not performed." % (analyze_flag))
+        comment("Analyze flag arg is set as %s. Analyze is not performed." % analyze_flag)
 
     comment('Processing Complete')
     

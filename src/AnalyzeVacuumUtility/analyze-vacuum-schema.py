@@ -57,8 +57,8 @@ TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
 
-def get_env_var(name, defaultVal):
-    return os.environ[name] if name in os.environ else defaultVal
+def get_env_var(name, default_val):
+    return os.environ[name] if name in os.environ else default_val
 
 
 def usage(with_message=None):
@@ -99,8 +99,6 @@ def usage(with_message=None):
 
 
 def main(argv):
-    master_conn = None
-    db_connections = {}
     db = get_env_var('PGDATABASE', None)
     db_user = get_env_var('PGUSER', None)
     db_pwd = get_env_var('PGPASSWORD', None)
@@ -110,13 +108,21 @@ def main(argv):
     table_name = None
     blacklisted_tables = None
     debug = False
-    do_execute = False
     query_slot_count = 1
     ignore_errors = False
     query_group = None
     analyze_flag = True
     vacuum_flag = True
+    vacuum_parameter = 'FULL'
     require_ssl = False
+    predicate_cols = False
+    min_unsorted_pct = 5
+    max_unsorted_pct = 50
+    deleted_pct = 5
+    stats_off_pct = 10
+    max_table_size_mb = (700*1024)
+    min_interleaved_skew = 1.4
+    min_interleaved_cnt = 0
 
     supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= blacklisted-tables= require-ssl= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= predicate-cols= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
 
@@ -155,7 +161,7 @@ def main(argv):
             if value != '' and value is not None:
                 db_port = value
         elif arg == "--require-ssl":
-            if value != '' and value != None:
+            if value != '' and value is not None:
                 if value.upper() == 'TRUE' or value == '1':
                     require_ssl = True
         elif arg == "--schema-name":
@@ -170,15 +176,11 @@ def main(argv):
         elif arg == "--debug":
             if value.upper() == 'TRUE':
                 debug = True
-            else:
-                debug = False
         elif arg == "--output-file":
             output_file = value
         elif arg == "--ignore-errors":
             if value.upper() == 'TRUE':
                 ignore_errors = True
-            else:
-                ignore_errors = False
         elif arg == "--slot-count":
             query_slot_count = int(value)
         elif arg == "--query_group":
@@ -188,13 +190,11 @@ def main(argv):
             if value.upper() == 'FALSE':
                 vacuum_flag = False
         elif arg == "--analyze-flag":
-            if value.upper()  == 'FALSE':
+            if value.upper() == 'FALSE':
                 analyze_flag = False
         elif arg == "--vacuum-parameter":
-            if value.upper() == 'SORT ONLY' or value.upper() == 'DELETE ONLY' or value.upper() == 'REINDEX' :
+            if value.upper() == 'SORT ONLY' or value.upper() == 'DELETE ONLY' or value.upper() == 'REINDEX':
                 vacuum_parameter = value
-            else:
-                vacuum_parameter = 'FULL'
         elif arg == "--min-unsorted-pct":
             if value != '' and value is not None:
                 min_unsorted_pct = value
@@ -210,8 +210,6 @@ def main(argv):
         elif arg == "--predicate-cols":
             if value.upper() == 'TRUE':
                 predicate_cols = True
-            else:
-                predicate_cols = False
         elif arg == "--max-table-size-mb":
             if value != '' and value is not None:
                 max_table_size_mb = value
@@ -222,8 +220,7 @@ def main(argv):
             if value != '' and value is not None:
                 min_interleaved_cnt = value
         else:
-            assert False, "Unsupported Argument " + arg
-            usage()
+            usage("Unsupported Argument " + arg)
 
     # Validate that we've got all the args needed
     if db is None:
@@ -237,16 +234,40 @@ def main(argv):
     if db_port is None:
         usage("Missing Parameter 'db-port'")
 
-    if (output_file is not None):
-        sys.stdout = open(output_file,'w')
+    if output_file is not None:
+        sys.stdout = open(output_file, 'w')
 
     # invoke the main method of the utility
-    result = analyze_vacuum.run_analyze_vacuum(db_host, db_port, db_user, db_pwd, db, query_group, query_slot_count, vacuum_flag, analyze_flag, schema_name, table_name, blacklisted_tables, ignore_errors, require_ssl, debug)
+    result = analyze_vacuum.run_analyze_vacuum(db_host,
+                                               db_port,
+                                               db_user,
+                                               db_pwd,
+                                               db,
+                                               query_group,
+                                               query_slot_count,
+                                               vacuum_flag,
+                                               analyze_flag,
+                                               schema_name,
+                                               table_name,
+                                               blacklisted_tables,
+                                               ignore_errors,
+                                               require_ssl,
+                                               debug,
+                                               vacuum_parameter,
+                                               min_unsorted_pct,
+                                               max_unsorted_pct,
+                                               deleted_pct,
+                                               stats_off_pct,
+                                               predicate_cols,
+                                               max_table_size_mb,
+                                               min_interleaved_skew,
+                                               min_interleaved_cnt)
 
-    if (result is not None):
+    if result is not None:
         sys.exit(result)
     else:
         sys.exit(0)
-    
+
+
 if __name__ == "__main__":
     main(sys.argv)
