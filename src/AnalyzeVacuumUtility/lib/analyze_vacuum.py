@@ -8,7 +8,7 @@ import pg8000
 import traceback
 
 # set default values to vacuum, analyze variables
-goback_no_of_days = 1
+goback_no_of_days = -1
 query_rank = 25
 
 
@@ -218,7 +218,7 @@ def run_vacuum(conn,
                               JOIN pg_class c ON c.oid = s.tbl
                               JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                             WHERE l.userid > 1
-                            AND   l.event_time >= dateadd(DAY,-%s,CURRENT_DATE)
+                            AND   l.event_time >= dateadd(DAY,%s,CURRENT_DATE)
                             AND   l.Solution LIKE '%%VACUUM command%%'
                             GROUP BY TRIM(n.nspname),
                                      c.relname) anlyz_tbl
