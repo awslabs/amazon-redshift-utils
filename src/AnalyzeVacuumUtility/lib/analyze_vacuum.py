@@ -8,7 +8,7 @@ import pg8000
 import traceback
 
 # set default values to vacuum, analyze variables
-goback_no_of_days = 1
+goback_no_of_days = -1
 query_rank = 25
 
 
