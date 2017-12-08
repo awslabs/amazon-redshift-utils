@@ -545,10 +545,10 @@ def run_analyze_vacuum(db_host,
     if vacuum_flag is True:
         # Run vacuum based on the Unsorted , Stats off and Size of the table
         run_vacuum(master_conn,
-                   schema_name,
+                   schema_name if schema_name is not None else _schema_name,
                    table_name,
                    blacklisted_tables,
-                   ignore_errors,
+                   ignore_errors if ignore_errors is not None else _ignore_errors,
                    vacuum_parameter if vacuum_parameter is not None else _vacuum_parameter,
                    min_unsorted_pct if min_unsorted_pct is not None else _min_unsorted_pct,
                    max_unsorted_pct if max_unsorted_pct is not None else _max_unsorted_pct,
@@ -565,7 +565,13 @@ def run_analyze_vacuum(db_host,
             comment("Warning - Analyze without Vacuum may result in sub-optimal performance")
 
         # Run Analyze based on the  Stats off Metrics table
-        run_analyze(master_conn, schema_name, table_name, ignore_errors, predicate_cols, stats_off_pct)
+        run_analyze(master_conn,
+                    schema_name if schema_name is not None else _schema_name,
+                    table_name,
+                    ignore_errors if ignore_errors is not None else _ignore_errors,
+                    predicate_cols if predicate_cols is not None else _predicate_cols,
+                    stats_off_pct if stats_off_pct is not None else _stats_off_pct,
+                    )
     else:
         comment("Analyze flag arg is set as %s. Analyze is not performed." % analyze_flag)
 
