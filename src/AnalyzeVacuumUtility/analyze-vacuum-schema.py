@@ -104,25 +104,25 @@ def main(argv):
     db_pwd = get_env_var('PGPASSWORD', None)
     db_host = get_env_var('PGHOST', None)
     db_port = get_env_var('PGPORT', 5439)
-    schema_name = 'public'
+    query_group = None
+    schema_name = None
     table_name = None
     blacklisted_tables = None
     debug = False
-    query_slot_count = 1
-    ignore_errors = False
-    query_group = None
+    query_slot_count = None
+    ignore_errors = None
     analyze_flag = True
     vacuum_flag = True
-    vacuum_parameter = 'FULL'
-    require_ssl = False
-    predicate_cols = False
-    min_unsorted_pct = 5
-    max_unsorted_pct = 50
-    deleted_pct = 5
-    stats_off_pct = 10
-    max_table_size_mb = (700*1024)
-    min_interleaved_skew = 1.4
-    min_interleaved_cnt = 0
+    vacuum_parameter = None
+    require_ssl = None
+    predicate_cols = None
+    min_unsorted_pct = None
+    max_unsorted_pct = None
+    deleted_pct = None
+    stats_off_pct = None
+    max_table_size_mb = None
+    min_interleaved_skew = None
+    min_interleaved_cnt = None
 
     supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= blacklisted-tables= require-ssl= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= predicate-cols= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
 
