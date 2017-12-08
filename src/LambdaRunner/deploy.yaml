@@ -14,9 +14,14 @@ Parameters:
     Default: subnet1, subnet2, subnet3
     Description: List of private Subnets in VPC in which the function will egress network connections
     Type: CommaDelimitedList
-  CronExpression:
+  ColumnEncodingCronExpression:
     Default: 0 0 * * ? *
-    Description: Cron expression indicating how frequently to run the specified utility (default is once a day at midnight)
+    Description: Cron expression for when to run the Column Encoding Utility (default midnight daily)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+  AnalyzeVacuumCronExpression:
+    Default: 0 1 * * ? *
+    Description: Cron expression for when to run the Analyze Vacuum Utility (default 1 am daily)
     Type: String
     AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
 Resources:
@@ -73,7 +78,7 @@ Resources:
     Properties:
       Description: CloudWatch Events Rule to Invoke Lambda Runner - Analyze Vacuum Utility
       Name: InvokeLambdaRedshiftRunner-AnalyzeVacuumUtility
-      ScheduleExpression: !Sub cron(${CronExpression})
+      ScheduleExpression: !Sub cron(${AnalyzeVacuumCronExpression})
       State: ENABLED
       Targets:
         - Arn: !GetAtt LambdaRedshiftAutomation.Arn
@@ -97,7 +102,7 @@ Resources:
     Properties:
       Description: CloudWatch Events Rule to Invoke Lambda Runner - Column Encoding Utility
       Name: InvokeLambdaRedshiftRunner-ColumnEncodingUtility
-      ScheduleExpression: !Sub cron(${CronExpression})
+      ScheduleExpression: !Sub cron(${ColumnEncodingCronExpression})
       State: ENABLED
       Targets:
         - Arn: !GetAtt LambdaRedshiftAutomation.Arn
