@@ -740,7 +740,7 @@ def analyze(table_info):
                                                                              source_columns,
                                                                              analyze_schema,
                                                                              table_name)
-                if table_sortkeys is not None:
+                if len(table_sortkeys) > 0:
                     insert = "%s order by %s" % (insert, ",".join(table_sortkeys))
 
                 statements.extend([insert])
