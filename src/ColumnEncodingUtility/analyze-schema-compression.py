@@ -397,6 +397,7 @@ def analyze(table_info):
     table_name = table_info[0]
     dist_style = table_info[3]
     owner = table_info[4]
+    table_comment = table_info[5];
     
     # get the count of columns that have raw encoding applied
     table_unoptimised = False
@@ -734,6 +735,8 @@ def analyze(table_info):
                 # set the table owner
                 statements.extend(['alter table %s."%s" owner to %s;' % (target_schema, target_table, owner)]);
 
+                if table_comment != None:
+                    statements.extend(['comment on table %s."%s" is \'%s\';' % (target_schema, target_table, table_comment)]);
     
                 # insert the old data into the new table
                 # if we have identity column(s), we can't insert data from them, so do selective insert
@@ -943,9 +946,10 @@ def run():
         pass
     
     if analyze_table is not None:        
-        statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner"
+        statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
+left outer join pg_description pgd ON pgd.objoid = pgc.oid
 join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
@@ -956,9 +960,10 @@ and pgn.nspname = '%s' and pgc.relname = '%s'
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Table List...")
         
-        statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner"
+        statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
+left outer join pg_description pgd ON pgd.objoid = pgc.oid
 join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner 
 join (select tbl, count(*) as mbytes
