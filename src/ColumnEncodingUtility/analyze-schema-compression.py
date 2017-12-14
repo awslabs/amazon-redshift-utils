@@ -34,6 +34,7 @@ Ian Meyers
 Amazon Web Services (2014)
 '''
 
+from __future__ import print_function
 import sys
 import os
 from multiprocessing import Pool
@@ -87,9 +88,7 @@ new_dist_key = None
 new_sort_keys = None
 debug = False
 threads = 2
-output_file = None
-output_file_handle = None
-report_file_handle = None
+analyze_col_width = False
 do_execute = False
 query_slot_count = 1
 ignore_errors = False
@@ -134,53 +133,20 @@ def cleanup():
         if db_connections[key] is not None:
             close_conn(db_connections[key])
 
-    global output_file_handle
-    if output_file_handle is not None:
-        output_file_handle.close()
-
-    global report_file_handle
-    if report_file_handle is not None:
-        report_file_handle.close()
-
 
 def comment(string):
     if string is not None:
         if re.match('.*\\n.*', string) is not None:
-            write('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string))
+            print('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string))
         else:
-            write('-- [%s] %s' % (str(os.getpid()), string))
-
-
-def comment_report(string):
-    if string is not None:
-        if re.match('.*\\n.*', string) is not None:
-            write_report('/* \n%s\n*/\n' % string)
-        else:
-            write_report('%s' % string)
+            print('-- [%s] %s' % (str(os.getpid()), string))
 
 
 def print_statements(statements):
     if statements is not None:
         for s in statements:
             if s is not None:
-                write(s)
-
-
-def write(s):
-    # write output to all the places we want it
-    print(s)
-    if output_file_handle is not None:
-        output_file_handle.write(str(s) + "\n")
-        output_file_handle.flush()
-
-
-def write_report(s):
-    # write output to generate a report
-    print(s)
-    if report_file_handle is not None:
-        report_file_handle.write(str(s) + "\n")
-        report_file_handle.flush()
-
+                print(s)
 
 def get_pg_conn():
     global db_connections
@@ -203,8 +169,8 @@ def get_pg_conn():
             conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd,
                                   ssl=ssl_option, timeout=None)
         except Exception as e:
-            write(e)
-            write('Unable to connect to Cluster Endpoint')
+            print(e)
+            print('Unable to connect to Cluster Endpoint')
             cleanup()
             return ERROR
 
@@ -222,9 +188,9 @@ def get_pg_conn():
             cursor.execute(search_path)
         except pg8000.Error as e:
             if re.match('schema "%s" does not exist' % analyze_schema, e.message) is not None:
-                write('Schema %s does not exist' % analyze_schema)
+                print('Schema %s does not exist' % analyze_schema)
             else:
-                write(e.message)
+                print(e.message)
             return None
 
         if query_group is not None:
@@ -399,7 +365,7 @@ def run_commands(conn, commands):
             except Exception as e:
                 # cowardly bail on errors
                 conn.rollback()
-                write(traceback.format_exc())
+                print(traceback.format_exc())
                 return False
 
     return True
@@ -418,7 +384,7 @@ def analyze(table_info):
     output = get_count_raw_columns(table_name)
 
     if output is None:
-        write("Unable to determine potential RAW column encoding for %s" % table_name)
+        print("Unable to determine potential RAW column encoding for %s" % table_name)
         return ERROR
     else:
         for row in output:
@@ -458,7 +424,7 @@ def analyze(table_info):
                     cleanup()
                     return TERMINATED_BY_USER
                 except Exception as e:
-                    write(e)
+                    print(e)
                     attempt_count += 1
                     last_exception = e
 
@@ -467,9 +433,9 @@ def analyze(table_info):
 
             if analyze_compression_result is None:
                 if last_exception is not None:
-                    write("Unable to analyze %s due to Exception %s" % (table_name, last_exception.message))
+                    print("Unable to analyze %s due to Exception %s" % (table_name, last_exception.message))
                 else:
-                    write("Unknown Error")
+                    print("Unknown Error")
                 return ERROR
 
             if target_schema == analyze_schema:
@@ -510,12 +476,6 @@ def analyze(table_info):
                     encodings_modified = True
                     count_optimized += 1
 
-                    if report_file is not None:
-                        if count_optimized == 1:
-                            comment_report("\nTable %s could be optimised" % table_name)
-                        comment_report("Column %s should be modified from %s encoding to %s encoding" % (
-                            col, old_encoding, new_encoding))
-
                     if debug:
                         comment("Column %s will be modified from %s encoding to %s encoding" % (
                             col, old_encoding, new_encoding))
@@ -549,7 +509,7 @@ def analyze(table_info):
                                     cleanup()
                                     return TERMINATED_BY_USER
                                 except Exception as e:
-                                    write(e)
+                                    print(e)
                                     col_len_attempt_count += 1
                                     col_len_last_exception = e
 
@@ -558,10 +518,10 @@ def analyze(table_info):
 
                             if col_len_result is None:
                                 if col_len_last_exception is not None:
-                                    write("Unable to determine length of %s for table %s due to Exception %s" % (
+                                    print("Unable to determine length of %s for table %s due to Exception %s" % (
                                         col, table_name, last_exception.message))
                                 else:
-                                    write("Unknown Error")
+                                    print("Unknown Error")
                                 return ERROR
 
                             if debug:
@@ -575,8 +535,8 @@ def analyze(table_info):
                                 encodings_modified = True
 
                         except Exception as e:
-                            write('Exception %s during analysis of %s' % (e.message, table_name))
-                            write(traceback.format_exc())
+                            print('Exception %s during analysis of %s' % (e.message, table_name))
+                            print(traceback.format_exc())
                             return ERROR
 
                 col_type = col_type.replace('character varying', 'varchar').replace('without time zone', '')
@@ -603,7 +563,7 @@ def analyze(table_info):
                                 cleanup()
                                 return TERMINATED_BY_USER
                             except Exception as e:
-                                write(e)
+                                print(e)
                                 col_len_attempt_count += 1
                                 col_len_last_exception = e
 
@@ -612,10 +572,10 @@ def analyze(table_info):
 
                         if col_len_result is None:
                             if col_len_last_exception is not None:
-                                write("Unable to determine length of %s for table %s due to Exception %s" % (
+                                print("Unable to determine length of %s for table %s due to Exception %s" % (
                                     col, table_name, last_exception.message))
                             else:
-                                write("Unknown Error")
+                                print("Unknown Error")
                             return ERROR
 
                         if debug:
@@ -633,8 +593,8 @@ def analyze(table_info):
                             encodings_modified = True
 
                     except Exception as e:
-                        write('Exception %s during analysis of %s' % (e.message, table_name))
-                        write(traceback.format_exc())
+                        print('Exception %s during analysis of %s' % (e.message, table_name))
+                        print(traceback.format_exc())
                         return ERROR
 
                         # link in the existing distribution key, or set the new one
@@ -807,7 +767,7 @@ def analyze(table_info):
                     if not run_commands(get_pg_conn(), statements):
                         if not ignore_errors:
                             if debug:
-                                write("Error running statements: %s" % (str(statements),))
+                                print("Error running statements: %s" % (str(statements),))
                             return ERROR
 
                     # emit a cloudwatch metric for the table
@@ -822,8 +782,8 @@ def analyze(table_info):
                 else:
                     comment("No encoding modifications run for %s.%s" % (analyze_schema, table_name))
         except Exception as e:
-            write('Exception %s during analysis of %s' % (e.message, table_name))
-            write(traceback.format_exc())
+            print('Exception %s during analysis of %s' % (e.message, table_name))
+            print(traceback.format_exc())
             return ERROR
 
         print_statements(statements)
@@ -832,38 +792,38 @@ def analyze(table_info):
 
 
 def usage(with_message):
-    write('Usage: analyze-schema-compression.py')
-    write('       Generates a script to optimise Redshift column encodings on all tables in a schema\n')
+    print('Usage: analyze-schema-compression.py')
+    print('       Generates a script to optimise Redshift column encodings on all tables in a schema\n')
 
     if with_message is not None:
-        write(with_message + "\n")
+        print(with_message + "\n")
 
-    write('Arguments: --db                  - The Database to Use')
-    write('           --db-user             - The Database User to connect to')
-    write('           --db-pwd              - The Password for the Database User to connect to')
-    write('           --db-host             - The Cluster endpoint')
-    write('           --db-port             - The Cluster endpoint port (default 5439)')
-    write('           --analyze-schema      - The Schema to be Analyzed (default public)')
-    write('           --analyze-table       - A specific table to be Analyzed, if --analyze-schema is not desired')
-    write('           --analyze-cols        - Analyze column width and reduce the column width if needed')
-    write('           --new-dist-key        - Set a new Distribution Key (only used if --analyze-table is specified)')
-    write(
+    print('Arguments: --db                  - The Database to Use')
+    print('           --db-user             - The Database User to connect to')
+    print('           --db-pwd              - The Password for the Database User to connect to')
+    print('           --db-host             - The Cluster endpoint')
+    print('           --db-port             - The Cluster endpoint port (default 5439)')
+    print('           --analyze-schema      - The Schema to be Analyzed (default public)')
+    print('           --analyze-table       - A specific table to be Analyzed, if --analyze-schema is not desired')
+    print('           --analyze-cols        - Analyze column width and reduce the column width if needed')
+    print('           --new-dist-key        - Set a new Distribution Key (only used if --analyze-table is specified)')
+    print(
         '           --new-sort-keys       - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)')
-    write(
+    print(
         '           --target-schema       - Name of a Schema into which the newly optimised tables and data should be created, rather than in place')
-    write('           --threads             - The number of concurrent connections to use during analysis (default 2)')
-    write('           --output-file         - The full path to the output file to be generated')
-    write('           --report-file         - The full path to the report file to be generated')
-    write('           --debug               - Generate Debug Output including SQL Statements being run')
-    write('           --do-execute          - Run the compression encoding optimisation')
-    write('           --slot-count          - Modify the wlm_query_slot_count from the default of 1')
-    write('           --ignore-errors       - Ignore errors raised in threads when running and continue processing')
-    write('           --force               - Force table migration even if the table already has Column Encoding applied')
-    write('           --drop-old-data       - Drop the old version of the data table, rather than renaming')
-    write('           --comprows            - Set the number of rows to use for Compression Encoding Analysis')
-    write('           --query_group         - Set the query_group for all queries')
-    write('           --ssl-option          - Set SSL to True or False (default False)')
-    write('           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True')
+    print('           --threads             - The number of concurrent connections to use during analysis (default 2)')
+    print('           --output-file         - The full path to the output file to be generated')
+    print('           --report-file         - The full path to the report file to be generated')
+    print('           --debug               - Generate Debug Output including SQL Statements being run')
+    print('           --do-execute          - Run the compression encoding optimisation')
+    print('           --slot-count          - Modify the wlm_query_slot_count from the default of 1')
+    print('           --ignore-errors       - Ignore errors raised in threads when running and continue processing')
+    print('           --force               - Force table migration even if the table already has Column Encoding applied')
+    print('           --drop-old-data       - Drop the old version of the data table, rather than renaming')
+    print('           --comprows            - Set the number of rows to use for Compression Encoding Analysis')
+    print('           --query_group         - Set the query_group for all queries')
+    print('           --ssl-option          - Set SSL to True or False (default False)')
+    print('           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True')
     sys.exit(INVALID_ARGS)
 
 
@@ -899,6 +859,9 @@ def configure(**kwargs):
     for key, value in kwargs.iteritems():
         setattr(thismodule, key, value)
 
+        if debug:
+            comment("%s = %s" % (key,value))
+
     # create a cloudwatch client
     region_key = 'AWS_REGION'
     aws_region = os.environ[region_key] if region_key in os.environ else 'us-east-1'
@@ -911,28 +874,7 @@ def configure(**kwargs):
 
     if debug:
         comment("Redshift Column Encoding Utility Configuration")
-        comment("output_file: %s " % output_file)
-        comment("db: %s " % db)
-        comment("db_user: %s " % db_user)
-        comment("db_host: %s " % db_host)
-        comment("db_port: %s " % db_port)
-        comment("threads: %s " % threads)
-        comment("analyze_schema: %s " % analyze_schema)
-        comment("analyze_table: %s " % analyze_table)
-        comment("new_dist_key: %s " % new_dist_key)
-        comment("new_sort_keys: %s " % new_sort_keys)
-        comment("analyze_col: %s " % analyze_col_width)
-        comment("target_schema: %s " % target_schema)
-        comment("debug: %s " % debug)
-        comment("do_execute: %s " % do_execute)
-        comment("query_slot_count: %s " % query_slot_count)
-        comment("ignore_errors: %s " % ignore_errors)
-        comment("force: %s " % force)
-        comment("drop_old_data: %s " % drop_old_data)
-        comment("comprows: %s " % comprows)
-        comment("query_group: %s " % query_group)
-        comment("ssl_option: %s " % ssl_option)
-        comment("report_file: %s " % report_file)
+
         if "suppress_cw" in kwargs and kwargs["suppress_cw"]:
             comment("Suppressing CloudWatch metrics")
         else:
@@ -942,15 +884,6 @@ def configure(**kwargs):
 
 def run():
     global master_conn
-    global output_file_handle
-    global report_file_handle
-
-    # open the output file
-    output_file_handle = open(output_file, 'w')
-
-    # open the file to store report
-    if report_file:
-        report_file_handle = open(report_file, 'w')
 
     # get a connection for the controlling processes
     master_conn = get_pg_conn()
@@ -972,7 +905,7 @@ def run():
                 "This will make irreversible changes to your database, and cannot be undone. Type 'Yes' to continue: ")
 
             if not really_go == 'Yes':
-                write("Terminating on User Request")
+                print("Terminating on User Request")
                 return TERMINATED_BY_USER
 
         comment("Recommended encoding changes will be applied automatically...")
@@ -1043,7 +976,7 @@ order by 2;
                 cleanup()
                 return TERMINATED_BY_USER
             except:
-                write(traceback.format_exc())
+                print(traceback.format_exc())
                 p.close()
                 p.terminate()
                 cleanup()
@@ -1073,11 +1006,11 @@ order by 2;
             if do_execute:
                 if not run_commands(master_conn, fk_commands):
                     if not ignore_errors:
-                        write("Error running commands %s" % (fk_commands,))
+                        print("Error running commands %s" % (fk_commands,))
                         return ERROR
 
         if return_code != OK:
-            write("Error in worker thread: return code %d. Exiting." % (return_code,))
+            print("Error in worker thread: return code %d. Exiting." % (return_code,))
             return return_code
 
     comment("Performed modification of %s tables" % modified_tables)
@@ -1093,191 +1026,134 @@ order by 2;
 
 
 def main(argv):
-    output_file = None
-    db = None
-    db_user = None
-    db_pwd = None
-    db_host = None
-    db_port = None
-    threads = None
-    analyze_schema = None
-    analyze_table = None
-    new_dist_key = None
-    new_sort_keys = None
-    analyze_col_width = None
-    target_schema = None
-    debug = None
-    do_execute = None
-    query_slot_count = None
-    ignore_errors = None
-    force = None
-    drop_old_data = None
-    comprows = None
-    query_group = None
-    ssl_option = None
-    report_file = None
-    suppress_cw = None
-
-    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= report-file= suppress-cloudwatch="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= report-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch="""
 
     # extract the command line arguments
     try:
         optlist, remaining = getopt.getopt(argv[1:], "", supported_args.split())
     except getopt.GetoptError as err:
-        print str(err)
+        print(str(err))
         usage(None)
 
     # parse command line arguments
+    args={}
     for arg, value in optlist:
         if arg == "--db":
             if value == '' or value is None:
                 usage()
             else:
-                db = value
+                args['db'] = value
         elif arg == "--db-user":
             if value == '' or value is None:
                 usage()
             else:
-                db_user = value
+                args['db_user'] = value
         elif arg == "--db-host":
             if value == '' or value is None:
                 usage()
             else:
-                db_host = value
+                args['db_host'] = value
         elif arg == "--db-port":
             if value != '' and value is not None:
-                db_port = int(value)
+                args['db_port'] = int(value)
         elif arg == "--db-pwd":
             if value != '' and value is not None:
-                db_pwd = value
+                args['db_pwd'] = value
         elif arg == "--analyze-schema":
             if value != '' and value is not None:
-                analyze_schema = value
+                args['analyze_schema'] = value
         elif arg == "--analyze-table":
             if value != '' and value is not None:
-                analyze_table = value
+                args['analyze_table'] = value
         elif arg == "--new-dist-key":
             if value != '' and value is not None:
-                new_dist_key = value
+                args['new_dist_key'] = value
         elif arg == "--new-sort-keys":
             if value != '' and value is not None:
-                new_sort_keys = value
+                args['new_sort_keys'] = value
         elif arg == "--analyze-cols":
             if value != '' and value is not None:
-                analyze_col_width = value
-
+                args['analyze_col_width'] = value
         elif arg == "--target-schema":
             if value != '' and value is not None:
-                target_schema = value
+                args['target_schema'] = value
         elif arg == "--threads":
             if value != '' and value is not None:
-                threads = int(value)
+                args['threads'] = int(value)
         elif arg == "--debug":
             if value == 'true' or value == 'True':
-                debug = True
+                args['debug'] = True
             else:
-                debug = False
+                args['debug'] = False
         elif arg == "--output-file":
-            if value == '' or value is None:
-                usage()
-            else:
-                output_file = value
+            global output_file
+            sys.stdout = open(value,'w')
         elif arg == "--ignore-errors":
             if value == 'true' or value == 'True':
-                ignore_errors = True
+                args['ignore_errors'] = True
             else:
-                ignore_errors = False
+                args['ignore_errors'] = False
         elif arg == "--force":
             if value == 'true' or value == 'True':
-                force = True
+                args['force'] = True
             else:
-                force = False
+                args['force'] = False
         elif arg == "--drop-old-data":
             if value == 'true' or value == 'True':
-                drop_old_data = True
+                args['drop_old_data'] = True
             else:
-                drop_old_data = False
+                args['drop_old_data'] = False
         elif arg == "--do-execute":
             if value == 'true' or value == 'True':
-                do_execute = True
+                args['do_execute'] = True
             else:
-                do_execute = False
+                args['do_execute'] = False
         elif arg == "--slot-count":
-            query_slot_count = int(value)
+                args['query_slot_count'] = int(value)
         elif arg == "--comprows":
-            comprows = int(value)
+                args['comprows'] = int(value)
         elif arg == "--query_group":
             if value != '' and value is not None:
-                query_group = value
+                args['query_group'] = value
         elif arg == "--ssl-option":
             if value == 'true' or value == 'True':
-                ssl_option = True
+                args['ssl_option'] = True
             else:
-                ssl_option = False
+                args['ssl_option'] = False
         elif arg == "--suppress-cloudwatch":
             if value == 'true' or value == 'True':
-                suppress_cw = True
+                args['suppress_cw'] = True
             else:
-                ssl_option = False
-        elif arg == "--report-file":
-            if value == '' or value is None:
-                report_file = False
-            else:
-                report_file = value
+                args['ssl_option'] = False
         else:
             assert False, "Unsupported Argument " + arg
             usage()
 
     # Validate that we've got all the args needed
-    if db is None:
+    if 'db' not in args:
         usage("Missing Parameter 'db'")
-    if db_user is None:
+    if 'db_user' not in args:
         usage("Missing Parameter 'db-user'")
-    if db_host is None:
+    if 'db_host' not in args:
         usage("Missing Parameter 'db-host'")
-    if db_port is None:
+    if 'db_port' not in args:
         usage("Missing Parameter 'db-port'")
-    if output_file is None:
-        usage("Missing Parameter 'output-file'")
-    if analyze_schema is None:
+    if 'analyze_schema' not in args:
         analyze_schema = 'public'
-    if target_schema is None:
-        target_schema = analyze_schema
+    if 'analyze_schema' not in args:
+        args['analyze_schema'] = 'public'
+    if 'target_schema' not in args:
+        args['target_schema'] = args['analyze_schema']
 
     # Reduce to 1 thread if we're analyzing a single table
-    if analyze_table is not None:
-        threads = 1
+    if analyze_table in args:
+        args['threads'] = 1
 
     # get the database password
-    if not db_pwd:
-        db_pwd = getpass.getpass("Password <%s>: " % db_user)
+    if 'db_pwd' not in args:
+        args['db_pwd'] = getpass.getpass("Password <%s>: " % db_user)
 
     # setup the configuration
-    args = {'output_file': output_file,
-            'db': db,
-            'db_user': db_user,
-            'db_pwd': db_pwd,
-            'db_host': db_host,
-            'db_port': db_port,
-            'analyze_schema': analyze_schema,
-            'target_schema': target_schema,
-            'analyze_table': analyze_table,
-            'new_dist_key': new_dist_key,
-            'new_sort_keys': new_sort_keys,
-            'analyze_col_width': analyze_col_width,
-            'threads': threads,
-            'do_execute': do_execute,
-            'query_slot_count': query_slot_count,
-            'ignore_errors': ignore_errors,
-            'force': force,
-            'drop_old_data': drop_old_data,
-            'comprows': comprows,
-            'query_group': query_group,
-            'debug': debug,
-            'ssl_option': ssl_option,
-            'report_file': report_file,
-            'suppress_cw': suppress_cw
-            }
     configure(**args)
 
     # run the analyser
