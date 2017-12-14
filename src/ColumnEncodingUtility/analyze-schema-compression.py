@@ -476,7 +476,7 @@ def analyze(table_info):
             fks = []
             table_distkey = None
             table_sortkeys = []
-            new_sortkey_arr = new_sort_keys.split(',') if new_sort_keys is not None else []
+            new_sortkey_arr = [t.strip() for t in new_sort_keys.split(',')] if new_sort_keys is not None else []
 
             # count of suggested optimizations
             count_optimized = 0
