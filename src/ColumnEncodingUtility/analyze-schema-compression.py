@@ -35,19 +35,21 @@ Amazon Web Services (2014)
 '''
 
 from __future__ import print_function
-import sys
-import os
-from multiprocessing import Pool
+
 import getopt
-import re
 import getpass
-import time
+import os
+import re
+import sys
 import traceback
-import pg8000
-import shortuuid
+from multiprocessing import Pool
+
+import boto3
 import datetime
 import math
-import boto3
+import pg8000
+import shortuuid
+import time
 
 sys.path.append("..")
 import aws_utils
@@ -147,6 +149,7 @@ def print_statements(statements):
         for s in statements:
             if s is not None:
                 print(s)
+
 
 def get_pg_conn():
     global db_connections
@@ -376,7 +379,7 @@ def analyze(table_info):
     dist_style = table_info[3]
     owner = table_info[4]
     table_comment = table_info[5];
-    
+
     # get the count of columns that have raw encoding applied
     table_unoptimised = False
     count_unoptimised = 0
@@ -719,8 +722,9 @@ def analyze(table_info):
                 statements.extend(['alter table %s."%s" owner to %s;' % (target_schema, target_table, owner)]);
 
                 if table_comment is not None:
-                    statements.extend(['comment on table %s."%s" is \'%s\';' % (target_schema, target_table, table_comment)]);
-    
+                    statements.extend(
+                        ['comment on table %s."%s" is \'%s\';' % (target_schema, target_table, table_comment)]);
+
                 # insert the old data into the new table
                 # if we have identity column(s), we can't insert data from them, so do selective insert
                 if has_identity:
@@ -730,12 +734,15 @@ def analyze(table_info):
                     source_columns = '*'
                     mig_columns = ''
 
-                insert = 'insert into %s."%s" %s select %s from %s."%s";' % (target_schema,
+                insert = 'insert into %s."%s" %s select %s from %s."%s"' % (target_schema,
                                                                              target_table,
                                                                              mig_columns,
                                                                              source_columns,
                                                                              analyze_schema,
                                                                              table_name)
+                if table_sortkeys is not None:
+                    insert = "%s order by %s" % (insert, ",".join(table_sortkeys))
+
                 statements.extend([insert])
 
                 # analyze the new table
@@ -818,12 +825,14 @@ def usage(with_message):
     print('           --do-execute          - Run the compression encoding optimisation')
     print('           --slot-count          - Modify the wlm_query_slot_count from the default of 1')
     print('           --ignore-errors       - Ignore errors raised in threads when running and continue processing')
-    print('           --force               - Force table migration even if the table already has Column Encoding applied')
+    print(
+        '           --force               - Force table migration even if the table already has Column Encoding applied')
     print('           --drop-old-data       - Drop the old version of the data table, rather than renaming')
     print('           --comprows            - Set the number of rows to use for Compression Encoding Analysis')
     print('           --query_group         - Set the query_group for all queries')
     print('           --ssl-option          - Set SSL to True or False (default False)')
-    print('           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True')
+    print(
+        '           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True')
     sys.exit(INVALID_ARGS)
 
 
@@ -860,7 +869,7 @@ def configure(**kwargs):
         setattr(thismodule, key, value)
 
         if debug:
-            comment("%s = %s" % (key,value))
+            comment("%s = %s" % (key, value))
 
     # create a cloudwatch client
     region_key = 'AWS_REGION'
@@ -912,7 +921,7 @@ def run():
     else:
         pass
 
-    if analyze_table is not None:        
+    if analyze_table is not None:
         statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
@@ -1036,7 +1045,7 @@ def main(argv):
         usage(None)
 
     # parse command line arguments
-    args={}
+    args = {}
     for arg, value in optlist:
         if arg == "--db":
             if value == '' or value is None:
@@ -1087,7 +1096,7 @@ def main(argv):
                 args['debug'] = False
         elif arg == "--output-file":
             global output_file
-            sys.stdout = open(value,'w')
+            sys.stdout = open(value, 'w')
         elif arg == "--ignore-errors":
             if value == 'true' or value == 'True':
                 args['ignore_errors'] = True
@@ -1109,9 +1118,9 @@ def main(argv):
             else:
                 args['do_execute'] = False
         elif arg == "--slot-count":
-                args['query_slot_count'] = int(value)
+            args['query_slot_count'] = int(value)
         elif arg == "--comprows":
-                args['comprows'] = int(value)
+            args['comprows'] = int(value)
         elif arg == "--query_group":
             if value != '' and value is not None:
                 args['query_group'] = value
