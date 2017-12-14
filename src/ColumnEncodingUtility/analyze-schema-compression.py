@@ -170,7 +170,8 @@ def get_pg_conn():
 
         try:
             conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd,
-                                  ssl=ssl_option, timeout=None)
+                                  ssl=ssl_option, timeout=None, keepalives=1, keepalives_idle=200,
+                                  keepalives_interval=200, keepalives_count=5)
         except Exception as e:
             print(e)
             print('Unable to connect to Cluster Endpoint')
@@ -735,11 +736,11 @@ def analyze(table_info):
                     mig_columns = ''
 
                 insert = 'insert into %s."%s" %s select %s from %s."%s"' % (target_schema,
-                                                                             target_table,
-                                                                             mig_columns,
-                                                                             source_columns,
-                                                                             analyze_schema,
-                                                                             table_name)
+                                                                            target_table,
+                                                                            mig_columns,
+                                                                            source_columns,
+                                                                            analyze_schema,
+                                                                            table_name)
                 if len(table_sortkeys) > 0:
                     insert = "%s order by %s" % (insert, ",".join(table_sortkeys))
 
