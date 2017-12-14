@@ -36,25 +36,30 @@ This utility was built and tested on Python 2.7x, but may work with other versio
 Usage: analyze-schema-compression.py
        Generates a script to optimise Redshift column encodings on all tables in a schema
 
-Arguments: --db             - The Database to Use (or $PGDATABASE)
-           --db-user        - The Database User to connect to (or $PGUSER)
-           --db-host        - The Cluster endpoint (or $PGHOST)
-           --db-port        - The Cluster endpoint port (default 5439 or $PGPORT)
-           --analyze-schema - The Schema to be Analyzed (default public)
-           --analyze-table  - A specific table to be Analyzed, if --analyze-schema is not desired
-           --new-dist-key   - Set a new Distribution Key (only used if --analyze-table is specified)
-           --new-sort-keys  - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)
-           --target-schema  - Name of a Schema into which the newly optimised tables and data should be created, rather than in place
-           --threads        - The number of concurrent connections to use during analysis (default 2)
-           --output-file    - The full path to the output file to be generated
-           --debug          - Generate Debug Output including SQL Statements being run
-           --do-execute     - Run the compression encoding optimisation
-           --slot-count     - Modify the wlm_query_slot_count from the default of 1
-           --ignore-errors  - Ignore errors raised in threads when running and continue processing
-           --force          - Force table migration even if the table already has Column Encoding applied
-           --drop-old-data  - Drop the old version of the data table, rather than renaming
-           --comprows       - Set the number of rows to use for Compression Encoding Analysis
-           --report-file    - The full path to the file which will store the difference of suggested/current encoding
+Arguments: --db                  - The Database to Use
+           --db-user             - The Database User to connect to
+           --db-pwd              - The Password for the Database User to connect to
+           --db-host             - The Cluster endpoint
+           --db-port             - The Cluster endpoint port (default 5439)
+           --analyze-schema      - The Schema to be Analyzed (default public)
+           --analyze-table       - A specific table to be Analyzed, if --analyze-schema is not desired
+           --analyze-cols        - Analyze column width and reduce the column width if needed
+           --new-dist-key        - Set a new Distribution Key (only used if --analyze-table is specified)
+           --new-sort-keys       - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)
+           --target-schema       - Name of a Schema into which the newly optimised tables and data should be created, rather than in place
+           --threads             - The number of concurrent connections to use during analysis (default 2)
+           --output-file         - The full path to the output file to be generated
+           --report-file         - The full path to the report file to be generated
+           --debug               - Generate Debug Output including SQL Statements being run
+           --do-execute          - Run the compression encoding optimisation
+           --slot-count          - Modify the wlm_query_slot_count from the default of 1
+           --ignore-errors       - Ignore errors raised in threads when running and continue processing
+           --force               - Force table migration even if the table already has Column Encoding applied
+           --drop-old-data       - Drop the old version of the data table, rather than renaming
+           --comprows            - Set the number of rows to use for Compression Encoding Analysis
+           --query_group         - Set the query_group for all queries
+           --ssl-option          - Set SSL to True or False (default False)
+           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True
 
 ```
 
@@ -81,6 +86,10 @@ If you specify the `new-dist-key` or `new-sort-keys` options when setting `analy
 ### Do Execute
 
 This option will cause the encoding utility to run the generated script as it goes. Changes will be made to your database LIVE and cannot be undone. It is not recommended that you use this option on Production systems. Furthermore, if the ```--drop-old-data true``` option is included with ```--do-execute true```, then you will be required to confirm that you wish to run this operation before the utility will proceed.
+
+### Metrics
+
+The module will export CloudWatch metrics for the number of tables that are modified if the `do-execute` option is provided. Data is indexed by the cluster name. You can suppress this by adding option `--suppress-cloudwatch` from the command line, or argument `suppress_cw` in the `configure()` method.
 
 # Version Notes
 
