@@ -42,6 +42,8 @@ Arguments: --db             - The Database to Use (or $PGDATABASE)
            --db-port        - The Cluster endpoint port (default 5439 or $PGPORT)
            --analyze-schema - The Schema to be Analyzed (default public)
            --analyze-table  - A specific table to be Analyzed, if --analyze-schema is not desired
+           --new-dist-key   - Set a new Distribution Key (only used if --analyze-table is specified)
+           --new-sort-keys  - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)
            --target-schema  - Name of a Schema into which the newly optimised tables and data should be created, rather than in place
            --threads        - The number of concurrent connections to use during analysis (default 2)
            --output-file    - The full path to the output file to be generated

@@ -804,6 +804,7 @@ def usage(with_message):
     write('           --analyze-table  - A specific table to be Analyzed, if --analyze-schema is not desired')
     write('           --analyze-cols   - Analyze column width and reduce the column width if needed')
     write('           --new-dist-key   - Set a new Distribution Key (only used if --analyze-table is specified)')
+    write('           --new-sort-keys  - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)')
     write('           --target-schema  - Name of a Schema into which the newly optimised tables and data should be created, rather than in place')
     write('           --threads        - The number of concurrent connections to use during analysis (default 2)')
     write('           --output-file    - The full path to the output file to be generated')
