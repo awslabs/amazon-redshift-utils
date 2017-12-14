@@ -48,7 +48,7 @@ import datetime
 from _curses import OK
 import math
 
-__version__ = ".9.2.5"
+__version__ = ".9.3.0"
 
 OK = 0
 ERROR = 1
@@ -77,6 +77,7 @@ analyze_schema = 'public'
 target_schema = None
 analyze_table = None
 new_dist_key = None
+new_sort_keys = None
 debug = False
 threads = 2
 output_file = None
@@ -118,47 +119,47 @@ def close_conn(conn):
             
 def cleanup():
     # close all connections and close the output file
-    if master_conn != None:
+    if master_conn is not None:
         close_conn(master_conn)
     
     for key in db_connections:
-        if db_connections[key] != None:            
+        if db_connections[key] is not None:            
             close_conn(db_connections[key]) 
 
     global output_file_handle    
-    if output_file_handle != None:
+    if output_file_handle is not None:
         output_file_handle.close()
 
     global report_file_handle
-    if report_file_handle != None:
+    if report_file_handle is not None:
         report_file_handle.close()
 
 def comment(string):
-    if (string != None):
-        if re.match('.*\\n.*', string) != None:
+    if string is not None:
+        if re.match('.*\\n.*', string) is not None:
             write('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string))
         else:
             write('-- [%s] %s' % (str(os.getpid()), string))
 
 def comment_report(string):
-    if (string != None):
-        if re.match('.*\\n.*', string) != None:
-            write_report('/* \n%s\n*/\n' % (string))
+    if string is not None:
+        if re.match('.*\\n.*', string) is not None:
+            write_report('/* \n%s\n*/\n' % string)
         else:
-            write_report('%s' % (string))
+            write_report('%s' % string)
 
 
 def print_statements(statements):
-    if statements != None:
+    if statements is not None:
         for s in statements:
-            if s != None:
+            if s is not None:
                 write(s)
         
         
 def write(s):
     # write output to all the places we want it
     print(s)
-    if output_file_handle != None:
+    if output_file_handle is not None:
         output_file_handle.write(str(s) + "\n")
         output_file_handle.flush()
 
@@ -166,7 +167,7 @@ def write(s):
 def write_report(s):
     # write output to generate a report
     print(s)
-    if report_file_handle != None:
+    if report_file_handle is not None:
         report_file_handle.write(str(s) + "\n")
         report_file_handle.flush()
         
@@ -183,7 +184,7 @@ def get_pg_conn():
     except KeyError:
         pass
         
-    if conn == None:
+    if conn is None:
         # connect to the database
         if debug:
             comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
@@ -197,9 +198,9 @@ def get_pg_conn():
             return ERROR      
         
         # set default search path        
-        search_path = 'set search_path = \'$user\',public,%s' % (analyze_schema)
-        if target_schema != None and target_schema != analyze_schema:
-            search_path = search_path + ', %s' % (target_schema)
+        search_path = 'set search_path = \'$user\',public,%s' % analyze_schema
+        if target_schema is not None and target_schema != analyze_schema:
+            search_path = search_path + ', %s' % target_schema
             
         if debug:
             comment(search_path)
@@ -209,22 +210,22 @@ def get_pg_conn():
             cursor = conn.cursor()
             cursor.execute(search_path)
         except pg8000.Error as e:
-            if re.match('schema "%s" does not exist' % (analyze_schema,), e.message) != None:
-                write('Schema %s does not exist' % (analyze_schema,))
+            if re.match('schema "%s" does not exist' % analyze_schema, e.message) is not None:
+                write('Schema %s does not exist' % analyze_schema)
             else:
                 write(e.message)
             return None
 
-        if query_group != None:
-            set_query_group = 'set query_group to %s' % (query_group)
+        if query_group is not None:
+            set_query_group = 'set query_group to %s' % query_group
 
             if debug:
                 comment(set_query_group)
 
             cursor.execute(set_query_group)
         
-        if query_slot_count != None and query_slot_count != 1:
-            set_slot_count = 'set wlm_query_slot_count = %s' % (query_slot_count)
+        if query_slot_count is not None and query_slot_count != 1:
+            set_slot_count = 'set wlm_query_slot_count = %s' % query_slot_count
             
             if debug:
                 comment(set_slot_count)
@@ -272,7 +273,7 @@ def get_foreign_keys(analyze_schema, target_schema, table_name):
  ORDER BY 1
 ''' % (analyze_schema, table_name)
 
-    if (debug):
+    if debug:
         comment(fk_statement)
     
     foreign_keys = execute_query(fk_statement)
@@ -280,7 +281,7 @@ def get_foreign_keys(analyze_schema, target_schema, table_name):
     
     for fk in foreign_keys:
         has_fks = True
-        references_clause = fk[1].replace('REFERENCES ', 'REFERENCES %s.' % (target_schema))      
+        references_clause = fk[1].replace('REFERENCES ', 'REFERENCES %s.' % target_schema)
         fk_statements.append('alter table %s."%s" add constraint %s %s;' % (target_schema, table_name, fk[0], references_clause))
     
     if has_fks:
@@ -370,7 +371,7 @@ def get_count_raw_columns(table_name):
 
 def run_commands(conn, commands):
     for c in commands:
-        if c != None:
+        if c is not None:
             cursor = conn.cursor()
             comment('[%s] Running %s' % (str(os.getpid()), c))
             try:
@@ -378,7 +379,7 @@ def run_commands(conn, commands):
                     subcommands = c.split(';')
                     
                     for s in subcommands:
-                        if s != None and s != '':
+                        if s is not None and s != '':
                             cursor.execute(s.replace("\n", ""))
                 else:
                     cursor.execute(c)
@@ -401,7 +402,7 @@ def analyze(table_info):
     count_unoptimised = 0
     encodings_modified = False    
     output = get_count_raw_columns(table_name)
-    if output == None:
+    if output is None:
         write("Unable to determine potential RAW column encoding for %s" % table_name)
         return ERROR
     else:
@@ -420,7 +421,7 @@ def analyze(table_info):
     
         statement = 'analyze compression %s."%s"' % (analyze_schema, table_name)
         
-        if comprows != None:
+        if comprows is not None:
             statement = statement + (" comprows %s" % int(comprows))
             
         try:
@@ -434,7 +435,7 @@ def analyze(table_info):
             analyze_retry = 10
             attempt_count = 0
             last_exception = None
-            while attempt_count < analyze_retry and analyze_compression_result == None:
+            while attempt_count < analyze_retry and analyze_compression_result is None:
                 try:
                     analyze_compression_result = execute_query(statement)
                 except KeyboardInterrupt:
@@ -449,8 +450,8 @@ def analyze(table_info):
                     # Exponential Backoff
                     time.sleep(2 ** attempt_count * RETRY_TIMEOUT)
     
-            if analyze_compression_result == None:
-                if last_exception != None:
+            if analyze_compression_result is None:
+                if last_exception is not None:
                     write("Unable to analyze %s due to Exception %s" % (table_name, last_exception.message))
                 else:
                     write("Unknown Error")
@@ -474,6 +475,8 @@ def analyze(table_info):
             non_identity_columns = []
             fks = []
             table_distkey = None
+            table_sortkeys = []
+            new_sortkey_arr = new_sort_keys.split(',') if new_sort_keys is not None else []
 
             # count of suggested optimizations
             count_optimized = 0
@@ -493,7 +496,7 @@ def analyze(table_info):
 
                     if report_file is not None:
                         if count_optimized ==1:
-                            comment_report("\nTable %s could be optimised" % (table_name))
+                            comment_report("\nTable %s could be optimised" % table_name)
                         comment_report("Column %s should be modified from %s encoding to %s encoding" % (col, old_encoding, new_encoding))
 
                     if debug:
@@ -518,7 +521,7 @@ def analyze(table_info):
                             col_len_retry = 10
                             col_len_attempt_count = 0
                             col_len_last_exception = None
-                            while col_len_attempt_count < col_len_retry and col_len_result == None:
+                            while col_len_attempt_count < col_len_retry and col_len_result is None:
                                 try:
                                     col_len_result = execute_query(col_len_statement)
                                 except KeyboardInterrupt:
@@ -533,8 +536,8 @@ def analyze(table_info):
                                     # Exponential Backoff
                                     time.sleep(2 ** col_len_attempt_count * RETRY_TIMEOUT)
                                     
-                            if col_len_result == None:
-                                if col_len_last_exception != None:
+                            if col_len_result is None:
+                                if col_len_last_exception is not None:
                                     write("Unable to determine length of %s for table %s due to Exception %s" % (col, table_name, last_exception.message))
                                 else:
                                     write("Unknown Error")
@@ -568,7 +571,7 @@ def analyze(table_info):
                         col_len_retry = 10
                         col_len_attempt_count = 0
                         col_len_last_exception = None
-                        while col_len_attempt_count < col_len_retry and col_len_result == None:
+                        while col_len_attempt_count < col_len_retry and col_len_result is None:
                             try:
                                 col_len_result = execute_query(col_len_statement)
                             except KeyboardInterrupt:
@@ -583,8 +586,8 @@ def analyze(table_info):
                                 # Exponential Backoff
                                 time.sleep(2 ** col_len_attempt_count * RETRY_TIMEOUT)
                                     
-                        if col_len_result == None:
-                            if col_len_last_exception != None:
+                        if col_len_result is None:
+                            if col_len_last_exception is not None:
                                 write("Unable to determine length of %s for table %s due to Exception %s" % (col, table_name, last_exception.message))
                             else:
                                 write("Unknown Error")
@@ -611,32 +614,38 @@ def analyze(table_info):
                             
                 # link in the existing distribution key, or set the new one
                 row_distkey = descr[col][3]
-                if new_dist_key == None:
-                    if str(row_distkey).upper()[0] == 'T':
-                        distkey = 'DISTKEY'
-                        dist_style = 'KEY'
-                        table_distkey = col
-                    else:
-                        distkey = ''
-                else:
+                if analyze_table is not None and new_dist_key is not None:
                     if col == new_dist_key:
                         distkey = 'DISTKEY'
                         dist_style = 'KEY'
                         table_distkey = col
                     else:
                         distkey = ''
+                else:
+                    if str(row_distkey).upper()[0] == 'T':
+                        distkey = 'DISTKEY'
+                        dist_style = 'KEY'
+                        table_distkey = col
+                    else:
+                        distkey = ''
                     
-                # is this the sort key?
-                sortkey = descr[col][4]
-                if sortkey != 0:
-                    # add the absolute ordering of the sortkey to the list of all sortkeys
-                    sortkeys[abs(sortkey)] = col
-                    
-                    if (sortkey < 0):
-                        has_zindex_sortkeys = True
+                # link in the existing sort keys, or set the new ones
+                row_sortkey = descr[col][4]
+                if analyze_table is not None and len(new_sortkey_arr) > 0:
+                    if col in new_sortkey_arr:
+                        sortkeys[new_sortkey_arr.index(col)+1] = col
+                        table_sortkeys.append(col)
+                else:
+                    if row_sortkey != 0:
+                        # add the absolute ordering of the sortkey to the list of all sortkeys
+                        sortkeys[abs(row_sortkey)] = col
+                        table_sortkeys.append(col)
+
+                        if row_sortkey < 0:
+                            has_zindex_sortkeys = True
                     
                 # don't compress first sort key
-                if abs(sortkey) == 1:
+                if abs(row_sortkey) == 1:
                     compression = 'RAW'
                 else:
                     compression = row[2]
@@ -669,7 +678,16 @@ def analyze(table_info):
 
             # abort if a new distkey was set but we couldn't find it in the set of all columns
             if new_dist_key is not None and table_distkey is None:
-                msg = "Column '%s' not found when setting new Table Distribution Key" % (new_dist_key)
+                msg = "Column '%s' not found when setting new Table Distribution Key" % new_dist_key
+                comment(msg)
+                raise Exception(msg)
+
+            # abort if new sortkeys were set but we couldn't find them in the set of all columns
+            if new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
+                if debug:
+                    comment("Reqested Sort Keys: %s" % new_sort_keys)
+                    comment("Resolved Sort Keys: %s" % table_sortkeys)
+                msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sort_keys
                 comment(msg)
                 raise Exception(msg)
 
@@ -691,6 +709,8 @@ def analyze(table_info):
                     
                 # add sort key as a table block to accommodate multiple columns
                 if len(sortkeys) > 0:
+                    if debug:
+                        comment("Adding Sortkeys: %s" % sortkeys)
                     sortkey = '%sSORTKEY(' % ('INTERLEAVED ' if has_zindex_sortkeys else '')    
                     
                     for i in range(1, len(sortkeys) + 1):
@@ -731,7 +751,7 @@ def analyze(table_info):
                 analyze = 'analyze %s."%s";' % (target_schema, target_table)
                 statements.extend([analyze])
                         
-                if (target_schema == analyze_schema):
+                if target_schema == analyze_schema:
                     # rename the old table to _$old or drop
                     if drop_old_data:
                         drop = 'drop table %s."%s" cascade;' % (target_schema, table_name)
@@ -757,14 +777,14 @@ def analyze(table_info):
                                 write("Error running statements: %s" % (str(statements),))
                             return ERROR
                 else:
-                    comment("No encoding modifications required for %s.%s" % (analyze_schema, table_name))    
+                    comment("No encoding modifications required for %s.%s" % (analyze_schema, table_name))
         except Exception as e:
             write('Exception %s during analysis of %s' % (e.message, table_name))
             write(traceback.format_exc())
             return ERROR
         
         print_statements(statements)
-        
+
         return (OK, fks, encodings_modified)
 
 
@@ -772,7 +792,7 @@ def usage(with_message):
     write('Usage: analyze-schema-compression.py')
     write('       Generates a script to optimise Redshift column encodings on all tables in a schema\n')
     
-    if with_message != None:
+    if with_message is not None:
         write(with_message + "\n")
         
     write('Arguments: --db             - The Database to Use')
@@ -801,7 +821,7 @@ def usage(with_message):
 
 
 # method used to configure global variables, so that we can call the run method
-def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze_schema, _target_schema, _analyze_table, _new_dist_key, _analyze_col_width, _threads, _do_execute, _query_slot_count, _ignore_errors, _force, _drop_old_data, _comprows, _query_group, _debug, _ssl_option, _report_file):
+def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze_schema, _target_schema, _analyze_table, _new_dist_key, _new_sort_keys, _analyze_col_width, _threads, _do_execute, _query_slot_count, _ignore_errors, _force, _drop_old_data, _comprows, _query_group, _debug, _ssl_option, _report_file):
     # setup globals
     global db
     global db_user
@@ -812,6 +832,7 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     global analyze_schema
     global analyze_table
     global new_dist_key
+    global new_sort_keys
     global analyze_col_width
     global target_schema
     global debug
@@ -836,43 +857,45 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     analyze_schema = None if _analyze_schema == "" else _analyze_schema
     analyze_table = None if _analyze_table == "" else _analyze_table
     new_dist_key = None if _new_dist_key == "" else _new_dist_key
-    target_schema = _analyze_schema if _target_schema == "" or _target_schema == None else _target_schema
-    analyze_col_width = False if _analyze_col_width == None else _analyze_col_width
-    debug = False if _debug == None else _debug    
-    do_execute = False if _do_execute == None else _do_execute
-    ignore_errors = False if _ignore_errors == None else _ignore_errors
-    force = False if _force == None else _force
-    drop_old_data = False if _drop_old_data == None else _drop_old_data
+    new_sort_keys = None if _new_sort_keys == "" else _new_sort_keys
+    target_schema = _analyze_schema if _target_schema == "" or _target_schema is None else _target_schema
+    analyze_col_width = False if _analyze_col_width is None else _analyze_col_width
+    debug = False if _debug is None else _debug    
+    do_execute = False if _do_execute is None else _do_execute
+    ignore_errors = False if _ignore_errors is None else _ignore_errors
+    force = False if _force is None else _force
+    drop_old_data = False if _drop_old_data is None else _drop_old_data
     query_group = None if _query_group == "" else _query_group
-    threads = 1 if _threads == None else int(_threads)
-    comprows = None if _comprows == -1 or _comprows == None else int(_comprows)
-    query_slot_count = None if _query_slot_count == -1 or _query_slot_count == None else int(_query_slot_count)
-    ssl_option = False if _ssl_option == None else _ssl_option
-    report_file = False if _report_file == None else _report_file
+    threads = 1 if _threads is None else int(_threads)
+    comprows = None if _comprows == -1 or _comprows is None else int(_comprows)
+    query_slot_count = None if _query_slot_count == -1 or _query_slot_count is None else int(_query_slot_count)
+    ssl_option = False if _ssl_option is None else _ssl_option
+    report_file = False if _report_file is None else _report_file
 
-    if (debug == True):
+    if debug == True:
         comment("Redshift Column Encoding Utility Configuration")
-        comment("output_file: %s " % (output_file))
-        comment("db: %s " % (db))
-        comment("db_user: %s " % (db_user))
-        comment("db_host: %s " % (db_host))
-        comment("db_port: %s " % (db_port))
-        comment("threads: %s " % (threads))
-        comment("analyze_schema: %s " % (analyze_schema))
-        comment("analyze_table: %s " % (analyze_table))
-        comment("new_dist_key: %s " % (new_dist_key))
-        comment("analyze_col: %s " % (analyze_col_width))
-        comment("target_schema: %s " % (target_schema))
-        comment("debug: %s " % (debug))
-        comment("do_execute: %s " % (do_execute))
-        comment("query_slot_count: %s " % (query_slot_count))
-        comment("ignore_errors: %s " % (ignore_errors))
-        comment("force: %s " % (force))
-        comment("drop_old_data: %s " % (drop_old_data))
-        comment("comprows: %s " % (comprows))
-        comment("query_group: %s " % (query_group))
-        comment("ssl_option: %s " % (ssl_option))
-        comment("report_file: %s " % (report_file))
+        comment("output_file: %s " % output_file)
+        comment("db: %s " % db)
+        comment("db_user: %s " % db_user)
+        comment("db_host: %s " % db_host)
+        comment("db_port: %s " % db_port)
+        comment("threads: %s " % threads)
+        comment("analyze_schema: %s " % analyze_schema)
+        comment("analyze_table: %s " % analyze_table)
+        comment("new_dist_key: %s " % new_dist_key)
+        comment("new_sort_keys: %s " % new_sort_keys)
+        comment("analyze_col: %s " % analyze_col_width)
+        comment("target_schema: %s " % target_schema)
+        comment("debug: %s " % debug)
+        comment("do_execute: %s " % do_execute)
+        comment("query_slot_count: %s " % query_slot_count)
+        comment("ignore_errors: %s " % ignore_errors)
+        comment("force: %s " % force)
+        comment("drop_old_data: %s " % drop_old_data)
+        comment("comprows: %s " % comprows)
+        comment("query_group: %s " % query_group)
+        comment("ssl_option: %s " % ssl_option)
+        comment("report_file: %s " % report_file)
     
     
 def run():
@@ -884,17 +907,17 @@ def run():
     output_file_handle = open(output_file, 'w')
 
     # open the file to store report
-    if (report_file):
+    if report_file:
         report_file_handle = open(report_file, 'w')
     
     # get a connection for the controlling processes
     master_conn = get_pg_conn()
     
-    if master_conn == None or master_conn == ERROR:
+    if master_conn is None or master_conn == ERROR:
         return NO_CONNECTION
     
     comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
-    if analyze_table != None:
+    if analyze_table is not None:
         snippet = "Table '%s'" % analyze_table        
     else:
         snippet = "Schema '%s'" % analyze_schema
@@ -913,7 +936,7 @@ def run():
     else:
         pass
     
-    if analyze_table != None:        
+    if analyze_table is not None:        
         statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
@@ -942,7 +965,7 @@ order by 2;
     
     query_result = execute_query(statement)
     
-    if query_result == None:
+    if query_result is None:
         comment("Unable to issue table query - aborting")
         return ERROR
     
@@ -957,7 +980,7 @@ order by 2;
 
     result = []
     
-    if analyze_tables != None:   
+    if analyze_tables is not None:   
         # we'll use a Pool to process all the tables with multiple threads, or just sequentially if 1 thread is requested         
         if threads > 1:
             # setup executor pool
@@ -997,7 +1020,7 @@ order by 2;
             return_code = ret
             fk_commands = None
         
-        if fk_commands != None and len(fk_commands) > 0:
+        if fk_commands is not None and len(fk_commands) > 0:
             print_statements(fk_commands)
             
             if do_execute:
@@ -1012,7 +1035,7 @@ order by 2;
     
     comment("Performed modification of %s tables" % modified_tables)
     
-    if (do_execute):
+    if do_execute:
         if not master_conn.commit():
             return ERROR
     
@@ -1033,6 +1056,7 @@ def main(argv):
     analyze_schema = None
     analyze_table = None
     new_dist_key = None
+    new_sort_keys = None
     analyze_col_width = None
     target_schema = None
     debug = None
@@ -1046,7 +1070,7 @@ def main(argv):
     ssl_option = None
     report_file = None
     
-    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= report-file="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= report-file="""
     
     # extract the command line arguments
     try:
@@ -1058,44 +1082,47 @@ def main(argv):
     # parse command line arguments
     for arg, value in optlist:
         if arg == "--db":
-            if value == '' or value == None:
+            if value == '' or value is None:
                 usage()
             else:
                 db = value
         elif arg == "--db-user":
-            if value == '' or value == None:
+            if value == '' or value is None:
                 usage()
             else:
                 db_user = value               
         elif arg == "--db-host":
-            if value == '' or value == None:
+            if value == '' or value is None:
                 usage()
             else:
                 db_host = value
         elif arg == "--db-port":
-            if value != '' and value != None:
+            if value != '' and value is not None:
                 db_port = int(value)
         elif arg == "--db-pwd":
-            if value != '' and value != None:
+            if value != '' and value is not None:
                 db_pwd = value
         elif arg == "--analyze-schema":
-            if value != '' and value != None:
+            if value != '' and value is not None:
                 analyze_schema = value
         elif arg == "--analyze-table":
-            if value != '' and value != None:
+            if value != '' and value is not None:
                 analyze_table = value
         elif arg == "--new-dist-key":
-            if value != '' and value != None:
+            if value != '' and value is not None:
                 new_dist_key = value
+        elif arg == "--new-sort-keys":
+            if value != '' and value is not None:
+                new_sort_keys = value
         elif arg == "--analyze-cols":
-            if value != '' and value != None:
+            if value != '' and value is not None:
                 analyze_col_width = value
                 
         elif arg == "--target-schema":
-            if value != '' and value != None:
+            if value != '' and value is not None:
                 target_schema = value
         elif arg == "--threads":
-            if value != '' and value != None:
+            if value != '' and value is not None:
                 threads = int(value)
         elif arg == "--debug":
             if value == 'true' or value == 'True':
@@ -1103,7 +1130,7 @@ def main(argv):
             else:
                 debug = False
         elif arg == "--output-file":
-            if value == '' or value == None:
+            if value == '' or value is None:
                 usage()
             else:
                 output_file = value
@@ -1132,7 +1159,7 @@ def main(argv):
         elif arg == "--comprows":
             comprows = int(value)
         elif arg == "--query_group":
-            if value != '' and value != None:
+            if value != '' and value is not None:
                 query_group = value
         elif arg == "--ssl-option":
             if value == 'true' or value == 'True':
@@ -1140,7 +1167,7 @@ def main(argv):
             else:
                 ssl_option = False
         elif arg == "--report-file":
-            if value == '' or value == None:
+            if value == '' or value is None:
                 report_file = False
             else:
                 report_file = value
@@ -1149,23 +1176,23 @@ def main(argv):
             usage()
     
     # Validate that we've got all the args needed
-    if db == None:
+    if db is None:
         usage("Missing Parameter 'db'")
-    if db_user == None:
+    if db_user is None:
         usage("Missing Parameter 'db-user'")
-    if db_host == None:        
+    if db_host is None:        
         usage("Missing Parameter 'db-host'")
-    if db_port == None:        
+    if db_port is None:        
         usage("Missing Parameter 'db-port'")
-    if output_file == None:
+    if output_file is None:
         usage("Missing Parameter 'output-file'")
-    if analyze_schema == None:
+    if analyze_schema is None:
         analyze_schema = 'public'
-    if target_schema == None:
+    if target_schema is None:
         target_schema = analyze_schema
         
     # Reduce to 1 thread if we're analyzing a single table
-    if analyze_table != None:
+    if analyze_table is not None:
         threads = 1
         
     # get the database password
@@ -1173,7 +1200,7 @@ def main(argv):
         db_pwd = getpass.getpass("Password <%s>: " % db_user)
     
     # setup the configuration
-    configure(output_file, db, db_user, db_pwd, db_host, db_port, analyze_schema, target_schema, analyze_table, new_dist_key, analyze_col_width, threads, do_execute, query_slot_count, ignore_errors, force, drop_old_data, comprows, query_group, debug, ssl_option, report_file)
+    configure(output_file, db, db_user, db_pwd, db_host, db_port, analyze_schema, target_schema, analyze_table, new_dist_key, new_sort_keys, analyze_col_width, threads, do_execute, query_slot_count, ignore_errors, force, drop_old_data, comprows, query_group, debug, ssl_option, report_file)
     
     # run the analyser
     result_code = run()

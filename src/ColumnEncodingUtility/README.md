@@ -72,9 +72,9 @@ Within a given queue, each session will be given a single concurrency slot. In s
 
 By default, the ANALYZE COMPRESSION command will attempt to analyze 100,000 rows across all Slices on the Cluster. For some types of data, you may wish to increase this value to get better coverage across all rows stored in the table.
 
-### Updates to Distribution Keys
+### Updates to Distribution and Sort Keys
 
-If you specify the `new-dist-key` option when setting `analyze-table`, you can change the table's distribution key during encoding management. This is a very simple option that allows you to react to changes in how internal customers use tables, and ensure that data is optimally distributed around the cluster. Please note that if for some reason you specify an invalid new distribution key, the utility will fail to run.
+If you specify the `new-dist-key` or `new-sort-keys` options when setting `analyze-table`, you can change the table's distribution or sort keys during encoding management. This is a very simple option that allows you to react to changes in how internal customers use tables, and ensure that data is optimally distributed around the cluster. Please note that if for some reason you specify an invalid new distribution or sort key value, the utility will fail to run. Also note these options are ignored unless you set the `analyze-table` option.
 
 ### Do Execute
 
