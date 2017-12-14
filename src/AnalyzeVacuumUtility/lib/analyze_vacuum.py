@@ -1,11 +1,12 @@
 from __future__ import print_function
 
 import os
-import sys
 import re
+import sys
+import traceback
+
 import datetime
 import pg8000
-import traceback
 
 # set default values to vacuum, analyze variables
 goback_no_of_days = -1
@@ -21,23 +22,7 @@ NO_WORK = 3
 TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
-# default settings for parameters
-_schema_name = 'public'
-_query_slot_count = 1
-_ignore_errors = False
-_analyze_flag = True
-_vacuum_flag = True
-_vacuum_parameter = 'FULL'
-_require_ssl = False
-_predicate_cols = False
-_min_unsorted_pct = 5
-_max_unsorted_pct = 50
-_deleted_pct = 5
-_stats_off_pct = 10
-_max_table_size_mb = (700 * 1024)
-_min_interleaved_skew = 1.4
-_min_interleaved_cnt = 0
-
+debug = False
 
 def execute_query(conn, query):
     cursor = conn.cursor()
@@ -86,7 +71,8 @@ def print_statements(statements):
                 print(s)
 
 
-def get_pg_conn(db_host, db_port, db, db_user, db_pwd, schema_name, query_group, query_slot_count, ssl_option):
+def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_group=None, query_slot_count=1,
+                ssl_option=True, **kwargs):
     conn = None
 
     if debug:
@@ -147,6 +133,8 @@ def get_pg_conn(db_host, db_port, db, db_user, db_pwd, schema_name, query_group,
 
     run_commands(conn, [set_timeout])
 
+    comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
+
     return conn
 
 
@@ -168,18 +156,19 @@ def run_commands(conn, commands):
 
 
 def run_vacuum(conn,
-               schema_name,
-               table_name,
-               blacklisted_tables,
-               ignore_errors,
-               vacuum_parameter,
-               min_unsorted_pct,
-               max_unsorted_pct,
-               deleted_pct,
-               stats_off_pct,
-               max_table_size_mb,
-               min_interleaved_skew,
-               min_interleaved_cnt):
+               schema_name='public',
+               table_name=None,
+               blacklisted_tables=None,
+               ignore_errors=False,
+               vacuum_parameter=True,
+               min_unsorted_pct=5,
+               max_unsorted_pct=50,
+               deleted_pct=5,
+               stats_off_pct=10,
+               max_table_size_mb=(700 * 1024),
+               min_interleaved_skew=1.4,
+               min_interleaved_cnt=0,
+               **kwargs):
     statements = []
 
     if table_name is not None:
@@ -365,7 +354,9 @@ def run_vacuum(conn,
     return True
 
 
-def run_analyze(conn, schema_name, table_name, ignore_errors, predicate_cols, stats_off_pct):
+def run_analyze(conn, schema_name='public', table_name=None, ignore_errors=False, predicate_cols=False,
+                stats_off_pct=10,
+                **kwargs):
     statements = []
 
     if predicate_cols:
@@ -385,7 +376,7 @@ def run_analyze(conn, schema_name, table_name, ignore_errors, predicate_cols, st
                                                 ''' % (predicate_cols_option, stats_off_pct, schema_name, table_name,)
     else:
         # query for all tables in the schema
-        comment("Extracting Candidate Tables for analyze based on Query Optimizer Alerts(Feedbacks) ...")
+        comment("Extracting Candidate Tables for analyze based on Query Optimizer Alerts...")
 
         get_analyze_statement_feedback = '''
                                     SELECT DISTINCT 'analyze ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '"' + '%s ; ' + '/* ' + ' Table Name : ' + info_tbl."schema" + '."' + info_tbl."table" + '", Stats_Off : ' + CAST(info_tbl."stats_off" AS VARCHAR(10)) + ' */ ;'
@@ -400,8 +391,8 @@ def run_analyze(conn, schema_name, table_name, ignore_errors, predicate_cols, st
                                                WHERE a.query = b.query
                                                AND   CAST(b.starttime AS DATE) >= dateadd(DAY,%s,CURRENT_DATE)
                                                AND   a.userid > 1
-                                               AND   a.plannode LIKE '%%missing statistics%%'
-                                               AND   a.plannode NOT LIKE '%%_bkp_%%'
+                                               AND   regexp_instr(a.plannode,'.*missing statistics.*') > 0
+                                               AND   regexp_instr(a.plannode,'.*_bkp_.*') = 0
                                                GROUP BY Table_Name) miss_tbl 
                                                LEFT JOIN pg_class c ON c.relname = TRIM(miss_tbl.table_name) 
                                                LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE miss_tbl.qry_rnk <= %s 
@@ -426,7 +417,7 @@ def run_analyze(conn, schema_name, table_name, ignore_errors, predicate_cols, st
                                                        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                                                      WHERE l.userid > 1
                                                      AND   l.event_time >= dateadd(DAY,%s,CURRENT_DATE)
-                                                     AND   l.Solution LIKE '%%ANALYZE command%%'
+                                                     AND   regexp_instr(l.Solution,'.*ANALYZE command.*') > 0
                                                      GROUP BY TRIM(n.nspname),
                                                               TRIM(c.relname)) anlyz_tbl
                                                WHERE anlyz_tbl.qry_rnk < %s 
@@ -493,85 +484,38 @@ def run_analyze(conn, schema_name, table_name, ignore_errors, predicate_cols, st
                     return ERROR
     return True
 
-def run_analyze_vacuum(db_host,
-                       db_port,
-                       db_user,
-                       db_pwd,
-                       db,
-                       query_group,
-                       query_slot_count,
-                       vacuum_flag,
-                       analyze_flag,
-                       schema_name,
-                       table_name,
-                       blacklisted_tables,
-                       ignore_errors,
-                       ssl_option,
-                       set_debug,
-                       vacuum_parameter,
-                       min_unsorted_pct,
-                       max_unsorted_pct,
-                       deleted_pct,
-                       stats_off_pct,
-                       predicate_cols,
-                       max_table_size_mb,
-                       min_interleaved_skew,
-                       min_interleaved_cnt):
-    global debug
-    debug = set_debug
 
+def run_analyze_vacuum(**kwargs):
+    global debug
     if 'DEBUG' in os.environ:
         debug = os.environ['DEBUG']
+    if 'debug' in kwargs and kwargs['debug']:
+        debug = True
 
     # get a connection for the controlling processes
-    master_conn = get_pg_conn(db_host,
-                              db_port,
-                              db,
-                              db_user,
-                              db_pwd,
-                              schema_name,
-                              query_group,
-                              query_slot_count,
-                              ssl_option)
+    master_conn = get_pg_conn(**kwargs)
 
     if master_conn is None:
         sys.exit(NO_CONNECTION)
 
-    comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
-
+    blacklisted_tables = kwargs['blacklisted_tables'] if "blacklisted_tables" in kwargs else None
     if blacklisted_tables is not None and len(blacklisted_tables) > 0:
         comment("The blacklisted tables are: %s" % (str(blacklisted_tables)))
 
-    if vacuum_flag is True:
+    vacuum_flag = kwargs['vacuum_flag'] if 'vacuum_flag' in kwargs else False
+    if vacuum_flag:
         # Run vacuum based on the Unsorted , Stats off and Size of the table
-        run_vacuum(master_conn,
-                   schema_name if schema_name is not None else _schema_name,
-                   table_name,
-                   blacklisted_tables,
-                   ignore_errors if ignore_errors is not None else _ignore_errors,
-                   vacuum_parameter if vacuum_parameter is not None else _vacuum_parameter,
-                   min_unsorted_pct if min_unsorted_pct is not None else _min_unsorted_pct,
-                   max_unsorted_pct if max_unsorted_pct is not None else _max_unsorted_pct,
-                   deleted_pct if deleted_pct is not None else _deleted_pct,
-                   stats_off_pct if stats_off_pct is not None else _stats_off_pct,
-                   max_table_size_mb if max_table_size_mb is not None else _max_table_size_mb,
-                   min_interleaved_skew if min_interleaved_skew is not None else _min_interleaved_skew,
-                   min_interleaved_cnt if min_interleaved_cnt is not None else _min_interleaved_cnt)
+        run_vacuum(master_conn, **kwargs)
     else:
-        comment("Vacuum flag arg is set as %s. Vacuum is not performed." % vacuum_flag)
+        comment("Vacuum flag arg is not set. Vacuum not performed.")
 
-    if analyze_flag is True:
-        if vacuum_flag is False:
+    analyze_flag = kwargs['analyze_flag'] if 'analyze_flag' in kwargs else False
+    if analyze_flag:
+        if not vacuum_flag:
             comment("Warning - Analyze without Vacuum may result in sub-optimal performance")
 
         # Run Analyze based on the  Stats off Metrics table
-        run_analyze(master_conn,
-                    schema_name if schema_name is not None else _schema_name,
-                    table_name,
-                    ignore_errors if ignore_errors is not None else _ignore_errors,
-                    predicate_cols if predicate_cols is not None else _predicate_cols,
-                    stats_off_pct if stats_off_pct is not None else _stats_off_pct,
-                    )
+        run_analyze(master_conn, **kwargs)
     else:
         comment("Analyze flag arg is set as %s. Analyze is not performed." % analyze_flag)
 

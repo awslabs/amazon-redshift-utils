@@ -34,6 +34,7 @@ Srinikri Amazon Web Services (2015)
 11/21/2015 : Added support for vacuum reindex to analyze the interleaved sort keys.
 09/01/2017 : Fixed issues with interleaved sort key tables per https://github.com/awslabs/amazon-redshift-utils/issues/184
 11/09/2017 : Refactored to support running in AWS Lambda
+14/12/2017 : Refactored to support a more sensible interface style with kwargs
 '''
 import os
 import sys
@@ -47,7 +48,7 @@ except:
 import getopt
 import analyze_vacuum
 
-__version__ = ".9.1.4"
+__version__ = ".9.1.5"
 
 OK = 0
 ERROR = 1
@@ -99,31 +100,6 @@ def usage(with_message=None):
 
 
 def main(argv):
-    db = get_env_var('PGDATABASE', None)
-    db_user = get_env_var('PGUSER', None)
-    db_pwd = get_env_var('PGPASSWORD', None)
-    db_host = get_env_var('PGHOST', None)
-    db_port = get_env_var('PGPORT', 5439)
-    query_group = None
-    schema_name = None
-    table_name = None
-    blacklisted_tables = None
-    debug = False
-    query_slot_count = None
-    ignore_errors = None
-    analyze_flag = True
-    vacuum_flag = True
-    vacuum_parameter = None
-    require_ssl = None
-    predicate_cols = None
-    min_unsorted_pct = None
-    max_unsorted_pct = None
-    deleted_pct = None
-    stats_off_pct = None
-    max_table_size_mb = None
-    min_interleaved_skew = None
-    min_interleaved_cnt = None
-
     supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= blacklisted-tables= require-ssl= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= predicate-cols= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
 
     # extract the command line arguments
@@ -133,135 +109,122 @@ def main(argv):
         print(str(err))
         usage()
 
-    output_file = None
+    args={}
+    args['db'] = get_env_var('PGDATABASE', None)
+    args['db_user'] = get_env_var('PGUSER', None)
+    args['db_pwd'] = get_env_var('PGPASSWORD', None)
+    args['db_host'] = get_env_var('PGHOST', None)
+    args['db_port'] = get_env_var('PGPORT', 5439)
 
     # parse command line arguments
     for arg, value in optlist:
         if arg == "--db":
-            if value == '' or value is None:
+            if value == '':
                 usage()
             else:
-                db = value
+                args['db'] = value
         elif arg == "--db-user":
-            if value == '' or value is None:
+            if value == '':
                 usage()
             else:
-                db_user = value
+                args['db_user'] = value
         elif arg == "--db-pwd":
-            if value == '' or value is None:
+            if value == '':
                 usage()
             else:
-                db_pwd = value
+                args['db_pwd'] = value
         elif arg == "--db-host":
-            if value == '' or value is None:
+            if value == '':
                 usage()
             else:
-                db_host = value
+                args['db_host'] = value
         elif arg == "--db-port":
             if value != '' and value is not None:
-                db_port = value
+                args['db_port'] = int(value)
         elif arg == "--require-ssl":
             if value != '' and value is not None:
                 if value.upper() == 'TRUE' or value == '1':
-                    require_ssl = True
+                    args['require_ssl'] = True
         elif arg == "--schema-name":
             if value != '' and value is not None:
-                schema_name = value
+                args['schema_name'] = value
         elif arg == "--table-name":
             if value != '' and value is not None:
-                table_name = value
+                args['table_name'] = value
         elif arg == "--blacklisted-tables":
             if value != '' and value is not None:
-                blacklisted_tables = value
+                args['blacklisted_tables'] = value
         elif arg == "--debug":
             if value.upper() == 'TRUE':
-                debug = True
+                args['debug'] = True
         elif arg == "--output-file":
-            output_file = value
+            # open the supplied file path and bind it to stdout
+            sys.stdout = open(value,'w')
         elif arg == "--ignore-errors":
             if value.upper() == 'TRUE':
-                ignore_errors = True
+                args['ignore_errors'] = True
         elif arg == "--slot-count":
-            query_slot_count = int(value)
+                args['query_slot_count'] = int(value)
         elif arg == "--query_group":
             if value != '' and value is not None:
-                query_group = value
+                args['query_group'] = value
         elif arg == "--vacuum-flag":
             if value.upper() == 'FALSE':
-                vacuum_flag = False
+                args['vacuum_flag'] = False
+            else:
+                args['vacuum_flag'] = True
         elif arg == "--analyze-flag":
             if value.upper() == 'FALSE':
-                analyze_flag = False
+                args['analyze_flag'] = False
+            else:
+                args['analyze_flag'] = True
         elif arg == "--vacuum-parameter":
             if value.upper() == 'SORT ONLY' or value.upper() == 'DELETE ONLY' or value.upper() == 'REINDEX':
-                vacuum_parameter = value
+                args['vacuum_parameter'] = value
         elif arg == "--min-unsorted-pct":
             if value != '' and value is not None:
-                min_unsorted_pct = value
+                args['min_unsorted_pct'] = value
         elif arg == "--max-unsorted-pct":
             if value != '' and value is not None:
-                max_unsorted_pct = value
+                args['max_unsorted_pct'] = value
         elif arg == "--deleted-pct":
             if value != '' and value is not None:
-                deleted_pct = value
+                args['deleted_pct'] = value
         elif arg == "--stats-off-pct":
             if value != '' and value is not None:
-                stats_off_pct = value
+                args['stats_off_pct'] = value
         elif arg == "--predicate-cols":
             if value.upper() == 'TRUE':
-                predicate_cols = True
+                args['predicate_cols'] = True
         elif arg == "--max-table-size-mb":
             if value != '' and value is not None:
-                max_table_size_mb = value
+                args['max_table_size_mb'] = value
         elif arg == "--min-interleaved-skew":
             if value != '' and value is not None:
-                min_interleaved_skew = value
+                args['min_interleaved_skew'] = value
         elif arg == "--min-interleaved-cnt":
             if value != '' and value is not None:
-                min_interleaved_cnt = value
+                args['min_interleaved_cnt'] = value
         else:
             usage("Unsupported Argument " + arg)
 
     # Validate that we've got all the args needed
-    if db is None:
+    if 'db' not in args:
         usage("Missing Parameter 'db'")
-    if db_user is None:
+    if 'db_user' not in args:
         usage("Missing Parameter 'db-user'")
-    if db_pwd is None:
+    if 'db_pwd' not in args:
         usage("Missing Parameter 'db-pwd'")
-    if db_host is None:
+    if 'db_host' not in args:
         usage("Missing Parameter 'db-host'")
-    if db_port is None:
+    if 'db_port' not in args:
         usage("Missing Parameter 'db-port'")
 
-    if output_file is not None:
-        sys.stdout = open(output_file, 'w')
+    if 'output_file' in args:
+        sys.stdout = open(args['output_file'], 'w')
 
     # invoke the main method of the utility
-    result = analyze_vacuum.run_analyze_vacuum(db_host,
-                                               db_port,
-                                               db_user,
-                                               db_pwd,
-                                               db,
-                                               query_group,
-                                               query_slot_count,
-                                               vacuum_flag,
-                                               analyze_flag,
-                                               schema_name,
-                                               table_name,
-                                               blacklisted_tables,
-                                               ignore_errors,
-                                               require_ssl,
-                                               debug,
-                                               vacuum_parameter,
-                                               min_unsorted_pct,
-                                               max_unsorted_pct,
-                                               deleted_pct,
-                                               stats_off_pct,
-                                               predicate_cols,
-                                               max_table_size_mb,
-                                               min_interleaved_skew,
-                                               min_interleaved_cnt)
+    result = analyze_vacuum.run_analyze_vacuum(**args)
 
     if result is not None:
         sys.exit(result)
