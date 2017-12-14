@@ -76,6 +76,7 @@ db_port = get_env_var('PGPORT', 5439)
 analyze_schema = 'public'
 target_schema = None
 analyze_table = None
+new_dist_key = None
 debug = False
 threads = 2
 output_file = None
@@ -472,6 +473,7 @@ def analyze(table_info):
             has_identity = False
             non_identity_columns = []
             fks = []
+            table_distkey = None
 
             # count of suggested optimizations
             count_optimized = 0
@@ -607,12 +609,22 @@ def analyze(table_info):
                         return ERROR    
                 
                             
-                # is this the dist key?
-                distkey = descr[col][3]
-                if str(distkey).upper()[0] == 'T':
-                    distkey = 'DISTKEY'
+                # link in the existing distribution key, or set the new one
+                row_distkey = descr[col][3]
+                if new_dist_key == None:
+                    if str(row_distkey).upper()[0] == 'T':
+                        distkey = 'DISTKEY'
+                        dist_style = 'KEY'
+                        table_distkey = col
+                    else:
+                        distkey = ''
                 else:
-                    distkey = ''
+                    if col == new_dist_key:
+                        distkey = 'DISTKEY'
+                        dist_style = 'KEY'
+                        table_distkey = col
+                    else:
+                        distkey = ''
                     
                 # is this the sort key?
                 sortkey = descr[col][4]
@@ -654,7 +666,13 @@ def analyze(table_info):
                 # add the formatted column specification
                 encode_columns.extend(['"%s" %s %s %s encode %s %s'
                                        % (col, col_type, default_value, col_null, compression, distkey)])
-            
+
+            # abort if a new distkey was set but we couldn't find it in the set of all columns
+            if new_dist_key is not None and table_distkey is None:
+                msg = "Column '%s' not found when setting new Table Distribution Key" % (new_dist_key)
+                comment(msg)
+                raise Exception(msg)
+
             # if this table's encodings have not changed, then don't do a modification, unless force options is set
             if (not force) and (not encodings_modified):
                 comment("Column Encoding resulted in an identical table - no changes will be made")
@@ -765,6 +783,7 @@ def usage(with_message):
     write('           --analyze-schema - The Schema to be Analyzed (default public)')
     write('           --analyze-table  - A specific table to be Analyzed, if --analyze-schema is not desired')
     write('           --analyze-cols   - Analyze column width and reduce the column width if needed')
+    write('           --new-dist-key   - Set a new Distribution Key (only used if --analyze-table is specified)')
     write('           --target-schema  - Name of a Schema into which the newly optimised tables and data should be created, rather than in place')
     write('           --threads        - The number of concurrent connections to use during analysis (default 2)')
     write('           --output-file    - The full path to the output file to be generated')
@@ -782,7 +801,7 @@ def usage(with_message):
 
 
 # method used to configure global variables, so that we can call the run method
-def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze_schema, _target_schema, _analyze_table, _analyze_col_width, _threads, _do_execute, _query_slot_count, _ignore_errors, _force, _drop_old_data, _comprows, _query_group, _debug, _ssl_option, _report_file):
+def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze_schema, _target_schema, _analyze_table, _new_dist_key, _analyze_col_width, _threads, _do_execute, _query_slot_count, _ignore_errors, _force, _drop_old_data, _comprows, _query_group, _debug, _ssl_option, _report_file):
     # setup globals
     global db
     global db_user
@@ -792,6 +811,7 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     global threads
     global analyze_schema
     global analyze_table
+    global new_dist_key
     global analyze_col_width
     global target_schema
     global debug
@@ -815,6 +835,7 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
     db_port = _db_port
     analyze_schema = None if _analyze_schema == "" else _analyze_schema
     analyze_table = None if _analyze_table == "" else _analyze_table
+    new_dist_key = None if _new_dist_key == "" else _new_dist_key
     target_schema = _analyze_schema if _target_schema == "" or _target_schema == None else _target_schema
     analyze_col_width = False if _analyze_col_width == None else _analyze_col_width
     debug = False if _debug == None else _debug    
@@ -839,6 +860,7 @@ def configure(_output_file, _db, _db_user, _db_pwd, _db_host, _db_port, _analyze
         comment("threads: %s " % (threads))
         comment("analyze_schema: %s " % (analyze_schema))
         comment("analyze_table: %s " % (analyze_table))
+        comment("new_dist_key: %s " % (new_dist_key))
         comment("analyze_col: %s " % (analyze_col_width))
         comment("target_schema: %s " % (target_schema))
         comment("debug: %s " % (debug))
@@ -1010,6 +1032,7 @@ def main(argv):
     threads = None
     analyze_schema = None
     analyze_table = None
+    new_dist_key = None
     analyze_col_width = None
     target_schema = None
     debug = None
@@ -1023,7 +1046,7 @@ def main(argv):
     ssl_option = None
     report_file = None
     
-    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= report-file="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= report-file="""
     
     # extract the command line arguments
     try:
@@ -1061,6 +1084,9 @@ def main(argv):
         elif arg == "--analyze-table":
             if value != '' and value != None:
                 analyze_table = value
+        elif arg == "--new-dist-key":
+            if value != '' and value != None:
+                new_dist_key = value
         elif arg == "--analyze-cols":
             if value != '' and value != None:
                 analyze_col_width = value
@@ -1147,7 +1173,7 @@ def main(argv):
         db_pwd = getpass.getpass("Password <%s>: " % db_user)
     
     # setup the configuration
-    configure(output_file, db, db_user, db_pwd, db_host, db_port, analyze_schema, target_schema, analyze_table, analyze_col_width, threads, do_execute, query_slot_count, ignore_errors, force, drop_old_data, comprows, query_group, debug, ssl_option, report_file)
+    configure(output_file, db, db_user, db_pwd, db_host, db_port, analyze_schema, target_schema, analyze_table, new_dist_key, analyze_col_width, threads, do_execute, query_slot_count, ignore_errors, force, drop_old_data, comprows, query_group, debug, ssl_option, report_file)
     
     # run the analyser
     result_code = run()
