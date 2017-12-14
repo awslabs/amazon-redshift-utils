@@ -24,6 +24,7 @@ NO_CONNECTION = 5
 
 debug = False
 
+
 def execute_query(conn, query):
     cursor = conn.cursor()
     cursor.execute(query)
@@ -79,12 +80,9 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
         comment('Connect %s:%s:%s:%s' % (db_host, db_port, db, db_user))
 
     try:
-        conn = pg8000.connect(user=db_user,
-                              host=db_host,
-                              port=int(db_port),
-                              database=db,
-                              password=db_pwd,
-                              ssl=ssl_option)
+        conn = pg8000.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd,
+                              ssl=ssl_option, timeout=None, keepalives=1, keepalives_idle=200,
+                              keepalives_interval=200, keepalives_count=5)
         conn.autocommit = True
     except Exception as e:
         print("Exception on Connect to Cluster: %s" % e)
