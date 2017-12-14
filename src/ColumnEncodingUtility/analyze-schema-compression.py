@@ -190,7 +190,7 @@ def get_pg_conn():
             comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
         
         try:
-            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd, ssl=ssl_option, timeout=None)
+            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd, ssl=ssl_option, timeout=None, keepalives=1, keepalives_idle=200, keepalives_interval=200, keepalives_count=5)
         except Exception as e:
             write(e)
             write('Unable to connect to Cluster Endpoint')
