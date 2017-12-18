@@ -22,6 +22,7 @@ History:
 		object. Also added schemaname and objname columns.
 2017-12-17	adedotua added sequence column to order grant or revoke DDLs in order of heirarchy.
 2017-12-17	adedotua added schema name admin
+2017-12-18	adedotua added case statement for revoke DDLs to account for situations where the grantor is not object owner 
 		
 		
 		
@@ -68,9 +69,12 @@ from pg_proc c join schemas sc on c.pronamespace=sc.oid,grantor g,grantee u
 where  aclcontains(c.proacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'EXECUTE',false))
 UNION ALL
 -- Functions revokes
-select pg_get_userbyid(c.proowner),sc.nspname,textin(regprocedureout(c.oid::regprocedure)),g.usename,u.usename,'Function','revoke',1,
+select pg_get_userbyid(c.proowner),sc.nspname,textin(regprocedureout(c.oid::regprocedure)),g.usename,u.usename,'Function','revoke',
+CASE WHEN (g.usename <> pg_get_userbyid(c.proowner) and g.usename<> 'rdsdb') THEN 1::int ELSE 2::int END,
+CASE WHEN (g.usename <> pg_get_userbyid(c.proowner) and g.usename<> 'rdsdb') THEN 'set session authorization '||g.usename||'; ' ELSE '' END::text||
 'revoke execute on function '||sc.nspname||'.'||textin(regprocedureout(c.oid::regprocedure))||
-CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||CASE WHEN g.usename <> pg_get_userbyid(c.proowner) THEN ' -- revoke this object as '||g.usename ELSE '' END::text
+CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||
+CASE WHEN (g.usename <> current_user and g.usename<> 'rdsdb') THEN 'reset session authorization;' ELSE '' END::text 
 from pg_proc c join schemas sc on c.pronamespace=sc.oid,grantor g,grantee u
 where  aclcontains(c.proacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'EXECUTE',false)) 
 UNION ALL
@@ -83,9 +87,12 @@ from pg_language c,grantor g,grantee u
 where aclcontains(c.lanacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'USAGE',false)) 
 UNION ALL
 -- Language revokes
-select null,null,c.lanname,g.usename,u.usename,'Language','revoke',2,
+select null,null,c.lanname,g.usename,u.usename,'Language','revoke',
+CASE WHEN (g.usename <> current_user and g.usename<> 'rdsdb') THEN 2::int ELSE 3::int END,
+CASE WHEN (g.usename <> current_user and g.usename<>'rdsdb') THEN 'set session authorization '||g.usename||'; ' ELSE '' END::text||
 'revoke usage on language '||c.lanname||
-CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||CASE WHEN (g.usename <> current_user) and (g.usename<>'rdsdb') THEN ' -- revoke this object as '||g.usename ELSE '' END::text
+CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||
+CASE WHEN (g.usename <> current_user and g.usename<> 'rdsdb') THEN 'reset session authorization;' ELSE '' END::text 
 from pg_language c,grantor g,grantee u
 where aclcontains(c.lanacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'USAGE',false)) 
 UNION ALL
@@ -98,9 +105,12 @@ from pg_class c join schemas sc on c.relnamespace=sc.oid, grantor g,grantee u,ta
 where aclcontains(c.relacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,t.type,false)) 
 UNION ALL
 --Tables revokes
-select distinct pg_get_userbyid(c.relowner),sc.nspname,c.relname,g.usename,u.usename,'Table/View','revoke',1,
+select distinct pg_get_userbyid(c.relowner),sc.nspname,c.relname,g.usename,u.usename,'Table/View','revoke',
+CASE WHEN (g.usename <> pg_get_userbyid(c.relowner) and g.usename<> 'rdsdb') THEN 1::int ELSE 2::int END,
+CASE WHEN (g.usename <> pg_get_userbyid(c.relowner) and g.usename<>'rdsdb') THEN 'set session authorization '||g.usename||'; ' ELSE '' END::text||
 'revoke all on '||sc.nspname||'.'||c.relname||
-CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||CASE WHEN g.usename <> pg_get_userbyid(c.relowner) THEN ' -- revoke this object as '||g.usename ELSE '' END::text
+CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||
+CASE WHEN (g.usename <> pg_get_userbyid(c.relowner) and g.usename<> 'rdsdb') THEN 'reset session authorization;' ELSE '' END::text 
 from pg_class c join schemas sc on c.relnamespace=sc.oid, grantor g,grantee u
 where EXISTS (
 select 1 WHERE aclcontains(c.relacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'SELECT',false))
@@ -122,9 +132,12 @@ from pg_namespace c, grantor g,grantee u,schemaprivs s
 where  aclcontains(c.nspacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,s.type,false))
 UNION ALL
 -- Schema revokes
-select pg_get_userbyid(c.nspowner),null,c.nspname,g.usename,u.usename,'Schema','revoke',2,
+select pg_get_userbyid(c.nspowner),null,c.nspname,g.usename,u.usename,'Schema','revoke',
+CASE WHEN (g.usename <> pg_get_userbyid(c.nspowner) and g.usename<> 'rdsdb') THEN 2::int ELSE 3::int END,
+CASE WHEN (g.usename <> pg_get_userbyid(c.nspowner) and g.usename<>'rdsdb') THEN 'set session authorization '||g.usename||'; ' ELSE '' END::text||
 'revoke all on schema '||c.nspname||
-CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||CASE WHEN g.usename <> pg_get_userbyid(c.nspowner) THEN ' -- revoke this object as '||g.usename ELSE '' END::text
+CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||
+CASE WHEN (g.usename <> pg_get_userbyid(c.nspowner) and g.usename<> 'rdsdb') THEN 'reset session authorization;' ELSE '' END::text 
 from pg_namespace c, grantor g,grantee u
 where  exists 
 (select 1 where aclcontains(c.nspacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'CREATE',false))
@@ -140,9 +153,12 @@ from pg_database c, grantor g,grantee u,dbprivs d
 where  aclcontains(c.datacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,d.type,false))
 UNION ALL
 -- Database revokes
-select pg_get_userbyid(c.datdba),null,c.datname,g.usename,u.usename,'Database','revoke',3,
+select pg_get_userbyid(c.datdba),null,c.datname,g.usename,u.usename,'Database','revoke',
+CASE WHEN (g.usename <> pg_get_userbyid(c.datdba) and g.usename<> 'rdsdb') THEN 3::int ELSE 4::int END,
+CASE WHEN (g.usename <> pg_get_userbyid(c.datdba) and g.usename<>'rdsdb') THEN 'set session authorization '||g.usename||'; ' ELSE '' END::text||
 'revoke all on database '||c.datname||
-CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||CASE WHEN g.usename <> pg_get_userbyid(c.datdba) THEN ' -- revoke this object as '||g.usename ELSE '' END::text
+CASE WHEN u.usesysid>1 THEN ' from ' ELSE ' from group ' END||u.usename||';'||
+CASE WHEN (g.usename <> pg_get_userbyid(c.datdba) and g.usename<> 'rdsdb') THEN 'reset session authorization;' ELSE '' END::text 
 from pg_database c, grantor g,grantee u 
 where  exists 
 (select 1 where aclcontains(c.datacl, makeaclitem(u.usesysid,u.grosysid,g.usesysid,'CREATE',false))
