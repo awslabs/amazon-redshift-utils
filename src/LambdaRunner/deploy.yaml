@@ -24,6 +24,11 @@ Parameters:
     Description: Cron expression for when to run the Analyze Vacuum Utility (default 1 am daily)
     Type: String
     AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+  MonitorCronExpression:
+    Default: 5 * * * ? *
+    Description: Cron expression for when to run Monitoring (default 5 minutes past every hour)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
 Resources:
   LambdaRedshiftAutomation:
     Type: AWS::Serverless::Function
@@ -32,7 +37,7 @@ Resources:
       Runtime: python2.7
       CodeUri:
         Bucket: !Sub awslabs-code-${AWS::Region}
-        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip
+        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.2.zip
       MemorySize: 192
       Timeout: 300
       Tags:
@@ -72,6 +77,7 @@ Resources:
                   Action:
                     - "s3:GetObject"
                     - "kms:Decrypt"
+                    - "cloudwatch:PutMetricData"
                   Resource: "*"
   AnalyzeVacuumEventRule:
     Type: "AWS::Events::Rule"
@@ -97,6 +103,7 @@ Resources:
       Principal: events.amazonaws.com
       SourceAccount: !Ref 'AWS::AccountId'
       SourceArn: !GetAtt AnalyzeVacuumEventRule.Arn
+
   ColumnEncodingEventRule:
     Type: "AWS::Events::Rule"
     Properties:
@@ -121,3 +128,28 @@ Resources:
       Principal: events.amazonaws.com
       SourceAccount: !Ref 'AWS::AccountId'
       SourceArn: !GetAtt ColumnEncodingEventRule.Arn
+
+  MonitoringEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to Invoke Lambda Runner - Redshift Monitoring
+      Name: InvokeLambdaRedshiftRunner-MonitoringUtility
+      ScheduleExpression: !Sub cron(${MonitorCronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: RedshiftMonitoringUtility
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"Monitoring",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeMonitoringPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt MonitoringEventRule.Arn
