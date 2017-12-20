@@ -17,6 +17,8 @@ except:
 import aws_utils
 import config_constants
 
+__version__ = ".9.1.5"
+
 # set default values to vacuum, analyze variables
 goback_no_of_days = -1
 query_rank = 25
@@ -138,6 +140,14 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
         comment(set_timeout)
 
     run_commands(conn, [set_timeout])
+
+    # set application name
+    set_name = "set application_name to 'AnalyzeVacuumUtility-v%s'" % __version__
+
+    if debug:
+        comment(set_name)
+
+    run_commands(conn, [set_name])
 
     comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
 
