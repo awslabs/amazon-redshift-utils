@@ -35,7 +35,6 @@ SUPPRESS_CLOUDWATCH = "suppress_cw"
 MAX_TBL_SIZE_MB = "max_table_size_mb"
 MIN_INTERLEAVED_SKEW = "min_interleaved_skew"
 MIN_INTERLEAVED_COUNT = "min_interleaved_count"
-CMK_ALIAS = "cmk_alias"
 
 config_aliases = {
     "db": ["db", "DatabaseName"],
