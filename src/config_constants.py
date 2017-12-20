@@ -35,6 +35,7 @@ SUPPRESS_CLOUDWATCH = "suppress_cw"
 MAX_TBL_SIZE_MB = "max_table_size_mb"
 MIN_INTERLEAVED_SKEW = "min_interleaved_skew"
 MIN_INTERLEAVED_COUNT = "min_interleaved_count"
+KMS_AUTH_CONTEXT = "kms_auth_context"
 
 config_aliases = {
     "db": ["db", "DatabaseName"],
