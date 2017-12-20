@@ -11,6 +11,7 @@ Parameters:
     AllowedValues:
       - AnalyzeVacuumUtility
       - ColumnEncodingUtility
+      - Monitoring
   S3ConfigPath:
     Default: s3://my-bucket/prefix/config-file.json
     Description: Configuration File for this Utility instance
