@@ -51,8 +51,13 @@ import pg8000
 import shortuuid
 import time
 
-sys.path.append("..")
+try:
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+except:
+    pass
+
 import aws_utils
+import config_constants
 
 thismodule = sys.modules[__name__]
 
@@ -72,20 +77,19 @@ RETRY_TIMEOUT = 100. / 1000
 IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \(?\'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
 
 
-def get_env_var(name, defaultVal):
-    return os.environ[name] if name in os.environ else defaultVal
+def get_env_var(name, default_value):
+    return os.environ[name] if name in os.environ else default_value
 
 
-master_conn = None
 db_connections = {}
-db = get_env_var('PGDATABASE', None)
+db_name = get_env_var('PGDATABASE', None)
 db_user = get_env_var('PGUSER', None)
 db_pwd = None
 db_host = get_env_var('PGHOST', None)
 db_port = get_env_var('PGPORT', 5439)
-analyze_schema = 'public'
+schema_name = 'public'
 target_schema = None
-analyze_table = None
+table_name = None
 new_dist_key = None
 new_sort_keys = None
 debug = False
@@ -98,8 +102,8 @@ force = False
 drop_old_data = False
 comprows = None
 query_group = None
-ssl_option = False
-cw = None
+ssl = False
+suppress_cw = None
 
 
 def execute_query(str):
@@ -126,10 +130,10 @@ def close_conn(conn):
             print(e)
 
 
-def cleanup():
+def cleanup(conn):
     # close all connections and close the output file
-    if master_conn is not None:
-        close_conn(master_conn)
+    if conn is not None:
+        close_conn(conn)
 
     for key in db_connections:
         if db_connections[key] is not None:
@@ -169,18 +173,17 @@ def get_pg_conn():
             comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
 
         try:
-            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd,
-                                  ssl=ssl_option, timeout=None, keepalives=1, keepalives_idle=200,
-                                  keepalives_interval=200, keepalives_count=5)
+            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db_name, password=db_pwd,
+                                  ssl=ssl, timeout=None)
         except Exception as e:
             print(e)
             print('Unable to connect to Cluster Endpoint')
-            cleanup()
+            cleanup(conn)
             return ERROR
 
             # set default search path
-        search_path = 'set search_path = \'$user\',public,%s' % analyze_schema
-        if target_schema is not None and target_schema != analyze_schema:
+        search_path = 'set search_path = \'$user\',public,%s' % schema_name
+        if target_schema is not None and target_schema != schema_name:
             search_path = search_path + ', %s' % target_schema
 
         if debug:
@@ -191,8 +194,8 @@ def get_pg_conn():
             cursor = conn.cursor()
             cursor.execute(search_path)
         except pg8000.Error as e:
-            if re.match('schema "%s" does not exist' % analyze_schema, e.message) is not None:
-                print('Schema %s does not exist' % analyze_schema)
+            if re.match('schema "%s" does not exist' % schema_name, e.message) is not None:
+                print('Schema %s does not exist' % schema_name)
             else:
                 print(e.message)
             return None
@@ -238,7 +241,7 @@ def get_identity(adsrc):
         return None
 
 
-def get_foreign_keys(analyze_schema, target_schema, table_name):
+def get_foreign_keys(schema_name, target_schema, table_name):
     has_fks = False
 
     fk_statement = '''SELECT /* fetching foreign key relations */ conname,
@@ -252,7 +255,7 @@ def get_foreign_keys(analyze_schema, target_schema, table_name):
  and pgc.oid = '%s'::regclass
  AND cons.contype = 'f'
  ORDER BY 1
-''' % (analyze_schema, table_name)
+''' % (schema_name, table_name)
 
     if debug:
         comment(fk_statement)
@@ -317,7 +320,7 @@ def get_table_desc(table_name):
  and de.tablename = '%s'
  and at.attrelid = '%s."%s"'::regclass
  and de.column = at.attname
-''' % (analyze_schema, table_name, analyze_schema, table_name)
+''' % (schema_name, table_name, schema_name, table_name)
 
     if debug:
         comment(statement)
@@ -341,7 +344,7 @@ def get_count_raw_columns(table_name):
         and lower(encoding) in ('raw','none') 
         and sortkey != 1        
         and tablename = '%s'
-''' % (analyze_schema, table_name)
+''' % (schema_name, table_name)
 
     if debug:
         comment(statement)
@@ -379,7 +382,7 @@ def analyze(table_info):
     table_name = table_info[0]
     dist_style = table_info[3]
     owner = table_info[4]
-    table_comment = table_info[5];
+    table_comment = table_info[5]
 
     # get the count of columns that have raw encoding applied
     table_unoptimised = False
@@ -404,7 +407,7 @@ def analyze(table_info):
         if force:
             comment("Using Force Override Option")
 
-        statement = 'analyze compression %s."%s"' % (analyze_schema, table_name)
+        statement = 'analyze compression %s."%s"' % (schema_name, table_name)
 
         if comprows is not None:
             statement = statement + (" comprows %s" % int(comprows))
@@ -425,7 +428,7 @@ def analyze(table_info):
                     analyze_compression_result = execute_query(statement)
                 except KeyboardInterrupt:
                     # To handle Ctrl-C from user
-                    cleanup()
+                    cleanup(conn)
                     return TERMINATED_BY_USER
                 except Exception as e:
                     print(e)
@@ -442,13 +445,13 @@ def analyze(table_info):
                     print("Unknown Error")
                 return ERROR
 
-            if target_schema == analyze_schema:
+            if target_schema == schema_name:
                 target_table = '%s_$mig' % table_name
             else:
                 target_table = table_name
 
             create_table = 'begin;\nlock table %s."%s";\ncreate table %s."%s"(' % (
-                analyze_schema, table_name, target_schema, target_table,)
+                schema_name, table_name, target_schema, target_table,)
 
             # query the table column definition
             descr = get_table_desc(table_name)
@@ -492,13 +495,13 @@ def analyze(table_info):
                     curr_col_length = int(re.search(r'\d+', col_type).group())
                     if curr_col_length > 255:
                         col_len_statement = 'select /* computing max column length */ max(len(%s)) from %s."%s"' % (
-                            descr[col][0], analyze_schema, table_name)
+                            descr[col][0], schema_name, table_name)
                         try:
                             if debug:
                                 comment(col_len_statement)
 
                             comment("Analyzing max length of character column '%s' for table '%s.%s' " % (
-                                col, analyze_schema, table_name))
+                                col, schema_name, table_name))
 
                             # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
                             col_len_result = None
@@ -510,7 +513,7 @@ def analyze(table_info):
                                     col_len_result = execute_query(col_len_statement)
                                 except KeyboardInterrupt:
                                     # To handle Ctrl-C from user
-                                    cleanup()
+                                    cleanup(conn)
                                     return TERMINATED_BY_USER
                                 except Exception as e:
                                     print(e)
@@ -531,7 +534,7 @@ def analyze(table_info):
                             if debug:
                                 comment(
                                     "Max width of character column '%s' for table '%s.%s' is %d. Current width is %d." % (
-                                        descr[col][0], analyze_schema, table_name, col_len_result[0][0],
+                                        descr[col][0], schema_name, table_name, col_len_result[0][0],
                                         curr_col_length))
 
                             if col_len_result[0][0] < curr_col_length:
@@ -547,12 +550,12 @@ def analyze(table_info):
 
                 # check whether number columns are too wide
                 if analyze_col_width and "int" in col_type:
-                    col_len_statement = 'select max(%s) from %s."%s"' % (descr[col][0], analyze_schema, table_name)
+                    col_len_statement = 'select max(%s) from %s."%s"' % (descr[col][0], schema_name, table_name)
                     try:
                         if debug:
                             comment(col_len_statement)
 
-                        comment("Analyzing max column '%s' for table '%s.%s' " % (col, analyze_schema, table_name))
+                        comment("Analyzing max column '%s' for table '%s.%s' " % (col, schema_name, table_name))
 
                         # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
                         col_len_result = None
@@ -564,7 +567,7 @@ def analyze(table_info):
                                 col_len_result = execute_query(col_len_statement)
                             except KeyboardInterrupt:
                                 # To handle Ctrl-C from user
-                                cleanup()
+                                cleanup(conn)
                                 return TERMINATED_BY_USER
                             except Exception as e:
                                 print(e)
@@ -584,7 +587,7 @@ def analyze(table_info):
 
                         if debug:
                             comment("Max of column '%s' for table '%s.%s' is %d. Current column type is %s." % (
-                                descr[col][0], analyze_schema, table_name, col_len_result[0][0], col_type))
+                                descr[col][0], schema_name, table_name, col_len_result[0][0], col_type))
 
                         # Test to see if largest value is smaller than largest value of smallint (2 bytes)
                         if col_len_result[0][0] <= int(math.pow(2, 15) - 1) and col_type != "smallint":
@@ -603,7 +606,7 @@ def analyze(table_info):
 
                         # link in the existing distribution key, or set the new one
                 row_distkey = descr[col][3]
-                if analyze_table is not None and new_dist_key is not None:
+                if table_name is not None and new_dist_key is not None:
                     if col == new_dist_key:
                         distkey = 'DISTKEY'
                         dist_style = 'KEY'
@@ -620,7 +623,7 @@ def analyze(table_info):
 
                 # link in the existing sort keys, or set the new ones
                 row_sortkey = descr[col][4]
-                if analyze_table is not None and len(new_sortkey_arr) > 0:
+                if table_name is not None and len(new_sortkey_arr) > 0:
                     if col in new_sortkey_arr:
                         sortkeys[new_sortkey_arr.index(col) + 1] = col
                         table_sortkeys.append(col)
@@ -684,7 +687,7 @@ def analyze(table_info):
             if (not force) and (not encodings_modified):
                 comment("Column Encoding resulted in an identical table - no changes will be made")
             else:
-                comment("Column Encoding will be modified for %s.%s" % (analyze_schema, table_name))
+                comment("Column Encoding will be modified for %s.%s" % (schema_name, table_name))
 
                 # add all the column encoding statements on to the create table statement, suppressing the leading comma on the first one
                 for i, s in enumerate(encode_columns):
@@ -717,14 +720,14 @@ def analyze(table_info):
                 statements.extend([create_table])
 
                 # get the primary key statement
-                statements.extend([get_primary_key(analyze_schema, target_schema, table_name, target_table)]);
+                statements.extend([get_primary_key(schema_name, target_schema, table_name, target_table)])
 
                 # set the table owner
-                statements.extend(['alter table %s."%s" owner to %s;' % (target_schema, target_table, owner)]);
+                statements.extend(['alter table %s."%s" owner to %s;' % (target_schema, target_table, owner)])
 
                 if table_comment is not None:
                     statements.extend(
-                        ['comment on table %s."%s" is \'%s\';' % (target_schema, target_table, table_comment)]);
+                        ['comment on table %s."%s" is \'%s\';' % (target_schema, target_table, table_comment)])
 
                 # insert the old data into the new table
                 # if we have identity column(s), we can't insert data from them, so do selective insert
@@ -739,7 +742,7 @@ def analyze(table_info):
                                                                             target_table,
                                                                             mig_columns,
                                                                             source_columns,
-                                                                            analyze_schema,
+                                                                            schema_name,
                                                                             table_name)
                 if len(table_sortkeys) > 0:
                     insert = "%s order by %s" % (insert, ",".join(table_sortkeys))
@@ -750,7 +753,7 @@ def analyze(table_info):
                 analyze = 'analyze %s."%s";' % (target_schema, target_table)
                 statements.extend([analyze])
 
-                if target_schema == analyze_schema:
+                if target_schema == schema_name:
                     # rename the old table to _$old or drop
                     if drop_old_data:
                         drop = 'drop table %s."%s" cascade;' % (target_schema, table_name)
@@ -767,7 +770,7 @@ def analyze(table_info):
                     statements.extend([rename])
 
                 # add foreign keys
-                fks = get_foreign_keys(analyze_schema, target_schema, table_name)
+                fks = get_foreign_keys(schema_name, target_schema, table_name)
 
                 statements.extend(['commit;'])
 
@@ -788,7 +791,7 @@ def analyze(table_info):
                         if debug:
                             comment("Emitted Cloudwatch Metric for Column Encoded table")
                 else:
-                    comment("No encoding modifications run for %s.%s" % (analyze_schema, table_name))
+                    comment("No encoding modifications run for %s.%s" % (schema_name, table_name))
         except Exception as e:
             print('Exception %s during analysis of %s' % (e.message, table_name))
             print(traceback.format_exc())
@@ -840,14 +843,14 @@ def usage(with_message):
 # method used to configure global variables, so that we can call the run method
 def configure(**kwargs):
     # setup globals
-    global db
+    global db_name
     global db_user
     global db_pwd
     global db_host
     global db_port
     global threads
-    global analyze_schema
-    global analyze_table
+    global schema_name
+    global table_name
     global new_dist_key
     global new_sort_keys
     global analyze_col_width
@@ -860,10 +863,8 @@ def configure(**kwargs):
     global drop_old_data
     global comprows
     global query_group
-    global output_file
-    global ssl_option
-    global report_file
-    global cw
+    global ssl
+    global suppress_cw
 
     # set variables
     for key, value in kwargs.iteritems():
@@ -893,8 +894,6 @@ def configure(**kwargs):
 
 
 def run():
-    global master_conn
-
     # get a connection for the controlling processes
     master_conn = get_pg_conn()
 
@@ -902,10 +901,10 @@ def run():
         return NO_CONNECTION
 
     comment("Connected to %s:%s:%s as %s" % (db_host, db_port, db, db_user))
-    if analyze_table is not None:
-        snippet = "Table '%s'" % analyze_table
+    if table_name is not None:
+        snippet = "Table '%s'" % table_name
     else:
-        snippet = "Schema '%s'" % analyze_schema
+        snippet = "Schema '%s'" % schema_name
 
     comment("Analyzing %s for Columnar Encoding Optimisations with %s Threads..." % (snippet, threads))
 
@@ -922,7 +921,7 @@ def run():
     else:
         pass
 
-    if analyze_table is not None:
+    if table_name is not None:
         statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
@@ -932,7 +931,7 @@ join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
 and pgn.nspname = '%s' and pgc.relname = '%s'        
-        ''' % (analyze_schema, analyze_table)
+        ''' % (schema_name, table_name)
     else:
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Table List...")
@@ -948,7 +947,7 @@ from stv_blocklist group by tbl) b on a.id=b.tbl
 where pgn.nspname = '%s'
   and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
 order by 2;
-        ''' % (analyze_schema,)
+        ''' % (schema_name,)
 
     if debug:
         comment(statement)
@@ -959,18 +958,18 @@ order by 2;
         comment("Unable to issue table query - aborting")
         return ERROR
 
-    analyze_tables = []
+    table_names = []
     for row in query_result:
-        analyze_tables.append(row)
+        table_names.append(row)
 
-    comment("Analyzing %s table(s) which contain allocated data blocks" % (len(analyze_tables)))
+    comment("Analyzing %s table(s) which contain allocated data blocks" % (len(table_names)))
 
     if debug:
-        [comment(str(x)) for x in analyze_tables]
+        [comment(str(x)) for x in table_names]
 
     result = []
 
-    if analyze_tables is not None:
+    if table_names is not None:
         # we'll use a Pool to process all the tables with multiple threads, or just sequentially if 1 thread is requested         
         if threads > 1:
             # setup executor pool
@@ -978,23 +977,23 @@ order by 2;
 
             try:
                 # run all concurrent steps and block on completion
-                result = p.map(analyze, analyze_tables)
+                result = p.map(analyze, table_names)
             except KeyboardInterrupt:
                 # To handle Ctrl-C from user
                 p.close()
                 p.terminate()
-                cleanup()
+                cleanup(master_conn)
                 return TERMINATED_BY_USER
             except:
                 print(traceback.format_exc())
                 p.close()
                 p.terminate()
-                cleanup()
+                cleanup(master_conn)
                 return ERROR
 
             p.terminate()
         else:
-            for t in analyze_tables:
+            for t in table_names:
                 result.append(analyze(t))
     else:
         comment("No Tables Found to Analyze")
@@ -1030,7 +1029,7 @@ order by 2;
             return ERROR
 
     comment('Processing Complete')
-    cleanup()
+    cleanup(master_conn)
 
     return OK
 
@@ -1052,29 +1051,29 @@ def main(argv):
             if value == '' or value is None:
                 usage()
             else:
-                args['db'] = value
+                args[config_constants.DB_NAME] = value
         elif arg == "--db-user":
             if value == '' or value is None:
                 usage()
             else:
-                args['db_user'] = value
+                args[config_constants.DB_USER] = value
         elif arg == "--db-host":
             if value == '' or value is None:
                 usage()
             else:
-                args['db_host'] = value
+                args[config_constants.DB_HOST] = value
         elif arg == "--db-port":
             if value != '' and value is not None:
-                args['db_port'] = int(value)
+                args[config_constants.DB_PORT] = int(value)
         elif arg == "--db-pwd":
             if value != '' and value is not None:
-                args['db_pwd'] = value
+                args[config_constants.DB_PASSWORD] = value
         elif arg == "--analyze-schema":
             if value != '' and value is not None:
-                args['analyze_schema'] = value
+                args[config_constants.SCHEMA_NAME] = value
         elif arg == "--analyze-table":
             if value != '' and value is not None:
-                args['analyze_table'] = value
+                args[config_constants.TABLE_NAME] = value
         elif arg == "--new-dist-key":
             if value != '' and value is not None:
                 args['new_dist_key'] = value
@@ -1086,82 +1085,79 @@ def main(argv):
                 args['analyze_col_width'] = value
         elif arg == "--target-schema":
             if value != '' and value is not None:
-                args['target_schema'] = value
+                args[config_constants.TARGET_SCHEMA] = value
         elif arg == "--threads":
             if value != '' and value is not None:
-                args['threads'] = int(value)
+                args[config_constants.THREADS] = int(value)
         elif arg == "--debug":
             if value == 'true' or value == 'True':
-                args['debug'] = True
+                args[config_constants.DEBUG] = True
             else:
-                args['debug'] = False
+                args[config_constants.DEBUG] = False
         elif arg == "--output-file":
-            global output_file
             sys.stdout = open(value, 'w')
         elif arg == "--ignore-errors":
             if value == 'true' or value == 'True':
-                args['ignore_errors'] = True
+                args[config_constants.IGNORE_ERRORS] = True
             else:
-                args['ignore_errors'] = False
+                args[config_constants.IGNORE_ERRORS] = False
         elif arg == "--force":
             if value == 'true' or value == 'True':
-                args['force'] = True
+                args[config_constants.FORCE] = True
             else:
-                args['force'] = False
+                args[config_constants.FORCE] = False
         elif arg == "--drop-old-data":
             if value == 'true' or value == 'True':
-                args['drop_old_data'] = True
+                args[config_constants.DROP_OLD_DATA] = True
             else:
-                args['drop_old_data'] = False
+                args[config_constants.DROP_OLD_DATA] = False
         elif arg == "--do-execute":
             if value == 'true' or value == 'True':
-                args['do_execute'] = True
+                args[config_constants.DO_EXECUTE] = True
             else:
-                args['do_execute'] = False
+                args[config_constants.DO_EXECUTE] = False
         elif arg == "--slot-count":
-            args['query_slot_count'] = int(value)
+            args[config_constants.QUERY_SLOT_COUNT] = int(value)
         elif arg == "--comprows":
-            args['comprows'] = int(value)
+            args[config_constants.COMPROWS] = int(value)
         elif arg == "--query_group":
             if value != '' and value is not None:
-                args['query_group'] = value
+                args[config_constants.QUERY_GROUP] = value
         elif arg == "--ssl-option":
             if value == 'true' or value == 'True':
-                args['ssl_option'] = True
+                args[config_constants.SSL] = True
             else:
-                args['ssl_option'] = False
+                args[config_constants.SSL] = False
         elif arg == "--suppress-cloudwatch":
             if value == 'true' or value == 'True':
-                args['suppress_cw'] = True
+                args[config_constants.SUPPRESS_CLOUDWATCH] = True
             else:
-                args['ssl_option'] = False
+                args[config_constants.SUPPRESS_CLOUDWATCH] = False
         else:
             assert False, "Unsupported Argument " + arg
             usage()
 
     # Validate that we've got all the args needed
-    if 'db' not in args:
+    if config_constants.DB_NAME not in args:
         usage("Missing Parameter 'db'")
-    if 'db_user' not in args:
+    if config_constants.DB_USER not in args:
         usage("Missing Parameter 'db-user'")
-    if 'db_host' not in args:
+    if config_constants.DB_HOST not in args:
         usage("Missing Parameter 'db-host'")
-    if 'db_port' not in args:
+    if config_constants.DB_PORT not in args:
         usage("Missing Parameter 'db-port'")
-    if 'analyze_schema' not in args:
-        analyze_schema = 'public'
-    if 'analyze_schema' not in args:
-        args['analyze_schema'] = 'public'
-    if 'target_schema' not in args:
-        args['target_schema'] = args['analyze_schema']
+    if config_constants.SCHEMA_NAME not in args:
+        args[config_constants.SCHEMA_NAME] = 'public'
+    if config_constants.TARGET_SCHEMA not in args:
+        args[config_constants.TARGET_SCHEMA] = args[config_constants.SCHEMA_NAME]
 
     # Reduce to 1 thread if we're analyzing a single table
-    if analyze_table in args:
-        args['threads'] = 1
+    if config_constants.TABLE_NAME in args:
+        args[config_constants.THREADS] = 1
 
     # get the database password
-    if 'db_pwd' not in args:
-        args['db_pwd'] = getpass.getpass("Password <%s>: " % db_user)
+    if config_constants.DB_PASSWORD not in args:
+        args[config_constants.DB_PASSWORD] = getpass.getpass("Password <%s>: " % db_user)
 
     # setup the configuration
     configure(**args)
@@ -1170,7 +1166,7 @@ def main(argv):
     result_code = run()
 
     # exit based on the provided return code
-    sys.exit(result_code)
+    return result_code
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-{"utilities":["ColumnEncodingUtility", "AnalyzeVacuumUtility"],
+{"utilities":["ColumnEncodingUtility", "AnalyzeVacuumUtility", "Monitoring"],
 "configuration":{
   "analyzeTable": "Specific table names to operate on (string)",
   "analyzeSchema": "Schema to be analyzed, vacuumed, or encoded (string)",

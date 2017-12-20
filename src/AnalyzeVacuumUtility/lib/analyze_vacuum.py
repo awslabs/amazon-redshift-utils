@@ -5,8 +5,17 @@ import re
 import sys
 import traceback
 
+import boto3
 import datetime
 import pg8000
+
+try:
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+except:
+    pass
+
+import aws_utils
+import config_constants
 
 # set default values to vacuum, analyze variables
 goback_no_of_days = -1
@@ -81,8 +90,7 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
 
     try:
         conn = pg8000.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd,
-                              ssl=ssl_option, timeout=None, keepalives=1, keepalives_idle=200,
-                              keepalives_interval=200, keepalives_count=5)
+                              ssl=ssl_option, timeout=None)
         conn.autocommit = True
     except Exception as e:
         print("Exception on Connect to Cluster: %s" % e)
@@ -136,7 +144,7 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
     return conn
 
 
-def run_commands(conn, commands):
+def run_commands(conn, commands, cw=None, cluster_name=None):
     for idx, c in enumerate(commands, start=1):
         if c is not None:
             comment('[%s] Running %s out of %s commands: %s' % (str(os.getpid()), idx, len(commands), c))
@@ -150,10 +158,29 @@ def run_commands(conn, commands):
                 print(traceback.format_exc())
                 return False
 
+            # emit a cloudwatch metric for the statement
+            if cw is not None and cluster_name is not None:
+                dimensions = [
+                    {'Name': 'ClusterIdentifier', 'Value': cluster_name}
+                ]
+                if c.lower().startswith('analyze'):
+                    metric_name = 'AnalyzeTable'
+                elif c.lower().startswith('vacuum'):
+                    metric_name = 'VacuumTable'
+                else:
+                    # skip to the next statement - not exporting anything about these statements to cloudwatch
+                    continue
+
+                aws_utils.put_metric(cw, 'Redshift', metric_name, dimensions, None, 1, 'Count')
+                if debug:
+                    comment("Emitted Cloudwatch Metric for Column Encoded table")
+
     return True
 
 
 def run_vacuum(conn,
+               cluster_name,
+               cw,
                schema_name='public',
                table_name=None,
                blacklisted_tables=None,
@@ -165,14 +192,13 @@ def run_vacuum(conn,
                stats_off_pct=10,
                max_table_size_mb=(700 * 1024),
                min_interleaved_skew=1.4,
-               min_interleaved_cnt=0,
+               min_interleaved_count=0,
                **kwargs):
     statements = []
 
     if table_name is not None:
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
-                                                   + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
-                                                   + '",  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') + ', Stats Off : ' + stats_off :: varchar(10)
+                                                   + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') + ', Stats Off : ' + stats_off :: varchar(10)
                                                    + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;' as statement,
                                          "table" as table_name
                                         FROM svv_table_info
@@ -186,8 +212,7 @@ def run_vacuum(conn,
     elif blacklisted_tables is not None:
         blacklisted_tables_array = blacklisted_tables.split(',')
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
-                                                   + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
-                                                   + '",  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null')
+                                                   + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null')
                                                    + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;' as statement,
                                          "table" as table_name
                                         FROM svv_table_info
@@ -204,7 +229,7 @@ def run_vacuum(conn,
         comment("Extracting Candidate Tables for vacuum based on stl_alert_event_log...")
 
         get_vacuum_statement = '''
-                SELECT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" ; ' + '/* ' + ' Table Name : ' + info_tbl."schema" + '."' + info_tbl."table" + '",  Size : ' + CAST(info_tbl."size" AS VARCHAR(10)) + ' MB' + ',  Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') + ',  Deleted_pct : ' + CAST(info_tbl."empty" AS VARCHAR(10)) + ' */ ;' as statement,
+                SELECT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" ; ' + '/* Size : ' + CAST(info_tbl."size" AS VARCHAR(10)) + ' MB' + ',  Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') + ',  Deleted_pct : ' + CAST(info_tbl."empty" AS VARCHAR(10)) + ' */ ;' as statement,
                        table_name
                 FROM (SELECT schema_name,
                              table_name
@@ -238,8 +263,14 @@ def run_vacuum(conn,
                 ORDER BY info_tbl.size,
                          info_tbl.skew_rows
                             ''' % (
-            vacuum_parameter, goback_no_of_days, query_rank, min_unsorted_pct, deleted_pct, stats_off_pct,
-            max_table_size_mb, schema_name,)
+            vacuum_parameter,
+            goback_no_of_days,
+            query_rank,
+            min_unsorted_pct,
+            deleted_pct,
+            stats_off_pct,
+            max_table_size_mb,
+            schema_name)
 
     if debug:
         comment(get_vacuum_statement)
@@ -251,7 +282,7 @@ def run_vacuum(conn,
         statements.append(vs[0])
         statements.append("analyze %s.\"%s\"" % (schema_name, vs[1]))
 
-    if not run_commands(conn, statements):
+    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
         if not ignore_errors:
             if debug:
                 print("Error running statements: %s" % (str(statements),))
@@ -262,8 +293,7 @@ def run_vacuum(conn,
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Tables for vacuum ...")
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
-                                                   + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
-                                                   + '",  Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
+                                                   + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                                    + ',  Unsorted_pct : ' + coalesce(info_tbl.unsorted :: varchar(10),'N/A')
                                                    + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;' as statement,
                                          info_tbl."table" as table_name
@@ -300,7 +330,7 @@ def run_vacuum(conn,
             statements.append(vs[0])
             statements.append("analyze %s.\"%s\"" % (schema_name, vs[1]))
 
-        if not run_commands(conn, statements):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -310,8 +340,7 @@ def run_vacuum(conn,
     if table_name is None and blacklisted_tables is None:
         # query for all tables in the schema for vacuum reindex
         comment("Extracting Candidate Tables for vacuum reindex ...")
-        get_vacuum_statement = ''' SELECT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" ; ' + '/* ' + ' Table Name : '
-                                    + schema_name + '."' + table_name + '",  Rows : ' + CAST("rows" AS VARCHAR(10))
+        get_vacuum_statement = ''' SELECT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" ; ' + '/* Rows : ' + CAST("rows" AS VARCHAR(10))
                                     + ',  Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10))
                                     + ' ,  Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;' AS statement, table_name
                                 FROM (SELECT TRIM(n.nspname) schema_name, TRIM(t.relname) table_name,
@@ -331,7 +360,7 @@ def run_vacuum(conn,
                                             GROUP BY 1, 2)
                                 WHERE reindex_flag = 'Yes'
                                     AND schema_name = '%s'
-                                        ''' % (min_interleaved_skew, min_interleaved_cnt, schema_name)
+                                        ''' % (min_interleaved_skew, min_interleaved_count, schema_name)
 
         if debug:
             comment(get_vacuum_statement)
@@ -343,7 +372,7 @@ def run_vacuum(conn,
             statements.append(vs[0])
             statements.append("analyze %s.\"%s\"" % (schema_name, vs[1]))
 
-        if not run_commands(conn, statements):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -352,7 +381,8 @@ def run_vacuum(conn,
     return True
 
 
-def run_analyze(conn, schema_name='public', table_name=None, ignore_errors=False, predicate_cols=False,
+def run_analyze(conn, cluster_name, cw, schema_name='public', table_name=None, ignore_errors=False,
+                predicate_cols=False,
                 stats_off_pct=10,
                 **kwargs):
     statements = []
@@ -365,8 +395,7 @@ def run_analyze(conn, schema_name='public', table_name=None, ignore_errors=False
     if table_name is not None:
         # If it is one table , just check if this needs to be analyzed and prepare analyze statements
         get_analyze_statement_feedback = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '"' + '%s ; '
-                                                   + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
-                                                   + '",  stats_off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
+                                                   + '/* Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
                                                 FROM svv_table_info
                                                 WHERE   stats_off::DECIMAL (32,4) > %s ::DECIMAL (32,4)
                                                 AND  trim("schema") = '%s'
@@ -377,7 +406,7 @@ def run_analyze(conn, schema_name='public', table_name=None, ignore_errors=False
         comment("Extracting Candidate Tables for analyze based on Query Optimizer Alerts...")
 
         get_analyze_statement_feedback = '''
-                                    SELECT DISTINCT 'analyze ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '"' + '%s ; ' + '/* ' + ' Table Name : ' + info_tbl."schema" + '."' + info_tbl."table" + '", Stats_Off : ' + CAST(info_tbl."stats_off" AS VARCHAR(10)) + ' */ ;'
+                                    SELECT DISTINCT 'analyze ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '"' + '%s ; ' + '/* Stats_Off : ' + CAST(info_tbl."stats_off" AS VARCHAR(10)) + ' */ ;'
                                     FROM (/* Get top N rank tables based on the missing statistics alerts */  
                                          SELECT TRIM(n.nspname)::VARCHAR schema_name,
                                                 TRIM(c.relname)::VARCHAR table_name 
@@ -448,7 +477,7 @@ def run_analyze(conn, schema_name='public', table_name=None, ignore_errors=False
 
     comment("Found %s Tables requiring Analysis" % len(statements))
 
-    if not run_commands(conn, statements):
+    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
         if not ignore_errors:
             if debug:
                 print("Error running statements: %s" % (str(statements),))
@@ -458,8 +487,7 @@ def run_analyze(conn, schema_name='public', table_name=None, ignore_errors=False
         comment("Extracting Candidate Tables for analyze based on stats off from system table info ...")
 
         get_analyze_statement = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '" %s ; '
-                                        + '/* '+ ' Table Name : ' + "schema" + '."' + "table"
-                                        + '", Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
+                                        + '/* Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
                                         FROM svv_table_info
                                         WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
                                         AND  trim("schema") = '%s'
@@ -475,7 +503,7 @@ def run_analyze(conn, schema_name='public', table_name=None, ignore_errors=False
         for vs in analyze_statements:
             statements.append(vs[0])
 
-        if not run_commands(conn, statements):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -485,35 +513,73 @@ def run_analyze(conn, schema_name='public', table_name=None, ignore_errors=False
 
 def run_analyze_vacuum(**kwargs):
     global debug
-    if 'DEBUG' in os.environ:
-        debug = os.environ['DEBUG']
-    if 'debug' in kwargs and kwargs['debug']:
+    if config_constants.DEBUG in os.environ:
+        debug = os.environ[config_constants.DEBUG]
+    if config_constants.DEBUG in kwargs and kwargs[config_constants.DEBUG]:
         debug = True
 
+    # connect to cloudwatch
+    region_key = 'AWS_REGION'
+    if region_key in os.environ:
+        aws_region = os.environ[region_key]
+    else:
+        aws_region = 'us-east-1'
+
+    cw = None
+    if config_constants.SUPPRESS_CLOUDWATCH not in kwargs or not kwargs[config_constants.SUPPRESS_CLOUDWATCH]:
+        try:
+            cw = boto3.client('cloudwatch', region_name=aws_region)
+            comment("Connected to CloudWatch in %s" % aws_region)
+        except Exception as e:
+            if debug:
+                print(traceback.format_exc())
+    else:
+        if debug:
+            comment("Suppressing CloudWatch connection and metrics export")
+
+    # extract the cluster name
+    if config_constants.CLUSTER_NAME in kwargs:
+        cluster_name = kwargs[config_constants.CLUSTER_NAME]
+
+        # remove the cluster name argument from kwargs as it's a positional arg
+        del kwargs[config_constants.CLUSTER_NAME]
+    else:
+        cluster_name = kwargs[config_constants.DB_HOST].split('.')[0]
+
+    if debug:
+        comment("Using Cluster Name %s" % cluster_name)
+
+        comment("Supplied Args:")
+        print(kwargs)
+
     # get a connection for the controlling processes
-    master_conn = get_pg_conn(**kwargs)
+    master_conn = get_pg_conn(kwargs[config_constants.DB_HOST],
+                              kwargs[config_constants.DB_NAME],
+                              kwargs[config_constants.DB_USER],
+                              kwargs[config_constants.DB_PASSWORD],
+                              kwargs[config_constants.SCHEMA_NAME],
+                              kwargs[config_constants.DB_PORT],
+                              None if 'query_group' not in kwargs else kwargs['query_group'],
+                              None if 'query_slot_count' not in kwargs else kwargs['query_slot_count'],
+                              None if 'ssl_option' not in kwargs else kwargs['ssl_option'])
 
     if master_conn is None:
-        sys.exit(NO_CONNECTION)
+        raise Exception("No Connection was established")
 
-    blacklisted_tables = kwargs['blacklisted_tables'] if "blacklisted_tables" in kwargs else None
-    if blacklisted_tables is not None and len(blacklisted_tables) > 0:
-        comment("The blacklisted tables are: %s" % (str(blacklisted_tables)))
-
-    vacuum_flag = kwargs['vacuum_flag'] if 'vacuum_flag' in kwargs else False
+    vacuum_flag = kwargs[config_constants.DO_VACUUM] if config_constants.DO_VACUUM in kwargs else False
     if vacuum_flag:
         # Run vacuum based on the Unsorted , Stats off and Size of the table
-        run_vacuum(master_conn, **kwargs)
+        run_vacuum(master_conn, cluster_name, cw, **kwargs)
     else:
         comment("Vacuum flag arg is not set. Vacuum not performed.")
 
-    analyze_flag = kwargs['analyze_flag'] if 'analyze_flag' in kwargs else False
+    analyze_flag = kwargs[config_constants.DO_ANALYZE] if config_constants.DO_ANALYZE in kwargs else False
     if analyze_flag:
         if not vacuum_flag:
             comment("Warning - Analyze without Vacuum may result in sub-optimal performance")
 
         # Run Analyze based on the  Stats off Metrics table
-        run_analyze(master_conn, **kwargs)
+        run_analyze(master_conn, cluster_name, cw, **kwargs)
     else:
         comment("Analyze flag arg is set as %s. Analyze is not performed." % analyze_flag)
 
