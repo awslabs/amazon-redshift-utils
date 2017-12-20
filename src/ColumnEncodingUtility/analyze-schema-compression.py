@@ -223,6 +223,14 @@ def get_pg_conn():
 
         cursor.execute(set_timeout)
 
+        # set application name
+        set_name = "set application_name to 'ColumnEncodingUtility-v%s'" % __version__
+
+        if debug:
+            comment(set_name)
+
+        cursor.execute(set_name)
+
         # cache the connection
         db_connections[pid] = conn
 
