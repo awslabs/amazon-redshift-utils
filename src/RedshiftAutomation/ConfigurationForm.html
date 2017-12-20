@@ -57,8 +57,11 @@ $('#config-form').parsley().on('field:validated', function() {
       }
       if (config['table_name'] == "") {
         delete config['table_name'];
-      }      
-      
+      }
+      if (config['kms_auth_context'] == "") {
+        delete config['kms_auth_context'];
+      }
+
       config['comprows'] = -1;
       config['ignore_errors'] = true;
       config['query_group'] = "";
@@ -118,6 +121,9 @@ $('#config-form').parsley().on('field:validated', function() {
   <label for="encryptedPassword">Base64 Encoded/Encrypted Password * :</label>
   <input type="text" class="form-control" name="configuration[encrypted_password]" required="true" data-parsley-trigger="change">
   
+  <label for="encryptedPassword">KMS Authorisation Context JSON:</label>
+  <input type="text" class="form-control" name="configuration[kms_auth_context]" required="false" data-parsley-trigger="change">
+
   <label for="dbName">Database Name * :</label>
   <input type="text" class="form-control" name="configuration[db]" required="true" data-parsley-trigger="change">
 
