@@ -6,7 +6,7 @@ This project includes code that is able to run a subset of the Amazon Redshift U
 
 This utility creates a Lambda function which imports other Redshift Utils modules, and then invokes them against a cluster. It runs within your VPC, and should be configured to connect via a Subnet which is either the same, or can route to the subnet where your Redshift cluster is running. It should also be configured with a Security Group which is trusted by your [Redshift Cluster Security Configuration](http://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html).
 
-Currently the [Column Encoding Utility](src/ColumnEncodingUtility) and [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility) are supported for automated invocation:
+Currently the [Column Encoding Utility](src/ColumnEncodingUtility), [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility), and [Redshift Advanced Monitoring](https://github.com/awslabs/amazon-redshift-monitoring) are supported for automated invocation:
 
 ![what it does](WhatItDoes.png)
 
@@ -38,7 +38,7 @@ This lambda function uses a configuration file to get information about which cl
 The required configuration items are placed into the ```configuration``` part of the config file, and include:
 
 ```
-{"utilities":["ColumnEncodingUtility", "AnalyzeVacuumUtility"],
+{"utilities":["ColumnEncodingUtility", "AnalyzeVacuumUtility", "Monitoring"],
 "configuration":{
   "analyzeTable": "Specific table names to operate on (string)",
   "analyzeSchema": "Schema to be analyzed, vacuumed, or encoded (string)",
@@ -106,7 +106,8 @@ When completed, it will deploy the following objects:
 * `RedshiftAutomation-LambdaRedshiftAutomation-**********`: The AWS Lambda Function which runs via the CloudWatch Scheduled Events
 * `InvokeLambdaRedshiftRunner-AnalyzeVacuumUtility`: The CloudWatch Scheduled Event which runs the [Analyze & Vacuum Utility](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/AnalyzeVacuumUtility)
 * `InvokeLambdaRedshiftRunner-ColumnEncodingUtility`: The CloudWatch Scheduled Event which runs the [Column Encoding Utility](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/ColumnEncodingUtility)
-* _2 AWS Lambda Permissions are also created so that CloudWatch Events can call the Lambda function_
+* `InvokeLambdaRedshiftRunner-MonitoringUtility`: The CloudWatch Scheduled Event which runs the [Redshift Advanced Monitoring Utility](https://github.com/awslabs/amazon-redshift-monitoring/)
+* _3 AWS Lambda Permissions are also created so that CloudWatch Events can call the Lambda function_
 
 ## Running the Modules
 
@@ -122,6 +123,12 @@ __To run the Analyze/Vacuum Utility__
 
 ```javascript
 {"ExecuteUtility":"AnalyzeVacuumUtility","ConfigLocation":"s3//mybucket/myprefix/config.json"}
+```
+
+__To run the Monitoring Utility__
+
+```javascript
+{"ExecuteUtility":"Monitoring","ConfigLocation":"s3//mybucket/myprefix/config.json"}
 ```
 
 You can change the CRON schedule for each event so they don't run at the same time, if you prefer.
