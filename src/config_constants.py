@@ -106,7 +106,7 @@ def normalise_config(config):
     add_to_config(MAX_TBL_SIZE_MB)
     add_to_config(MIN_INTERLEAVED_SKEW)
     add_to_config(MIN_INTERLEAVED_COUNT)
-    add_to_config(CMK_ALIAS)
+    add_to_config(KMS_AUTH_CONTEXT)
 
     return config_out
 
