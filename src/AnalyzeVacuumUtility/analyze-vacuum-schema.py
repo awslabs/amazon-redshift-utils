@@ -94,11 +94,11 @@ def usage(with_message=None):
     print(
         '           --vacuum-parameter   - Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL')
     print(
-        '           --min-unsorted-pct   - Minimum unsorted percentage(%) to consider a table for vacuum : Default = 05%')
+        '           --min-unsorted-pct   - Minimum unsorted percentage(%) to consider a table for vacuum : Default = 5%')
     print(
         '           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
     print(
-        '           --deleted-pct        - Minimum deleted percentage (%) to consider a table for vacuum: Default = 05%')
+        '           --deleted-pct        - Minimum deleted percentage (%) to consider a table for vacuum: Default = 5%')
     print(
         '           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
     print('           --predicate-cols     - Analyze predicate columns only')

@@ -29,7 +29,7 @@ Encryption Complete
 Encrypted Password: CiChAYm4goRPj1CuMlY+VbyChti8kHVW4kxInA+keC7gPxKZAQEBAgB4oQGJuIKET49QrjJWPlW8gobYvJB1VuJMSJwPpHgu4D8AAABwMG4GCSqGSIb3DQEHBqBhMF8CAQAwWgYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwdVzuq29SCuPKlh9ACARCALY1H/Tb4Hw73yqLyL+Unjp4NC0F5UjETNUGPtM+DTHG8urILNTKvdv1t9S5zuQ==
 ```
 
-Copy the value after ```Encrypted Password: ``` an use it for the creation of the config file
+Copy the value after ```Encrypted Password: ``` and use it for the creation of the config file.
 
 ## Configuration
 
@@ -40,31 +40,31 @@ The required configuration items are placed into the ```configuration``` part of
 ```
 {"utilities":["ColumnEncodingUtility", "AnalyzeVacuumUtility", "Monitoring"],
 "configuration":{
-  "analyzeTable": "Specific table names to operate on (string)",
-  "analyzeSchema": "Schema to be analyzed, vacuumed, or encoded (string)",
+  "table_name": "Specific table names to operate on (string)",
+  "schema_name": "Schema to be analyzed, vacuumed, or encoded (string)",
   "comprows": "Rows to use in the analyze compression request (int | default -1 meaning unspecified)",
   "db": "Database Name to connect to (string)",
-  "dbHost": "Your cluster DNS name (string)",
-  "dbPassword": "Your base64 encoded encrypted password here (string - generated with encrypt_password.py)",
-  "dbPort": "The database port number (int)",
-  "dbUser": "The database User to connect to (string)",
-  "dropOldData": "When column encoding is invoked, should the old database table be kept as XXX_$old? (boolean - true | false | default false)",
-  "ignoreErrors": "Should a given utility keep running if it encouters errors, and fail the Lambda function? (boolean - true | false | default false)",
-  "queryGroup": "Query group name to set for routing to a specific WLM queue (string)",
-  "querySlotCount": "Number of query slots to use - set to queue(max) for optimal performance (int - default 1)",
-  "targetSchema": "When column encoding is invoked, should it build new tables into a different schema? (string)",
+  "db_host": "Your cluster DNS name (string)",
+  "db_password": "Your base64 encoded encrypted password here (string - generated with encrypt_password.py)",
+  "db_port": "The database port number (int)",
+  "db_user": "The database User to connect to (string)",
+  "drop_old_data": "When column encoding is invoked, should the old database table be kept as XXX_$old? (boolean - true | false | default false)",
+  "ignore_errors": "Should a given utility keep running if it encouters errors, and fail the Lambda function? (boolean - true | false | default false)",
+  "query_group": "Query group name to set for routing to a specific WLM queue (string)",
+  "query_slot_count": "Number of query slots to use - set to queue(max) for optimal performance (int - default 1)",
+  "target_schema": "When column encoding is invoked, should it build new tables into a different schema? (string)",
   "force": "Do you want to force the utility to run for each provided table or schema, even if changes are not required? (boolean - true | false | default false)",
-  "outputFile":"/tmp/analyze-schema-compression.sql",
+  "output_file":"/tmp/analyze-schema-compression.sql",
   "debug": "Should the utilities run in debug mode? (boolean - true | false | default false)",
-  "do-execute": "Should changes be made automatically, or just for reporting purposes (boolean - true |  false | default true)",
+  "do_execute": "Should changes be made automatically, or just for reporting purposes (boolean - true |  false | default true)",
   "analyze_col_width": "Analyze columns wider than this value (int)",
   "threads": "How many threads should the column encoding utility use (can run in parallel - default 1 for Lambda)",
-  "ssl-option":"Should you connect to the cluster with SSL? (boolean true | false | default true)",
-  "doVacuum": "Should the Analyze Vacuum utility run Vacuum? (boolean true | false | default true)",
-  "doAnalyze":"Should the Analyze Vacuum utility run Analyze? (boolean true | false | default true)",
-  "tableBlacklist":"comma separated list of tables to suppress running the analyze vacuum utility against",
-  "aggregationInterval":"Interval on which to summarise database statistics (redshift interval literal: http://docs.aws.amazon.com/redshift/latest/dg/r_interval_literals.html | default '1 hour'",
-  "clusterName":"The cluster name that is the first part of the DNS name"
+  "ssl":"Should you connect to the cluster with SSL? (boolean true | false | default true)",
+  "do_vacuum": "Should the Analyze Vacuum utility run Vacuum? (boolean true | false | default true)",
+  "do_analyze":"Should the Analyze Vacuum utility run Analyze? (boolean true | false | default true)",
+  "table_blacklist":"comma separated list of tables to suppress running the analyze vacuum utility against",
+  "agg_interval":"Interval on which to summarise database statistics (redshift interval literal: http://docs.aws.amazon.com/redshift/latest/dg/r_interval_literals.html | default '1 hour'",
+  "cluster_name":"The cluster name that is the first part of the DNS name"
   }
 }
 ```
@@ -72,6 +72,25 @@ The required configuration items are placed into the ```configuration``` part of
 [<img src="button_create-a-configuration-now.png">](https://rawgit.com/awslabs/amazon-redshift-utils/master/src/LambdaRunner/ConfigurationForm.html)
 
 Save this configuration to a json file, and place it on S3. We will refer to the file when we launch the SAM Template. Alternatively you can rebuild the project manually using filename 'config.json', and it will automatically be imported.
+
+### Additional config options
+
+You can also add the following configuration options to finely tune the operation of the various included utilities:
+
+```
+"analyze_col_width": "Width of varchar columns to be optimised during encoding analysis (default 1)",
+"vacuum_parameter": "Vacuum type to be run, including FULL, SORT ONLY, DELETE ONLY, REINDEX (default FULL)",
+"min_unsorted_pct": "Minimum unsorted percentage(%) to consider a table for vacuum (default 5%)",
+"max_unsorted_pct": "Maximum unsorted percentage(%) to consider a table for vacuum (default 50%)",
+"deleted_pct": "Minimum deleted percentage (%) to consider a table for vacuum (default 5%)",
+"stats_off_pct": "Minimum stats off percentage(%) to consider a table for analyze (default 10%)",
+"predicate_cols": "Flag to enforce only analyzing predicate columns (see http://bit.ly/2o163tC)",
+"suppress_cw": "Set to true to suppress utilities exporting CloudWatch metrics",
+"max_table_size_mb": "Maximum Table Size in MB for automatic re-encoding (default 700MB)",
+"min_interleaved_skew": "Minimum index skew to consider a table for vacuum reindex (default 1.4)",
+"min_interleaved_count": "Minimum stv_interleaved_counts records to consider a table for vacuum reindex (default 0)",
+"kms_auth_context": "Authorisation context used when the db_pwd was encrypted (must be valid JSON)"
+```
 
 ## Deploying
 
@@ -94,7 +113,7 @@ We have provided the following AWS SAM templates so that you can deploy this fun
 |us-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-west-1.amazonaws.com/awslabs-code-us-west-1/LambdaRedshiftRunner/deploy.yaml) |
 |us-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-west-2.amazonaws.com/awslabs-code-us-west-2/LambdaRedshiftRunner/deploy.yaml) |
 
-Alternatively, you can manually upload the template from the `dist` directory. For both the package md5 is `dd3483885a03dc3ea2a07bab3eacf353`. There are also separate templates to [just deploy a single utility](deploy-function-and-schedule.yaml) or just [create a scheduled event for an existing function](deploy-schedule.yaml). You must supply the following parameters
+Alternatively, you can manually upload the template from the `dist` directory. There are also separate templates to [just deploy a single utility](deploy-function-and-schedule.yaml) or just [create a scheduled event for an existing function](deploy-schedule.yaml). You must supply the following parameters
 
 ![parameters](parameters.png)
 
