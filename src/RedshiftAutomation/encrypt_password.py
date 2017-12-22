@@ -13,6 +13,7 @@ OK = 0
 ERROR = -1
 INVALID_ARGS = -2
 region_key = 'AWS_REGION'
+cmk = 'alias/RedshiftUtilsLambdaRunner'
 
 def encrypt_password(args):
     if len(args) == 1:
@@ -33,7 +34,7 @@ def encrypt_password(args):
     # check to see if the application Customer Master Key exists
     cmkStatus = None
     try:
-        cmkStatus = kmsConnection.describe_key(KeyId=utils.CMK)
+        cmkStatus = kmsConnection.describe_key(KeyId=cmk)
     except ClientError as e:
         if 'NotFoundException' in str(e):
             pass
@@ -47,14 +48,14 @@ def encrypt_password(args):
         if new_cmk == None:
             print("Failed to create Customer Master Key")
             sys.exit(ERROR)
-        alias = kmsConnection.create_alias(AliasName=utils.CMK,
+        alias = kmsConnection.create_alias(AliasName=cmk,
                                            TargetKeyId=new_cmk['KeyMetadata']['KeyId'])
         
     # encrypt the provided password with this kms key
         # get the application authorisation context
     auth_context = utils.get_encryption_context(currentRegion)
     
-    encrypted = kmsConnection.encrypt(KeyId=utils.CMK,
+    encrypted = kmsConnection.encrypt(KeyId=cmk,
                                       Plaintext=args[1],
                                       EncryptionContext=auth_context)
     
