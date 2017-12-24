@@ -1,4 +1,12 @@
-SELECT a.userid,
+/**********************************************************************************************
+Purpose:      View to flatten stl_vacuum table and provide details like vacuum start and 
+              end times, current status, changed rows and freed blocks all in one row
+
+History:
+2017-12-24 adedotua created
+**********************************************************************************************/ 
+
+CREATE OR REPLACE VIEW admin.v_vacuum_summary as SELECT a.userid,
        a.xid,
        BTRIM((d.datname)::TEXT) AS database_name,
        a.table_id,
@@ -41,17 +49,14 @@ SELECT a.userid,
            stl_vacuum.max_merge_partitions,
            stl_vacuum.eventtime
               FROM stl_vacuum
-              WHERE (stl_vacuum.status = 'Finished'::bpchar)) b USING (xid)) LEFT JOIN (SELECT stv_tbl_perm.id,
-              stv_tbl_perm.name,
-              stv_tbl_perm.db_id
-                  FROM stv_tbl_perm
-                  WHERE (stv_tbl_perm.slice = 0)) c ON ((a.table_id = c.id))) JOIN pg_database d ON (((c.db_id)::OID = d.oid))) 
+              WHERE (stl_vacuum.status = 'Finished'::bpchar)) b USING (xid)) 
+              LEFT JOIN (SELECT stv_tbl_perm.id,stv_tbl_perm.name,stv_tbl_perm.db_id
+                  FROM stv_tbl_perm WHERE (stv_tbl_perm.slice = 0)) c ON ((a.table_id = c.id))) 
+              JOIN pg_database d ON (((c.db_id)::OID = d.oid))) 
                   LEFT JOIN (SELECT stv_blocklist.tbl,COUNT(*) AS empty_blk_cnt
                   FROM stv_blocklist
-                  WHERE (stv_blocklist.num_values = 0)
-             GROUP BY stv_blocklist.tbl) e ON ((a.table_id = e.tbl))) 
+                  WHERE (stv_blocklist.num_values = 0) GROUP BY stv_blocklist.tbl) e ON ((a.table_id = e.tbl))) 
              LEFT JOIN (SELECT svv_transactions.xid
               FROM svv_transactions
               WHERE ((svv_transactions.lockable_object_type)::TEXT = 'transactionid'::TEXT)) f USING (xid))
 ORDER BY a.xid;
-
