@@ -477,7 +477,7 @@ def run_analyze(conn,
                                     WHERE info_tbl.stats_off::DECIMAL(32,4) > %s::DECIMAL(32,4)
                                     AND   TRIM(info_tbl.schema) = '%s'
                                     AND   info_tbl.table NOT IN (%s)
-                                    ORDER BY info_tbl.size ASC
+                                    ORDER BY info_tbl.size ASC;
                             ''' % (predicate_cols_option,
                                    goback_no_of_days,
                                    query_rank,
