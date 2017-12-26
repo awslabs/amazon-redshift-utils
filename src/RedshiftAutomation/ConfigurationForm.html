@@ -1,0 +1,176 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="googlebot" content="noindex, nofollow">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script type="text/javascript" src="/js/lib/dummy.js"></script>
+  <link rel="stylesheet" type="text/css" href="/css/result-light.css">
+  <script type="text/javascript" src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery-serialize-object/2.5.0/jquery.serialize-object.min.js"></script>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/parsley.js/2.8.0/parsley.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="https://rawgit.com/guillaumepotier/Parsley.js/2.8.0/bower_components/bootstrap/dist/css/bootstrap.css">
+  <link rel="stylesheet" type="text/css" href="https://rawgit.com/guillaumepotier/Parsley.js/2.8.0/doc/assets/docs.css">
+  <link rel="stylesheet" type="text/css" href="https://rawgit.com/guillaumepotier/Parsley.js/2.8.0/src/parsley.css">
+  <style type="text/css">
+    #output {
+      white-space: pre-wrap;
+      font-family: monospace; font-size: 16px; font-style: normal;
+    }
+    input[type="text"] {
+      width: 40%;
+    }
+    input[type="number"] {
+      width: 40%;
+    }
+    input { 
+      margin: 5px;
+    }
+    label {
+      margin: 5px;
+    }
+  </style>
+<title></title>
+<script type='text/javascript'>//<![CDATA[
+window.onload=function(){
+// Validate
+$('#config-form').parsley().on('field:validated', function() {
+    // Validate and show validators
+    var ok = $('.parsley-error').length === 0;
+    $('.bs-callout-info').toggleClass('hidden', !ok);
+    $('.bs-callout-warning').toggleClass('hidden', ok);
+    if (ok) { // Serialize into JSON and add to output DIV
+      var formObj = $('form#config-form').serializeObject();
+			var config = formObj['configuration'];
+      
+      // remove unconfigured options
+      if (config['table_whitelist'] == "") {
+        delete config['table_whitelist'];
+      }
+      if (config['table_blacklist'] == "") {
+        delete config['table_blacklist'];
+      }
+      if (config['target_schema'] == "") {
+        delete config['target_schema'];
+      }
+      if (config['table_name'] == "") {
+        delete config['table_name'];
+      }
+      if (config['kms_auth_context'] == "") {
+        delete config['kms_auth_context'];
+      }
+
+      config['comprows'] = -1;
+      config['ignore_errors'] = true;
+      config['query_group'] = "";
+      config['query_slot_count'] = 1;
+      config['force'] = false;
+      config['output_file'] = "/tmp/redshift-automation.log";
+      config['debug'] = false;
+      config['do_execute'] = true;
+      config['analyze_col_width'] = 1;
+      config['threads'] = 1;
+      config['ssl'] = true;
+      config['do_analyze'] = true;
+      config['do_vacuum'] = true;
+      config['agg_interval'] = "1 hour";
+      
+      // add defaults
+      formObj.utilities = ["ColumnEncodingUtility", "AnalyzeVacuumUtility", "Monitoring"]; 
+      
+      // re-add the configuration
+      formObj['configuration'] = config;      
+
+      var formStringPretty = JSON.stringify(formObj, undefined, 4);
+      $('div#output').text(formStringPretty);
+    }
+  })
+  .on('form:submit', function() {
+    return false; // Don't submit form for this demo
+  });
+
+}//]]> 
+
+</script>
+
+  
+</head>
+
+<body>
+  <!-- all of these will work! -->
+<div class="bs-callout bs-callout-warning hidden">
+  <h4>Oh snap!</h4>
+  <p>This form seems to be invalid :(</p>
+</div>
+
+<form id="config-form" data-parsley-validate="">
+  <label for="clusterName">Cluster Name * :</label>
+  <input type="text" class="form-control" name="configuration[cluster_name]" required="true" data-parseley-required="true" data-parsley-trigger="change">
+
+  <label for="dnsName">Cluster Endpoint * :</label>
+  <input type="text" class="form-control" name="configuration[db_host]" required="true" data-parsley-trigger="change">
+
+  <label for="hostPort">Cluster Port * :</label>
+  <input type="number" class="form-control" name="configuration[db_port]" data-parsley-type="integer" data-parsley-trigger="change" required="true" min="1024" max="65535">
+
+  <label for="userName">Username * :</label>
+  <input type="text" class="form-control" name="configuration[db_user]" required="true" data-parsley-trigger="change">
+
+  <label for="encryptedPassword">Base64 Encoded/Encrypted Password * :</label>
+  <input type="text" class="form-control" name="configuration[encrypted_password]" required="true" data-parsley-trigger="change">
+  
+  <label for="encryptedPassword">KMS Authorisation Context JSON:</label>
+  <input type="text" class="form-control" name="configuration[kms_auth_context]" required="false" data-parsley-trigger="change">
+
+  <label for="dbName">Database Name * :</label>
+  <input type="text" class="form-control" name="configuration[db]" required="true" data-parsley-trigger="change">
+
+  <label for="sourceSchema">Source Schema * :</label>
+  <input type="text" class="form-control" name="configuration[schema_name]" required="true" data-parsley-trigger="change">
+
+  <hr/>
+  <label>Table Analyze Options</label>
+  <br>
+  <br>
+  <label for="tableWhitelist">Restrict to Table Name:</label>
+  <input type="text" class="form-control" name="configuration[table_name]" required="false" data-parsley-trigger="change">
+
+  <label for="tableBlackist">Table Blacklist :</label>
+  <input type="text" class="form-control" name="configuration[table_blacklist]" required="false" data-parsley-trigger="change">
+
+  <hr/>
+  <label>Automated Column Encoding Options</label>
+  <br>
+  <br>
+  <label for="targetSchema">Target Schema :</label>
+  <input type="text" class="form-control" name="configuration[target_schema]" required="false" data-parsley-trigger="change">
+
+  <label for="dropOldData">Drop old (unencoded) data tables? * :</label>
+  <select name="configuration[drop_old_data]" required="true" data-parsley-trigger="change">
+    <option value="false">False</option>
+    <option value="true">True</option>
+  </select>
+  <hr>
+  <br>
+  <input type="submit" class="btn btn-default" value="Validate Configuration">
+</form>
+<br/> Redshift Automation Configuration - place this file in S3!
+<br/>
+<div id="output">
+
+</div>
+  <script>
+  // tell the embed parent frame the height of the content
+  if (window.parent && window.parent.parent){
+    window.parent.parent.postMessage(["resultsFrame", {
+      height: document.body.getBoundingClientRect().height,
+      slug: "xnjLcw2L"
+    }], "*")
+  }
+</script>
+
+</body>
+
+</html>

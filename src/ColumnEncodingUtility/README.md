@@ -1,21 +1,21 @@
 # Amazon Redshift Column Encoding Utility
 
 In order to get the best performance from your Redshift Database, you must ensure 
-that database tables have the correct Column Encoding applied [http://docs.aws.amazon.com/redshift/latest/dg/t\_Compressing\_data\_on\_disk.html](http://docs.aws.amazon.com/redshift/latest/dg/t_Compressing_data_on_disk.html). 
+that database tables have the correct Column Encoding applied (see [http://docs.aws.amazon.com/redshift/latest/dg/t\_Compressing\_data\_on\_disk.html](http://docs.aws.amazon.com/redshift/latest/dg/t_Compressing_data_on_disk.html)). 
 Column Encoding specifies which algorithm is used to compress data within a column, 
 and is chosen on the basis of the datatype, the unique number of discrete values 
-in the column, and so on. When the COPY command [http://docs.aws.amazon.com/redshift/latest/dg/r\_COPY.html](http://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html)
+in the column, and so on. When the [COPY command](http://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html)
 is used to load data into a table, column encoding will be analyzed and applied by default. 
 Other tables may be loaded via Extract/Load/Transform/Load (ELT) processes, and 
 these tables may require having the column encoding updated at some point.
 
 The Redshift Column Encoding Utility gives you the ability to apply optimal Column 
 Encoding to an established Schema with data already loaded. When run, it will analyze 
-an entire schema or individual tables. The ANALYZE COMPRESSION [http://docs.aws.amazon.com/redshift/latest/dg/r\_ANALYZE\_COMPRESSION.html](http://docs.aws.amazon.com/redshift/latest/dg/r_ANALYZE_COMPRESSION.html) 
+an entire schema or individual tables. The [ANALYZE COMPRESSION](http://docs.aws.amazon.com/redshift/latest/dg/r_ANALYZE_COMPRESSION.html) 
 command is used to determine if any of the columns in the table require updating, 
 and if so a script is generated to convert to the optimal structure.
 
-Because this utility can make changes to your database live (using the ```--do-execute true``` option, it is highly recommended that you thoroughly test the utility against a dev/test system, and ensure that you take a manual snapshot of Production systems prior to running the generated script. Also, as a large amount of data will be migrated, you should ensure that the migration will not adversely impact Cluster customers. AWS has thoroughly tested this software on a variety of systems, but cannot be responsible for the impact of running the utility against your database. 
+Because this utility can make changes to your database live (using the ```--do-execute true``` option), it is highly recommended that you thoroughly test the utility against a dev/test system, and ensure that you take a manual snapshot of Production systems prior to running the generated script. Also, as a large amount of data will be migrated, you should ensure that the migration will not adversely impact Cluster customers. AWS has thoroughly tested this software on a variety of systems, but cannot be responsible for the impact of running the utility against your database. 
 
 ## Data Migration
 
@@ -36,23 +36,30 @@ This utility was built and tested on Python 2.7x, but may work with other versio
 Usage: analyze-schema-compression.py
        Generates a script to optimise Redshift column encodings on all tables in a schema
 
-Arguments: --db             - The Database to Use (or $PGDATABASE)
-           --db-user        - The Database User to connect to (or $PGUSER)
-           --db-host        - The Cluster endpoint (or $PGHOST)
-           --db-port        - The Cluster endpoint port (default 5439 or $PGPORT)
-           --analyze-schema - The Schema to be Analyzed (default public)
-           --analyze-table  - A specific table to be Analyzed, if --analyze-schema is not desired
-           --target-schema  - Name of a Schema into which the newly optimised tables and data should be created, rather than in place
-           --threads        - The number of concurrent connections to use during analysis (default 2)
-           --output-file    - The full path to the output file to be generated
-           --debug          - Generate Debug Output including SQL Statements being run
-           --do-execute     - Run the compression encoding optimisation
-           --slot-count     - Modify the wlm_query_slot_count from the default of 1
-           --ignore-errors  - Ignore errors raised in threads when running and continue processing
-           --force          - Force table migration even if the table already has Column Encoding applied
-           --drop-old-data  - Drop the old version of the data table, rather than renaming
-           --comprows       - Set the number of rows to use for Compression Encoding Analysis
-           --report-file    - The full path to the file which will store the difference of suggested/current encoding
+Arguments: --db                  - The Database to Use
+           --db-user             - The Database User to connect to
+           --db-pwd              - The Password for the Database User to connect to
+           --db-host             - The Cluster endpoint
+           --db-port             - The Cluster endpoint port (default 5439)
+           --analyze-schema      - The Schema to be Analyzed (default public)
+           --analyze-table       - A specific table to be Analyzed, if --analyze-schema is not desired
+           --analyze-cols        - Analyze column width and reduce the column width if needed
+           --new-dist-key        - Set a new Distribution Key (only used if --analyze-table is specified)
+           --new-sort-keys       - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)
+           --target-schema       - Name of a Schema into which the newly optimised tables and data should be created, rather than in place
+           --threads             - The number of concurrent connections to use during analysis (default 2)
+           --output-file         - The full path to the output file to be generated
+           --report-file         - The full path to the report file to be generated
+           --debug               - Generate Debug Output including SQL Statements being run
+           --do-execute          - Run the compression encoding optimisation
+           --slot-count          - Modify the wlm_query_slot_count from the default of 1
+           --ignore-errors       - Ignore errors raised in threads when running and continue processing
+           --force               - Force table migration even if the table already has Column Encoding applied
+           --drop-old-data       - Drop the old version of the data table, rather than renaming
+           --comprows            - Set the number of rows to use for Compression Encoding Analysis
+           --query_group         - Set the query_group for all queries
+           --ssl-option          - Set SSL to True or False (default False)
+           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True
 
 ```
 
@@ -72,9 +79,17 @@ Within a given queue, each session will be given a single concurrency slot. In s
 
 By default, the ANALYZE COMPRESSION command will attempt to analyze 100,000 rows across all Slices on the Cluster. For some types of data, you may wish to increase this value to get better coverage across all rows stored in the table.
 
+### Updates to Distribution and Sort Keys
+
+If you specify the `new-dist-key` or `new-sort-keys` options when setting `analyze-table`, you can change the table's distribution or sort keys during encoding management. This is a very simple option that allows you to react to changes in how internal customers use tables, and ensure that data is optimally distributed around the cluster. Please note that if for some reason you specify an invalid new distribution or sort key value, the utility will fail to run. Also note these options are ignored unless you set the `analyze-table` option.
+
 ### Do Execute
 
 This option will cause the encoding utility to run the generated script as it goes. Changes will be made to your database LIVE and cannot be undone. It is not recommended that you use this option on Production systems. Furthermore, if the ```--drop-old-data true``` option is included with ```--do-execute true```, then you will be required to confirm that you wish to run this operation before the utility will proceed.
+
+### Metrics
+
+The module will export CloudWatch metrics for the number of tables that are modified if the `do-execute` option is provided. Data is indexed by the cluster name. You can suppress this by adding option `--suppress-cloudwatch` from the command line, or argument `suppress_cw` in the `configure()` method.
 
 # Version Notes
 

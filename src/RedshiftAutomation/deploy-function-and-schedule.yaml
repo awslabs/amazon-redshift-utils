@@ -8,6 +8,7 @@ Parameters:
     AllowedValues:
       - AnalyzeVacuumUtility
       - ColumnEncodingUtility
+      - Monitoring
   SecurityGroups:
     Default: mygroup1, mygroup2
     Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
@@ -34,7 +35,7 @@ Resources:
       Runtime: python2.7
       CodeUri:         
         Bucket: !Sub awslabs-code-${AWS::Region}
-        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.1.zip
+        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.2.zip
       MemorySize: 192
       Timeout: 300
       Tags:
