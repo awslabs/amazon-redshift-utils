@@ -173,7 +173,7 @@ def get_pg_conn():
             comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
 
         try:
-            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db_name, password=db_pwd,
+            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd,
                                   ssl=ssl, timeout=None)
         except Exception as e:
             print(e)
