@@ -1,3 +1,11 @@
+
+/**********************************************************************************************
+Purpose:      View to flatten stl_connection_log table and provide details like session start
+              and end time, duration in human readble format and current state i.e disconnected,
+              terminated by admin, active or connection lost
+History:
+2017-12-29 adedotua created
+**********************************************************************************************/ 
 CREATE OR REPLACE VIEW admin.V_CONNECTION_INFO as
 select trim(a.username) as username,a.pid,a.recordtime as authentication_time,b.recordtime as session_starttime,
 d.recordtime session_endtime,trim(a.dbname) as dbname,trim(c.application_name) as app_name,trim(b.authmethod) as authmethod,
