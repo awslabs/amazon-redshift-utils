@@ -1,8 +1,9 @@
 /**********************************************************************************************
-Purpose:      View to list all fragmented tables in the database
+Purpose:      View to list all fragmented tables in the database. Tables can become fragmented
+              due to frequent vacuums overlapping with concurrent writes on the same table.
 
 History:
-2017-12-29 adedotua and indubh created
+2017-12-29    adedotua and indubh created
 **********************************************************************************************/ 
 
 CREATE VIEW admin.v_fragmented_tables as
