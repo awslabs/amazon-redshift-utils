@@ -127,7 +127,8 @@ def close_conn(conn):
         conn.close()
     except Exception as e:
         if debug:
-            print(e)
+            if 'connection is closed' not in str(e):
+                print(e)
 
 
 def cleanup(conn):
@@ -594,8 +595,9 @@ def analyze(table_info):
                             return ERROR
 
                         if debug:
-                            comment("Max of column '%s' for table '%s.%s' is %d. Current column type is %s." % (
-                                descr[col][0], schema_name, table_name, col_len_result[0][0], col_type))
+                            max = col_len_result[0][0] if col_len_result else 'not defined'
+                            comment("Max of column '%s' for table '%s.%s' is %s. Current column type is %s." % (
+                                descr[col][0], schema_name, table_name, max, col_type))
 
                         # Test to see if largest value is smaller than largest value of smallint (2 bytes)
                         if col_len_result[0][0] <= int(math.pow(2, 15) - 1) and col_type != "smallint":
@@ -832,7 +834,6 @@ def usage(with_message):
         '           --target-schema       - Name of a Schema into which the newly optimised tables and data should be created, rather than in place')
     print('           --threads             - The number of concurrent connections to use during analysis (default 2)')
     print('           --output-file         - The full path to the output file to be generated')
-    print('           --report-file         - The full path to the report file to be generated')
     print('           --debug               - Generate Debug Output including SQL Statements being run')
     print('           --do-execute          - Run the compression encoding optimisation')
     print('           --slot-count          - Modify the wlm_query_slot_count from the default of 1')
@@ -1043,7 +1044,7 @@ order by 2;
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= report-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch="""
 
     # extract the command line arguments
     try:
