@@ -7,11 +7,21 @@ History:
 2017-12-29 adedotua created
 **********************************************************************************************/ 
 CREATE OR REPLACE VIEW admin.V_CONNECTION_INFO as
-select trim(a.username) as username,a.pid,a.recordtime as authentication_time,b.recordtime as session_starttime,
-d.recordtime session_endtime,trim(a.dbname) as dbname,trim(c.application_name) as app_name,trim(b.authmethod) as authmethod,
+select trim(a.username) as username,
+a.pid,
+a.recordtime as authentication_time,
+b.recordtime as session_starttime,
+d.recordtime session_endtime,
+trim(a.dbname) as dbname,
+trim(c.application_name) as app_name,
+trim(b.authmethod) as authmethod,
 case when d.duration > 0 then (d.duration/1000000)/86400||' days '||((d.duration/1000000)%86400)/3600||'hrs '
 ||((d.duration/1000000)%3600)/60||'mins '||(d.duration/1000000%60)||'secs' end as duration,
-b.mtu,trim(b.sslversion) as sslversion,trim(b.sslcipher) as sslcipher,trim(b.remotehost) as remotehost,trim(b.remoteport) as remoteport,
+b.mtu,
+trim(b.sslversion) as sslversion,
+trim(b.sslcipher) as sslcipher,
+trim(b.remotehost) as remotehost,
+trim(b.remoteport) as remoteport,
 case when e.recordtime is not null then 'Terminated by administrator' 
 when d.recordtime is not null then 'Disconnected' 
 when f.process is not null then 'Active' else 'Connection Lost' end as current_state
