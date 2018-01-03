@@ -220,6 +220,7 @@ def run_vacuum(conn,
             vacuum_parameter, min_unsorted_pct, deleted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
 
     elif blacklisted_tables is not None:
+        comment("Extracting Candidate Tables for vacuum based on stl_alert_event_log...")
         blacklisted_tables_array = blacklisted_tables.split(',')
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
                                                    + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null')
@@ -391,7 +392,13 @@ def run_vacuum(conn,
     return True
 
 
-def run_analyze(conn, cluster_name, cw, schema_name='public', table_name=None, ignore_errors=False,
+def run_analyze(conn,
+                cluster_name,
+                cw,
+                schema_name='public',
+                table_name=None,
+                blacklisted_tables=None,
+                ignore_errors=False,
                 predicate_cols=False,
                 stats_off_pct=10,
                 **kwargs):
@@ -411,6 +418,76 @@ def run_analyze(conn, cluster_name, cw, schema_name='public', table_name=None, i
                                                 AND  trim("schema") = '%s'
                                                 AND  trim("table") = '%s';
                                                 ''' % (predicate_cols_option, stats_off_pct, schema_name, table_name,)
+
+    elif blacklisted_tables is not None:
+        comment("Extracting Candidate Tables for analyze based on Query Optimizer Alerts...")
+
+        blacklisted_tables_array = blacklisted_tables.split(',')
+        get_analyze_statement_feedback = '''
+                                    SELECT DISTINCT 'analyze ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '"' + '%s ; ' + '/* Stats_Off : ' + CAST(info_tbl."stats_off" AS VARCHAR(10)) + ' */ ;'
+                                    FROM (/* Get top N rank tables based on the missing statistics alerts */
+                                         SELECT TRIM(n.nspname)::VARCHAR schema_name,
+                                                TRIM(c.relname)::VARCHAR table_name
+                                         FROM (SELECT TRIM(SPLIT_PART(SPLIT_PART(a.plannode,':',2),' ',2)) AS Table_Name,
+                                                      COUNT(a.query),
+                                                      DENSE_RANK() OVER (ORDER BY COUNT(a.query) DESC) AS qry_rnk
+                                               FROM stl_explain a,
+                                                    stl_query b
+                                               WHERE a.query = b.query
+                                               AND   CAST(b.starttime AS DATE) >= dateadd(DAY,%s,CURRENT_DATE)
+                                               AND   a.userid > 1
+                                               AND   regexp_instr(a.plannode,'.*missing statistics.*') > 0
+                                               AND   regexp_instr(a.plannode,'.*_bkp_.*') = 0
+                                               GROUP BY Table_Name) miss_tbl
+                                               LEFT JOIN pg_class c ON c.relname = TRIM(miss_tbl.table_name)
+                                               LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE miss_tbl.qry_rnk <= %s
+                                               /* Get the top N rank tables based on the stl_alert_event_log alerts */
+                                               UNION
+                                               SELECT schema_name,
+                                                      table_name
+                                               FROM (SELECT TRIM(n.nspname)::VARCHAR schema_name,
+                                                            TRIM(c.relname)::VARCHAR table_name,
+                                                            DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS qry_rnk,
+                                                            COUNT(*)
+                                                     FROM stl_alert_event_log AS l
+                                                       JOIN (SELECT query,
+                                                                    tbl,
+                                                                    perm_table_name
+                                                             FROM stl_scan
+                                                             WHERE perm_table_name <> 'Internal Worktable'
+                                                             GROUP BY query,
+                                                                      tbl,
+                                                                      perm_table_name) AS s ON s.query = l.query
+                                                       JOIN pg_class c ON c.oid = s.tbl
+                                                       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                                                     WHERE l.userid > 1
+                                                     AND   l.event_time >= dateadd(DAY,%s,CURRENT_DATE)
+                                                     AND   regexp_instr(l.Solution,'.*ANALYZE command.*') > 0
+                                                     GROUP BY TRIM(n.nspname),
+                                                              TRIM(c.relname)) anlyz_tbl
+                                               WHERE anlyz_tbl.qry_rnk < %s
+                                               UNION
+                                               /* just a base dump of svv_table_info to check the stats_off metric */
+                                               SELECT "schema"::VARCHAR schema_name,
+                                                      "table"::VARCHAR table_name
+                                               FROM svv_table_info) feedback_tbl
+                                      JOIN svv_table_info info_tbl
+                                        ON info_tbl.schema = feedback_tbl.schema_name
+                                       AND info_tbl.table = feedback_tbl.table_name
+                                    WHERE info_tbl.stats_off::DECIMAL(32,4) > %s::DECIMAL(32,4)
+                                    AND   TRIM(info_tbl.schema) = '%s'
+                                    AND   info_tbl.table NOT IN (%s)
+                                    ORDER BY info_tbl.size ASC;
+                            ''' % (predicate_cols_option,
+                                   goback_no_of_days,
+                                   query_rank,
+                                   goback_no_of_days,
+                                   query_rank,
+                                   stats_off_pct,
+                                   schema_name,
+                                   str(blacklisted_tables_array)[1:-1],)
+
+
     else:
         # query for all tables in the schema
         comment("Extracting Candidate Tables for analyze based on Query Optimizer Alerts...")
@@ -496,13 +573,28 @@ def run_analyze(conn, cluster_name, cw, schema_name='public', table_name=None, i
     if table_name is None:
         comment("Extracting Candidate Tables for analyze based on stats off from system table info ...")
 
-        get_analyze_statement = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '" %s ; '
-                                        + '/* Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
-                                        FROM svv_table_info
-                                        WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
-                                        AND  trim("schema") = '%s'
-                                        ORDER BY "size" ASC ;
-                                        ''' % (predicate_cols_option, stats_off_pct, schema_name)
+        if blacklisted_tables is not None:
+            blacklisted_tables_array = blacklisted_tables.split(',')
+            get_analyze_statement = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '" %s ; '
+                                            + '/* Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
+                                            FROM svv_table_info
+                                            WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
+                                            AND  trim("schema") = '%s'
+                                            AND "table" NOT IN (%s)
+                                            ORDER BY "size" ASC ;
+                                            ''' % (predicate_cols_option,
+                                                   stats_off_pct,
+                                                   schema_name,
+                                                   str(blacklisted_tables_array)[1:-1],
+                                                   )
+        else:
+            get_analyze_statement = '''SELECT DISTINCT 'analyze ' + "schema" + '."' + "table" + '" %s ; '
+                                            + '/* Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
+                                            FROM svv_table_info
+                                            WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
+                                            AND  trim("schema") = '%s'
+                                            ORDER BY "size" ASC ;
+                                            ''' % (predicate_cols_option, stats_off_pct, schema_name)
 
         if debug:
             comment(get_analyze_statement)
