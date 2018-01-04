@@ -84,7 +84,7 @@ def print_statements(statements):
 
 
 def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_group=None, query_slot_count=1,
-                ssl_option=True, **kwargs):
+                ssl=True, **kwargs):
     conn = None
 
     if debug:
@@ -92,7 +92,7 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
 
     try:
         conn = pg8000.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd,
-                              ssl=ssl_option, timeout=None)
+                              ssl=ssl, timeout=None)
         conn.autocommit = True
     except Exception as e:
         print("Exception on Connect to Cluster: %s" % e)
@@ -665,9 +665,9 @@ def run_analyze_vacuum(**kwargs):
                               kwargs[config_constants.DB_PASSWORD],
                               kwargs[config_constants.SCHEMA_NAME],
                               kwargs[config_constants.DB_PORT],
-                              None if 'query_group' not in kwargs else kwargs['query_group'],
-                              None if 'query_slot_count' not in kwargs else kwargs['query_slot_count'],
-                              None if 'ssl_option' not in kwargs else kwargs['ssl_option'])
+                              None if config_constants.QUERY_GROUP not in kwargs else kwargs[config_constants.QUERY_GROUP],
+                              None if config_constants.QUERY_SLOT_COUNT not in kwargs else kwargs[config_constants.QUERY_SLOT_COUNT],
+                              None if config_constants.SSL not in kwargs else kwargs[config_constants.SSL])
 
     if master_conn is None:
         raise Exception("No Connection was established")
