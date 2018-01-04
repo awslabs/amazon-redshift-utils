@@ -98,8 +98,6 @@ def usage(with_message=None):
     print(
         '           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
     print(
-        '           --deleted-pct        - Minimum deleted percentage (%) to consider a table for vacuum: Default = 5%')
-    print(
         '           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
     print('           --predicate-cols     - Analyze predicate columns only')
     print('           --max-table-size-mb  - Maximum table size in MB : Default = 700*1024 MB')
@@ -114,7 +112,7 @@ def usage(with_message=None):
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= blacklisted-tables= suppress-cloudwatch= require-ssl= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= deleted-pct= stats-off-pct= predicate-cols= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= blacklisted-tables= suppress-cloudwatch= require-ssl= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= stats-off-pct= predicate-cols= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
 
     # extract the command line arguments
     try:
@@ -202,9 +200,6 @@ def main(argv):
         elif arg == "--max-unsorted-pct":
             if value != '' and value is not None:
                 args[config_constants.MAX_UNSORTED_PCT] = value
-        elif arg == "--deleted-pct":
-            if value != '' and value is not None:
-                args[config_constants.DELETED_PCT] = value
         elif arg == "--stats-off-pct":
             if value != '' and value is not None:
                 args[config_constants.STATS_OFF_PCT] = value
