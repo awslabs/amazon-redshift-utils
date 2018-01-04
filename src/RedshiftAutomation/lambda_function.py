@@ -82,6 +82,10 @@ def event_handler(event, context):
     if config_constants.DEBUG in config_detail and config_detail[config_constants.DEBUG]:
         debug = True
 
+    if debug:
+        print("Using Configuration:")
+        print(config_detail)
+        
     # KMS crypto authorisation context
     auth_context = None
     if config_constants.KMS_AUTH_CONTEXT in config_detail:
@@ -109,10 +113,6 @@ def event_handler(event, context):
         raise Exception("Unable to run Utilities without a configured Password")
 
     config_detail[config_constants.DB_PASSWORD] = use_password
-
-    if debug:
-        print("Using Configuration:")
-        print(config_detail)
 
     run_utilities = []
 

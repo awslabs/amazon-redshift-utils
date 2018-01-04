@@ -69,7 +69,7 @@ The required configuration items are placed into the ```configuration``` part of
 }
 ```
 
-[<img src="button_create-a-configuration-now.png">](https://rawgit.com/awslabs/amazon-redshift-utils/master/src/LambdaRunner/ConfigurationForm.html)
+[<img src="button_create-a-configuration-now.png">](https://rawgit.com/awslabs/amazon-redshift-utils/master/src/RedshiftAutomation/ConfigurationForm.html)
 
 Save this configuration to a json file, and place it on S3. We will refer to the file when we launch the SAM Template. Alternatively you can rebuild the project manually using filename 'config.json', and it will automatically be imported.
 
