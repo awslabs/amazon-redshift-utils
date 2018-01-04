@@ -28,8 +28,9 @@ ANALYZE_TABLE=${ANALYZE_TABLE:-}
 ANALYZE_COL_WIDTH=${ANALYZE_COL_WIDTH:-}
 OUTPUT_FILE=${OUTPUT_FILE:-}
 COMP_ROWS=${COMP_ROWS:-}
-REPORT_FILE=${REPORT_FILE:-}
 QUERY_GROUP=${QUERY_GROUP:-}
+NEW_DIST_KEY=${NEW_DIST_KEY:-}
+NEW_SORT_KEYS=${NEW_SORT_KEYS:-}
 
 if [ "${DB}" == "" ]; then echo "Environment Var 'DB' must be defined"
 elif [ "${DB_USER}" == "" ]; then echo "Environment Var 'DB_USER' must be defined"
@@ -40,8 +41,9 @@ else
     if [ "${ANALYZE_COL_WIDTH}" != "" ]; then ANALYZE_COL_WIDTH_CMD="--analyze-cols ${ANALYZE_COL_WIDTH}"; fi
     if [ "${OUTPUT_FILE}" != "" ]; then OUTPUT_FILE_CMD="--output-file ${OUTPUT_FILE}"; fi
     if [ "${COMP_ROWS}" != "" ]; then COMP_ROWS_CMD="--comprows ${COMP_ROWS}"; fi
-    if [ "${REPORT_FILE}" != "" ]; then REPORT_FILE_CMD="--report-file ${REPORT_FILE}"; fi
     if [ "${QUERY_GROUP}" != "" ]; then QUERY_GROUP_CMD="--query_group ${QUERY_GROUP}"; fi
+    if [ "${NEW_DIST_KEY}" != "" ]; then NEW_DIST_KEY_CMD="--new-dist-key ${NEW_DIST_KEY}"; fi
+    if [ "${NEW_SORT_KEYS}" != "" ]; then NEW_SORT_KEYS_CMD="--new-sort-keys ${NEW_SORT_KEYS}"; fi
 
     python ColumnEncodingUtility/analyze-schema-compression.py \
         --db ${DB} \
@@ -59,7 +61,8 @@ else
         --force ${FORCE} \
         --drop-old-data ${DROP_OLD_DATA} \
         --ssl-option ${SSL_OPTION} \
-        ${ANALYZE_TABLE_CMD} ${ANALYZE_COL_WIDTH_CMD} ${OUTPUT_FILE_CMD} ${COMP_ROWS_CMD} ${REPORT_FILE_CMD} ${QUERY_GROUP_CMD}
+        ${ANALYZE_TABLE_CMD} ${ANALYZE_COL_WIDTH_CMD} ${OUTPUT_FILE_CMD} ${COMP_ROWS_CMD} ${QUERY_GROUP_CMD} \
+        ${NEW_DIST_KEY_CMD} ${NEW_SORT_KEYS_CMD}
 
     echo "Done"
 fi
