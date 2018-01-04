@@ -60,26 +60,26 @@ Run ANALYZE based the `stats_off` metric in `svv_table_info`. If table has a `st
 | :--- | :---: | :--- |
 | --db | Yes | |
 | --db-user | Yes | |
-|--db-pwd |Yes | |
-|--db-host |Yes | |
-|--db-port |No | 5439|
-|--db-conn-opts |No | |
-|--schema-name |No | Public|
-|--table-name |No | |
-|--output-file |Yes | |
-|--debug |No | FALSE|
-|--slot-count |No | 1|
-|--ignore-errors |No | FALSE|
-|--query_group |No | None|
-|--analyze-flag |No | TRUE|
-|--vacuum-flag |No | TRUE|
-|--vacuum-parameter |No | FULL|
-|--min-unsorted-pct |No | 0.05|
-|--max-unsorted-pct |No | 0.5|
-|--stats-off-pct |No | 0.1|
-|--stats-threshold |No | 0.1|
-|--max-table-size-mb |No | 700*1024|
-|--predicate-cols |No | FALSE|
+|--db-pwd | Yes | |
+|--db-host | Yes | |
+|--db-port | No | 5439 |
+|--db-conn-opts | No | |
+|--schema-name | No | Public |
+|--table-name | No | |
+|--output-file | Yes | |
+|--debug | No | False |
+|--slot-count | No | 1 |
+|--ignore-errors | No | False |
+|--query_group | No | None |
+|--analyze-flag | No | False |
+|--vacuum-flag | No | False |
+|--vacuum-parameter | No | FULL |
+|--min-unsorted-pct | No | 0.05 |
+|--max-unsorted-pct | No | 0.5 |
+|--stats-off-pct | No | 0.1 |
+|--stats-threshold | No | 0.1 |
+|--max-table-size-mb | No | 700*1024 |
+|--predicate-cols | No | False |
 
 The above parameter values depend on the cluster type, table size, available system resources and available ‘Time window’ etc. The default values provided here are based on ds2.8xlarge, 8 node cluster. It may take some trial and error to come up with correct parameter values to vacuum and analyze your table(s). If table size is greater than certain size (`max_table_size_mb`) and has a large unsorted region (`deleted_pct` or `max_unsorted_pct`), consider performing a deep copy, which will be much faster than a vacuum.
 
@@ -103,11 +103,11 @@ If the value of `wlm_query_slot_count` is larger than the number of available sl
 
 #### analyze-flag
 
-Flag to turn ON/OFF ANALYZE functionality (True or False). If you want run the script to only perform ANALYZE on a schema or table, set this value ‘False’ : Default = ‘True’.
+Flag to turn ON/OFF ANALYZE functionality (True or False). If you want run the script to only perform ANALYZE on a schema or table, set this value ‘False’ : Default = ‘False’.
 
 #### vacuum-flag
 
-Flag to turn ON/OFF VACUUM functionality (True or False). If you want run the script to only perform VACUUM on a schema or table, set this value ‘False’ : Default = ‘True’.
+Flag to turn ON/OFF VACUUM functionality (True or False). If you want run the script to only perform VACUUM on a schema or table, set this value ‘False’ : Default = ‘False’.
 
 #### vacuum-parameter
 
