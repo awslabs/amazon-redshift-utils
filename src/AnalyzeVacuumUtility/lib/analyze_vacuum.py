@@ -669,14 +669,14 @@ def run_analyze_vacuum(**kwargs):
         raise Exception("No Connection was established")
 
     vacuum_flag = kwargs[config_constants.DO_VACUUM] if config_constants.DO_VACUUM in kwargs else False
-    if vacuum_flag:
+    if vacuum_flag is True:
         # Run vacuum based on the Unsorted , Stats off and Size of the table
         run_vacuum(master_conn, cluster_name, cw, **kwargs)
     else:
         comment("Vacuum flag arg is not set. Vacuum not performed.")
 
     analyze_flag = kwargs[config_constants.DO_ANALYZE] if config_constants.DO_ANALYZE in kwargs else False
-    if analyze_flag:
+    if analyze_flag is True:
         if not vacuum_flag:
             comment("Warning - Analyze without Vacuum may result in sub-optimal performance")
 

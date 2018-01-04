@@ -1,5 +1,38 @@
 AWSTemplateFormatVersion: 2010-09-09
 Transform: AWS::Serverless-2016-10-31
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: Configuration
+        Parameters:
+          - S3ConfigPath
+          - SecurityGroups
+          - SubnetIds
+      -
+        Label:
+          default: Run Schedule Cron Expressions
+        Parameters:
+          - ColumnEncodingCronExpression
+          - MonitorCronExpression
+          - AnalyzeCronExpression
+          - VacuumCronExpression
+    ParameterLabels:
+      S3ConfigPath:
+        default: S3 Config File
+      SecurityGroups:
+        default: VPC Security Group ID
+      SubnetIds:
+        default: VPC Subnet ID's for Networking
+      ColumnEncodingCronExpression:
+        default: Column Encoding
+      MonitorCronExpression:
+        default: Enhanced Monitoring
+      AnalyzeCronExpression:
+        default: Table Statistics Analysis
+      VacuumCronExpression:
+        default: Table Vacuum
 Parameters:
   S3ConfigPath:
     Default: s3://my-bucket/prefix/config-file.json
@@ -19,9 +52,14 @@ Parameters:
     Description: Cron expression for when to run the Column Encoding Utility (default midnight daily)
     Type: String
     AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
-  AnalyzeVacuumCronExpression:
+  AnalyzeCronExpression:
     Default: 0 1 * * ? *
-    Description: Cron expression for when to run the Analyze Vacuum Utility (default 1 am daily)
+    Description: Cron expression for when to run the Analyze  Utility (default 1 am daily)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+  VacuumCronExpression:
+    Default: 0 2 * * ? *
+    Description: Cron expression for when to run the Vacuum Utility (default 2 am daily)
     Type: String
     AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
   MonitorCronExpression:
@@ -79,35 +117,58 @@ Resources:
                     - "kms:Decrypt"
                     - "cloudwatch:PutMetricData"
                   Resource: "*"
-  AnalyzeVacuumEventRule:
+  AnalyzeEventRule:
     Type: "AWS::Events::Rule"
     Properties:
-      Description: CloudWatch Events Rule to Invoke Lambda Runner - Analyze Vacuum Utility
-      Name: InvokeLambdaRedshiftRunner-AnalyzeVacuumUtility
-      ScheduleExpression: !Sub cron(${AnalyzeVacuumCronExpression})
+      Description: CloudWatch Events Rule to invoke Redshift Automation - Analyze Utility
+      Name: InvokeLambdaRedshiftRunner-Analyze
+      ScheduleExpression: !Sub cron(${AnalyzeCronExpression})
       State: ENABLED
       Targets:
         - Arn: !GetAtt LambdaRedshiftAutomation.Arn
-          Id: RedshiftAnalyzeVacuumUtility
+          Id: RedshiftAnalyze
           Input:
             !Sub |
                 {
-                  "ExecuteUtility":"AnalyzeVacuumUtility",
+                  "ExecuteUtility":"Analyze",
                   "ConfigLocation":"${S3ConfigPath}"
                 }
-  CWEventsInvokeAnalyzeVacuumPermission:
+  VacuumEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to invoke Redshift Automation - Vacuum Utility
+      Name: InvokeLambdaRedshiftRunner-Vacuum
+      ScheduleExpression: !Sub cron(${VacuumCronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: RedshiftVacuum
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"Vacuum",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeAnalyzePermission:
     Type: 'AWS::Lambda::Permission'
     Properties:
       FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
       Action: 'lambda:InvokeFunction'
       Principal: events.amazonaws.com
       SourceAccount: !Ref 'AWS::AccountId'
-      SourceArn: !GetAtt AnalyzeVacuumEventRule.Arn
-
+      SourceArn: !GetAtt AnalyzeEventRule.Arn
+  CWEventsInvokeVacuumPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt VacuumEventRule.Arn
   ColumnEncodingEventRule:
     Type: "AWS::Events::Rule"
     Properties:
-      Description: CloudWatch Events Rule to Invoke Lambda Runner - Column Encoding Utility
+      Description: CloudWatch Events Rule to invoke Redshift Automation - Column Encoding Utility
       Name: InvokeLambdaRedshiftRunner-ColumnEncodingUtility
       ScheduleExpression: !Sub cron(${ColumnEncodingCronExpression})
       State: ENABLED
@@ -132,7 +193,7 @@ Resources:
   MonitoringEventRule:
     Type: "AWS::Events::Rule"
     Properties:
-      Description: CloudWatch Events Rule to Invoke Lambda Runner - Redshift Monitoring
+      Description: CloudWatch Events Rule to invoke Redshift Automation - Redshift Monitoring
       Name: InvokeLambdaRedshiftRunner-MonitoringUtility
       ScheduleExpression: !Sub cron(${MonitorCronExpression})
       State: ENABLED

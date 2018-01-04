@@ -25,6 +25,8 @@ import config_constants
 region_key = 'AWS_REGION'
 COLUMN_ENCODING = "ColumnEncodingUtility"
 ANALYZE_VACUUM = "AnalyzeVacuumUtility"
+ANALYZE = "Analyze"
+VACUUM = "Vacuum"
 MONITORING = "Monitoring"
 LOCAL_CONFIG = "config.json"
 debug = False if config_constants.DEBUG not in os.environ else os.environ[config_constants.DEBUG]
@@ -83,9 +85,9 @@ def event_handler(event, context):
         debug = True
 
     if debug:
-        print("Using Configuration:")
+        print("Using Provided Configuration:")
         print(config_detail)
-        
+
     # KMS crypto authorisation context
     auth_context = None
     if config_constants.KMS_AUTH_CONTEXT in config_detail:
@@ -121,6 +123,10 @@ def event_handler(event, context):
             run_utilities.append(COLUMN_ENCODING)
         elif event["ExecuteUtility"] == ANALYZE_VACUUM:
             run_utilities.append(ANALYZE_VACUUM)
+        elif event["ExecuteUtility"] == ANALYZE:
+            run_utilities.append(ANALYZE)
+        elif event["ExecuteUtility"] == VACUUM:
+            run_utilities.append(VACUUM)
         elif event["ExecuteUtility"] == MONITORING:
             run_utilities.append(MONITORING)
     elif 'utilities' in config:
@@ -130,6 +136,12 @@ def event_handler(event, context):
 
         if ANALYZE_VACUUM in config["utilities"]:
             run_utilities.append(ANALYZE_VACUUM)
+
+        if ANALYZE in config["utilities"]:
+            run_utilities.append(ANALYZE)
+
+        if VACUUM in config["utilities"]:
+            run_utilities.append(VACUUM)
 
         if MONITORING in config["utilities"]:
             run_utilities.append(MONITORING)
@@ -146,6 +158,24 @@ def event_handler(event, context):
             results.append(encoding_result)
         elif util == ANALYZE_VACUUM:
             print("Running %s" % util)
+            analyze_result = analyze_vacuum.run_analyze_vacuum(**config_detail)
+            if analyze_result == 0:
+                results.append("OK")
+        elif util == ANALYZE:
+            print("Running %s" % util)
+            # turn on correct flag
+            config_detail[config_constants.DO_ANALYZE] = True
+            config_detail[config_constants.DO_VACUUM] = False
+
+            analyze_result = analyze_vacuum.run_analyze_vacuum(**config_detail)
+            if analyze_result == 0:
+                results.append("OK")
+        elif util == VACUUM:
+            print("Running %s" % util)
+            # turn on correct flag
+            config_detail[config_constants.DO_ANALYZE] = False
+            config_detail[config_constants.DO_VACUUM] = True
+
             analyze_result = analyze_vacuum.run_analyze_vacuum(**config_detail)
             if analyze_result == 0:
                 results.append("OK")
