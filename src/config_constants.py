@@ -23,7 +23,7 @@ ANALYZE_COL_WIDTH = "analyze_col_width"
 THREADS = "threads"
 OUTPUT_FILE = "output_file"
 SSL = "ssl"
-TABLE_BLACKLIST = "table_blacklist"
+BLACKLISTED_TABLES = "blacklisted_tables"
 AGG_INTERVAL = "agg_interval"
 VACUUM_PARAMETER = "vacuum_parameter"
 MIN_UNSORTED_PCT = "min_unsorted_pct"
@@ -57,7 +57,7 @@ config_aliases = {
     "ignore_errors": ["ignoreErrors"],
     "output_file": ["outputFile"],
     "ssl": ["ssl-option", 'require-ssl'],
-    "table_blacklist": ["tableBlacklist"],
+    "blacklisted_tables": ["blacklistedTables"],
     "agg_interval": ["aggregationInterval"],
 }
 
@@ -94,7 +94,7 @@ def normalise_config(config):
     add_to_config(THREADS)
     add_to_config(OUTPUT_FILE)
     add_to_config(SSL)
-    add_to_config(TABLE_BLACKLIST)
+    add_to_config(BLACKLISTED_TABLES)
     add_to_config(AGG_INTERVAL)
     add_to_config(VACUUM_PARAMETER)
     add_to_config(MIN_UNSORTED_PCT)

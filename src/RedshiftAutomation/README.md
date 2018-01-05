@@ -62,7 +62,7 @@ The required configuration items are placed into the ```configuration``` part of
   "ssl":"Should you connect to the cluster with SSL? (boolean true | false | default true)",
   "do_vacuum": "Should the Analyze Vacuum utility run Vacuum? (boolean true | false | default true)",
   "do_analyze":"Should the Analyze Vacuum utility run Analyze? (boolean true | false | default true)",
-  "table_blacklist":"comma separated list of tables to suppress running the analyze vacuum utility against",
+  "blacklisted_tables":"comma separated list of tables to suppress running the analyze vacuum utility against",
   "agg_interval":"Interval on which to summarise database statistics (redshift interval literal: http://docs.aws.amazon.com/redshift/latest/dg/r_interval_literals.html | default '1 hour'",
   "cluster_name":"The cluster name that is the first part of the DNS name"
   }

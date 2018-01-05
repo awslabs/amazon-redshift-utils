@@ -49,8 +49,8 @@ $('#config-form').parsley().on('field:validated', function() {
       if (config['table_whitelist'] == "") {
         delete config['table_whitelist'];
       }
-      if (config['table_blacklist'] == "") {
-        delete config['table_blacklist'];
+      if (config['blacklisted_tables'] == "") {
+        delete config['blacklisted_tables'];
       }
       if (config['target_schema'] == "") {
         delete config['target_schema'];
@@ -137,8 +137,8 @@ $('#config-form').parsley().on('field:validated', function() {
   <label for="tableWhitelist">Restrict to Table Name:</label>
   <input type="text" class="form-control" name="configuration[table_name]" required="false" data-parsley-trigger="change">
 
-  <label for="tableBlackist">Table Blacklist :</label>
-  <input type="text" class="form-control" name="configuration[table_blacklist]" required="false" data-parsley-trigger="change">
+  <label for="blacklistedTables">Blacklisted Tables :</label>
+  <input type="text" class="form-control" name="configuration[blacklisted_tables]" required="false" data-parsley-trigger="change">
 
   <hr/>
   <label>Automated Column Encoding Options</label>
