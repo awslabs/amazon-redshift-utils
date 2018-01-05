@@ -6,6 +6,8 @@ Parameters:
     Description: Utility to run with this instance of the Scheduled Event
     Type: String
     AllowedValues:
+      - Analyze
+      - Vacuum
       - AnalyzeVacuumUtility
       - ColumnEncodingUtility
       - Monitoring

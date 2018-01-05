@@ -84,7 +84,7 @@ def print_statements(statements):
 
 
 def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_group=None, query_slot_count=1,
-                ssl_option=True, **kwargs):
+                ssl=True, **kwargs):
     conn = None
 
     if debug:
@@ -92,7 +92,7 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
 
     try:
         conn = pg8000.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd,
-                              ssl=ssl_option, timeout=None)
+                              ssl=ssl, timeout=None)
         conn.autocommit = True
     except Exception as e:
         print("Exception on Connect to Cluster: %s" % e)
@@ -198,7 +198,6 @@ def run_vacuum(conn,
                vacuum_parameter='FULL',
                min_unsorted_pct=5,
                max_unsorted_pct=50,
-               deleted_pct=5,
                stats_off_pct=10,
                max_table_size_mb=(700 * 1024),
                min_interleaved_skew=1.4,
@@ -208,31 +207,35 @@ def run_vacuum(conn,
 
     if table_name is not None:
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
-                                                   + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') + ', Stats Off : ' + stats_off :: varchar(10)
-                                                   + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;' as statement,
+                                         + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
+                                         + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') 
+                                         + ', Stats Off : ' + stats_off :: varchar(10)
+                                         + ' */ ;' as statement,
                                          "table" as table_name
-                                        FROM svv_table_info
-                                        WHERE (unsorted > %s OR empty > %s or stats_off > %s)
-                                            AND   size < %s
-                                            AND  "schema" = '%s'
-                                            AND  "table" = '%s';
+                                  FROM svv_table_info
+                                  WHERE (unsorted > %s or stats_off > %s)
+                                    AND   size < %s
+                                    AND  "schema" = '%s'
+                                    AND  "table" = '%s';
                                         ''' % (
-            vacuum_parameter, min_unsorted_pct, deleted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
+            vacuum_parameter, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
 
     elif blacklisted_tables is not None:
         comment("Extracting Candidate Tables for vacuum based on stl_alert_event_log...")
         blacklisted_tables_array = blacklisted_tables.split(',')
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
-                                                   + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB,  Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null')
-                                                   + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;' as statement,
+                                         + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
+                                         + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null')
+                                         + ', Stats Off : ' + stats_off :: varchar(10)
+                                         + ' */ ;' as statement,
                                          "table" as table_name
-                                        FROM svv_table_info
-                                        WHERE (unsorted > %s OR empty > %s or stats_off > %s)
-                                            AND   size < %s
-                                            AND  "schema" = '%s'
-                                            AND  "table" NOT IN (%s);
+                                  FROM svv_table_info
+                                  WHERE (unsorted > %s or stats_off > %s)
+                                    AND   size < %s
+                                    AND  "schema" = '%s'
+                                    AND  "table" NOT IN (%s);
                                         ''' % (
-            vacuum_parameter, min_unsorted_pct, deleted_pct, stats_off_pct, max_table_size_mb, schema_name,
+            vacuum_parameter, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name,
             str(blacklisted_tables_array)[1:-1])
 
     else:
@@ -240,7 +243,11 @@ def run_vacuum(conn,
         comment("Extracting Candidate Tables for vacuum based on stl_alert_event_log...")
 
         get_vacuum_statement = '''
-                SELECT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" ; ' + '/* Size : ' + CAST(info_tbl."size" AS VARCHAR(10)) + ' MB' + ',  Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') + ',  Deleted_pct : ' + CAST(info_tbl."empty" AS VARCHAR(10)) + ' */ ;' as statement,
+                SELECT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" ; ' 
+                       + '/* Size : ' + CAST(info_tbl."size" AS VARCHAR(10)) + ' MB' 
+                       + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') 
+                       + ', Stats Off : ' + stats_off :: varchar(10)
+                       + ' */ ;' as statement,
                        table_name
                 FROM (SELECT schema_name,
                              table_name
@@ -268,20 +275,18 @@ def run_vacuum(conn,
                   JOIN svv_table_info info_tbl
                     ON info_tbl.schema = feedback_tbl.schema_name
                    AND info_tbl.table = feedback_tbl.table_name
-                WHERE (info_tbl.unsorted > %s OR info_tbl.empty > %s OR info_tbl.stats_off > %s)
+                WHERE (info_tbl.unsorted > %s OR info_tbl.stats_off > %s)
                 AND   info_tbl.size < %s
                 AND   TRIM(info_tbl.schema) = '%s'
                 ORDER BY info_tbl.size,
                          info_tbl.skew_rows
-                            ''' % (
-            vacuum_parameter,
-            goback_no_of_days,
-            query_rank,
-            min_unsorted_pct,
-            deleted_pct,
-            stats_off_pct,
-            max_table_size_mb,
-            schema_name)
+                            ''' % (vacuum_parameter,
+                                   goback_no_of_days,
+                                   query_rank,
+                                   min_unsorted_pct,
+                                   stats_off_pct,
+                                   max_table_size_mb,
+                                   schema_name)
 
     if debug:
         comment(get_vacuum_statement)
@@ -306,14 +311,14 @@ def run_vacuum(conn,
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
                                                    + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                                    + ',  Unsorted_pct : ' + coalesce(info_tbl.unsorted :: varchar(10),'N/A')
-                                                   + ',  Deleted_pct : ' + CAST("empty" AS VARCHAR(10)) +' */ ;' as statement,
+                                                   + ' */ ;' as statement,
                                          info_tbl."table" as table_name
                                         FROM svv_table_info info_tbl
                                         WHERE "schema" = '%s'
                                                 AND
                                                  (
                                                 --If the size of the table is less than the max_table_size_mb then , run vacuum based on condition: >min_unsorted_pct AND >deleted_pct
-                                                    ((size < %s) AND (unsorted > %s OR empty > %s or stats_off > %s))
+                                                    ((size < %s) AND (unsorted > %s or stats_off > %s))
                                                     OR
                                                 --If the size of the table is greater than the max_table_size_mb then , run vacuum based on condition:
                                                 -- >min_unsorted_pct AND < max_unsorted_pct AND >deleted_pct
@@ -325,7 +330,6 @@ def run_vacuum(conn,
                                                schema_name,
                                                max_table_size_mb,
                                                min_unsorted_pct,
-                                               deleted_pct,
                                                stats_off_pct,
                                                max_table_size_mb,
                                                min_unsorted_pct,
@@ -661,22 +665,22 @@ def run_analyze_vacuum(**kwargs):
                               kwargs[config_constants.DB_PASSWORD],
                               kwargs[config_constants.SCHEMA_NAME],
                               kwargs[config_constants.DB_PORT],
-                              None if 'query_group' not in kwargs else kwargs['query_group'],
-                              None if 'query_slot_count' not in kwargs else kwargs['query_slot_count'],
-                              None if 'ssl_option' not in kwargs else kwargs['ssl_option'])
+                              None if config_constants.QUERY_GROUP not in kwargs else kwargs[config_constants.QUERY_GROUP],
+                              None if config_constants.QUERY_SLOT_COUNT not in kwargs else kwargs[config_constants.QUERY_SLOT_COUNT],
+                              None if config_constants.SSL not in kwargs else kwargs[config_constants.SSL])
 
     if master_conn is None:
         raise Exception("No Connection was established")
 
     vacuum_flag = kwargs[config_constants.DO_VACUUM] if config_constants.DO_VACUUM in kwargs else False
-    if vacuum_flag:
+    if vacuum_flag is True:
         # Run vacuum based on the Unsorted , Stats off and Size of the table
         run_vacuum(master_conn, cluster_name, cw, **kwargs)
     else:
         comment("Vacuum flag arg is not set. Vacuum not performed.")
 
     analyze_flag = kwargs[config_constants.DO_ANALYZE] if config_constants.DO_ANALYZE in kwargs else False
-    if analyze_flag:
+    if analyze_flag is True:
         if not vacuum_flag:
             comment("Warning - Analyze without Vacuum may result in sub-optimal performance")
 
