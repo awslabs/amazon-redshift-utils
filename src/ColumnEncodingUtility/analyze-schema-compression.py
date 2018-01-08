@@ -82,7 +82,7 @@ def get_env_var(name, default_value):
 
 
 db_connections = {}
-db_name = get_env_var('PGDATABASE', None)
+db = get_env_var('PGDATABASE', None)
 db_user = get_env_var('PGUSER', None)
 db_pwd = None
 db_host = get_env_var('PGHOST', None)
@@ -93,7 +93,7 @@ table_name = None
 new_dist_key = None
 new_sort_keys = None
 debug = False
-threads = 2
+threads = 1
 analyze_col_width = False
 do_execute = False
 query_slot_count = 1
@@ -852,7 +852,7 @@ def usage(with_message):
 # method used to configure global variables, so that we can call the run method
 def configure(**kwargs):
     # setup globals
-    global db_name
+    global db
     global db_user
     global db_pwd
     global db_host
