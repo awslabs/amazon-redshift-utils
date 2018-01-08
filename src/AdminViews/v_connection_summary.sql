@@ -6,7 +6,7 @@ Purpose:      View to flatten stl_connection_log table and provide details like 
 History:
 2017-12-29 adedotua created
 **********************************************************************************************/ 
-CREATE OR REPLACE VIEW admin.V_CONNECTION_INFO as
+CREATE OR REPLACE VIEW admin.V_CONNECTION_SUMMARY as
 select trim(a.username) as username,
 a.pid,
 a.recordtime as authentication_time,
