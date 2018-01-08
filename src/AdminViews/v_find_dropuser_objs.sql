@@ -71,5 +71,6 @@ FROM pg_class pgc,
      pg_namespace nc
 WHERE pgc.relnamespace = nc.oid
 AND   pgc.relkind IN ('r','v')
-AND   pgu.usesysid = pgc.relowner) OWNER ("objtype","objowner","userid","schemaname","objname","ddl") WHERE owner.userid > 1
+AND   pgu.usesysid = pgc.relowner) OWNER ("objtype","objowner","userid","schemaname","objname","ddl") 
+WHERE owner.userid > 1;
 
