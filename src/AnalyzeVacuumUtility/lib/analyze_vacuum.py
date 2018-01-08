@@ -317,11 +317,11 @@ def run_vacuum(conn,
                                         WHERE "schema" = '%s'
                                                 AND
                                                  (
-                                                --If the size of the table is less than the max_table_size_mb then , run vacuum based on condition: >min_unsorted_pct AND >deleted_pct
+                                                --If the size of the table is less than the max_table_size_mb then , run vacuum based on condition: >min_unsorted_pct
                                                     ((size < %s) AND (unsorted > %s or stats_off > %s))
                                                     OR
                                                 --If the size of the table is greater than the max_table_size_mb then , run vacuum based on condition:
-                                                -- >min_unsorted_pct AND < max_unsorted_pct AND >deleted_pct
+                                                -- >min_unsorted_pct AND < max_unsorted_pct
                                                 --This is to avoid big table with large unsorted_pct
                                                      ((size > %s) AND (unsorted > %s AND unsorted < %s ))
                                                  )
