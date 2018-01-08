@@ -43,7 +43,7 @@ options = """keepalives=1 keepalives_idle=200 keepalives_interval=200
 
 set_timeout_stmt = "set statement_timeout = 1200000"
 
-unload_stmt = """unload ('SELECT * FROM %s.%s')
+unload_stmt = """unload ('SELECT %s FROM %s.%s')
                  to '%s' credentials 
                  '%s;master_symmetric_key=%s'
                  manifest
@@ -51,7 +51,7 @@ unload_stmt = """unload ('SELECT * FROM %s.%s')
                  gzip
                  delimiter '^' addquotes escape allowoverwrite"""
 
-copy_stmt = """copy %s.%s
+copy_stmt = """copy %s.%s %s
                from '%smanifest' credentials 
                '%s;master_symmetric_key=%s'
                manifest 
@@ -69,18 +69,28 @@ def conn_to_rs(host, port, db, usr, pwd, opt=options, timeout=set_timeout_stmt):
     return rs_conn
 
 
-def unload_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPath, schema_name, table_name):
+def unload_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPath, schema_name, table_name, table_columns=None):
+
+    if table_columns is not None:
+        query = unload_stmt % (table_columns, schema_name, table_name, dataStagingPath, s3_access_credentials, master_symmetric_key)
+    else:
+        query = unload_stmt % ("*", schema_name, table_name, dataStagingPath, s3_access_credentials, master_symmetric_key)
     print "Exporting %s.%s to %s" % (schema_name, table_name, dataStagingPath)
-    conn.query(unload_stmt % (schema_name, table_name, dataStagingPath, s3_access_credentials, master_symmetric_key))
+    conn.query(query)
 
 
-def copy_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPath, dataStagingRegion, schema_name, table_name):
+def copy_data(conn, s3_access_credentials, master_symmetric_key, dataStagingPath, dataStagingRegion, schema_name, table_name, table_columns=""):
     global copy_stmt
     if dataStagingRegion != None:
         copy_stmt = copy_stmt + ("\nREGION '%s'" % (dataStagingRegion))
         
     print "Importing %s.%s from %s" % (schema_name, table_name, dataStagingPath + (":%s" % (dataStagingRegion) if dataStagingRegion != None else ""))
-    conn.query(copy_stmt % (schema_name, table_name, dataStagingPath, s3_access_credentials, master_symmetric_key))
+
+    if table_columns is not None:
+        query= copy_stmt % (schema_name, table_name, table_columns, dataStagingPath, s3_access_credentials, master_symmetric_key)
+    else:
+        query= copy_stmt % (schema_name, table_name, "", dataStagingPath, s3_access_credentials, master_symmetric_key)
+    conn.query(query)
 
 
 def decrypt(b64EncodedValue):
@@ -189,7 +199,13 @@ def main(args):
     src_schema = srcConfig['schemaName']
     src_table = srcConfig['tableName']
     src_user = srcConfig['connectUser']
-    
+
+    #Check if its present and that it is not empty
+    if 'columns' not in srcConfig or not srcConfig['columns'].strip():
+        src_columns=None
+    else:
+        src_columns = srcConfig['columns']
+
     # target to which we'll import data
     destConfig = config['copyTarget']
     
@@ -199,6 +215,11 @@ def main(args):
     dest_schema = destConfig['schemaName']
     dest_table = destConfig['tableName']
     dest_user = destConfig['connectUser']
+    #Check if its present and that it is not empty
+    if 'columns' not in destConfig or not destConfig['columns'].strip():
+        destination_columns=None
+    else:
+        destination_columns = destConfig['columns']
     
     # create a new data key for the unload operation        
     dataKey = kmsClient.generate_data_key(encryptionKeyID, key_spec="AES_256")
@@ -213,13 +234,13 @@ def main(args):
     src_conn = conn_to_rs(src_host, src_port, src_db, src_user,
                           src_pwd) 
     unload_data(src_conn, s3_access_credentials, master_symmetric_key, dataStagingPath,
-                src_schema, src_table) 
+                src_schema, src_table, table_columns=src_columns)
 
     print "Importing to Target"
     dest_conn = conn_to_rs(dest_host, dest_port, dest_db, dest_user,
                           dest_pwd) 
     copy_data(dest_conn, s3_access_credentials, master_symmetric_key, dataStagingPath, dataStagingRegion,
-              dest_schema, dest_table)
+              dest_schema, dest_table, table_columns=destination_columns)
 
     src_conn.close()
     dest_conn.close()
