@@ -23,7 +23,6 @@ VACUUM_FLAG=${VACUUM_FLAG:-true}
 VACUUM_PARAMETER=${VACUUM_PARAMETER:-full}
 MIN_UNSORTED_PCT=${MIN_UNSORTED_PCT:-5}
 MAX_UNSORTED_PCT=${MAX_UNSORTED_PCT:-50}
-DELETED_PCT=${DELETED_PCT:-5}
 STATS_OFF_PCT=${STATS_OFF_PCT:-10}
 PREDICATE_COLS=${PREDICATE_COLS:-false}
 MAX_TABLE_SIZE_MB=${MAX_TABLE_SIZE_MB:-(700*1024)}
@@ -65,7 +64,6 @@ else
         --vacuum-parameter ${VACUUM_PARAMETER} \
         --min-unsorted-pct ${MIN_UNSORTED_PCT} \
         --max-unsorted-pct ${MAX_UNSORTED_PCT} \
-        --deleted-pct ${DELETED_PCT} \
         --stats-off-pct ${STATS_OFF_PCT} \
         --predicate-cols ${PREDICATE_COLS} \
         --max-table-size-mb ${MAX_TABLE_SIZE_MB} \

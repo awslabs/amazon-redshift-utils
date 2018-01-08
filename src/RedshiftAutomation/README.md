@@ -82,7 +82,6 @@ You can also add the following configuration options to finely tune the operatio
 "vacuum_parameter": "Vacuum type to be run, including FULL, SORT ONLY, DELETE ONLY, REINDEX (default FULL)",
 "min_unsorted_pct": "Minimum unsorted percentage(%) to consider a table for vacuum (default 5%)",
 "max_unsorted_pct": "Maximum unsorted percentage(%) to consider a table for vacuum (default 50%)",
-"deleted_pct": "Minimum deleted percentage (%) to consider a table for vacuum (default 5%)",
 "stats_off_pct": "Minimum stats off percentage(%) to consider a table for analyze (default 10%)",
 "predicate_cols": "Flag to enforce only analyzing predicate columns (see http://bit.ly/2o163tC)",
 "suppress_cw": "Set to true to suppress utilities exporting CloudWatch metrics",

@@ -28,7 +28,6 @@ AGG_INTERVAL = "agg_interval"
 VACUUM_PARAMETER = "vacuum_parameter"
 MIN_UNSORTED_PCT = "min_unsorted_pct"
 MAX_UNSORTED_PCT = "max_unsorted_pct"
-DELETED_PCT = "deleted_pct"
 STATS_OFF_PCT = "stats_off_pct"
 PREDICATE_COLS = "predicate_cols"
 SUPPRESS_CLOUDWATCH = "suppress_cw"
@@ -99,7 +98,6 @@ def normalise_config(config):
     add_to_config(VACUUM_PARAMETER)
     add_to_config(MIN_UNSORTED_PCT)
     add_to_config(MAX_UNSORTED_PCT)
-    add_to_config(DELETED_PCT)
     add_to_config(STATS_OFF_PCT)
     add_to_config(PREDICATE_COLS)
     add_to_config(SUPPRESS_CLOUDWATCH)
