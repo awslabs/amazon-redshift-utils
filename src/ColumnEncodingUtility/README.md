@@ -42,7 +42,7 @@ Arguments: --db                  - The Database to Use
            --db-host             - The Cluster endpoint
            --db-port             - The Cluster endpoint port (default 5439)
            --analyze-schema      - The Schema to be Analyzed (default public)
-           --analyze-table       - A specific table to be Analyzed, if --analyze-schema is not desired
+           --analyze-table       - A specific table or list of tables to be Analyzed, if --analyze-schema is not desired
            --analyze-cols        - Analyze column width and reduce the column width if needed
            --new-dist-key        - Set a new Distribution Key (only used if --analyze-table is specified)
            --new-sort-keys       - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)

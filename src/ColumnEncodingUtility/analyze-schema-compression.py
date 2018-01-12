@@ -930,6 +930,17 @@ def run():
     else:
         pass
 
+    # process the table name to support multiple items
+    tables = ""
+    if ',' in table_name:
+        for t in table_name.split(','):
+            tables = tables + "'" + t + "',"
+
+        tables = tables[:-1]
+    else:
+        tables = table_name
+
+
     if table_name is not None:
         statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
@@ -939,8 +950,8 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-and pgn.nspname = '%s' and pgc.relname = '%s'        
-        ''' % (schema_name, table_name)
+and pgn.nspname = '%s' and pgc.relname in (%s)        
+        ''' % (schema_name, tables)
     else:
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Table List...")
