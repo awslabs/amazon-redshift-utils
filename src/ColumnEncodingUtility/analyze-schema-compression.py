@@ -932,7 +932,7 @@ def run():
 
     # process the table name to support multiple items
     tables = ""
-    if ',' in table_name:
+    if table_name is not None and ',' in table_name:
         for t in table_name.split(','):
             tables = tables + "'" + t + "',"
 
