@@ -3,6 +3,7 @@
 Purpose: View to get the DDL for a UDF. 
 History:
 2016-04-20 chriz-bigdata Created
+2018-01-15 pvbouwel Add QUOTE_IDENT for identifiers (function name)
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_udf_ddl
 AS
@@ -20,7 +21,7 @@ SELECT
    n.nspname AS schemaname,
    p.proname AS udfname,
    p.oid AS udfoid,
-1000 as seq, ('CREATE FUNCTION ' || p.proname || ' \(')::varchar(max) as ddl
+1000 as seq, ('CREATE FUNCTION ' || QUOTE_IDENT(p.proname) || ' \(')::varchar(max) as ddl
 FROM pg_proc p
 LEFT JOIN pg_namespace n on n.oid = p.pronamespace
 WHERE p.proowner != 1
