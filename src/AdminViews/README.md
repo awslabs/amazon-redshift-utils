@@ -32,6 +32,7 @@ All views assume you have a schema called admin.
 | v\_get\_vacuum\_details.sql | View to get vacuum details like table name, Schema Name, Deleted Rows , processing time |
 | v\_get\_view\_priv\_by\_user.sql |   View to get the views that a user has access to | 
 | v\_my\_last\_query\_summary.sql | View that shows a formatted extract of SVL\_QUERY\_SUMMARY for the last query run in the session |
+| v\_my\_last\_copy\_errors.sql | View to see any errors associated with a COPY command that was run in the session and had errors |
 | v\_object\_dependency.sql |   View to merge the different dependency views together | 
 | v\_open\_session.sql |   View to monitor currently connected and disconnected sessions | 
 | v\_session\_leakage\_by\_cnt.sql |   View to monitor session leakage by remote host |   
