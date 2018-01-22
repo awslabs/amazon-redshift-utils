@@ -12,6 +12,7 @@ All views assume you have a schema called admin.
 | v\_constraint\_dependency.sql |   View to get the the foreign key constraints between tables | 
 | v\_extended\_table\_info.sql| View to get extended table information for permanent database tables.
 | v\_generate\_cancel\_query.sql | View to get cancel query |
+| v\_generate\_database\_ddl.sql | View to get the DDL for a database |
 | v\_generate\_group\_ddl.sql |   View to get the DDL for a group. | 
 | v\_generate\_schema\_ddl.sql |   View to get the DDL for schemas. | 
 | v\_generate\_tbl\_ddl.sql | View to get the DDL for a table.  This will contain the distkey, sortkey, constraints |
