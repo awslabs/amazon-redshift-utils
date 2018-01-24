@@ -940,7 +940,7 @@ def run():
 
         tables = tables[:-1]
     else:
-        tables = table_name
+        tables = "'" + table_name + "'"
 
 
     if table_name is not None:
