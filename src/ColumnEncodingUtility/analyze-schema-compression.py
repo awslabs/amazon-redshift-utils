@@ -104,12 +104,13 @@ comprows = None
 query_group = None
 ssl = False
 suppress_cw = None
+cw = None
 
 
-def execute_query(str):
+def execute_query(string):
     conn = get_pg_conn()
     cursor = conn.cursor()
-    cursor.execute(str)
+    cursor.execute(string)
 
     try:
         results = cursor.fetchall()
@@ -437,7 +438,7 @@ def analyze(table_info):
                     analyze_compression_result = execute_query(statement)
                 except KeyboardInterrupt:
                     # To handle Ctrl-C from user
-                    cleanup(conn)
+                    cleanup(get_pg_conn())
                     return TERMINATED_BY_USER
                 except Exception as e:
                     print(e)
@@ -522,7 +523,7 @@ def analyze(table_info):
                                     col_len_result = execute_query(col_len_statement)
                                 except KeyboardInterrupt:
                                     # To handle Ctrl-C from user
-                                    cleanup(conn)
+                                    cleanup(get_pg_conn())
                                     return TERMINATED_BY_USER
                                 except Exception as e:
                                     print(e)
@@ -576,7 +577,7 @@ def analyze(table_info):
                                 col_len_result = execute_query(col_len_statement)
                             except KeyboardInterrupt:
                                 # To handle Ctrl-C from user
-                                cleanup(conn)
+                                cleanup(get_pg_conn())
                                 return TERMINATED_BY_USER
                             except Exception as e:
                                 print(e)
@@ -595,9 +596,9 @@ def analyze(table_info):
                             return ERROR
 
                         if debug:
-                            max = col_len_result[0][0] if col_len_result else 'not defined'
+                            maxlen = col_len_result[0][0] if col_len_result else 'not defined'
                             comment("Max of column '%s' for table '%s.%s' is %s. Current column type is %s." % (
-                                descr[col][0], schema_name, table_name, max, col_type))
+                                descr[col][0], schema_name, table_name, maxlen, col_type))
 
                         # Test to see if largest value is smaller than largest value of smallint (2 bytes)
                         if col_len_result[0][0] <= int(math.pow(2, 15) - 1) and col_type != "smallint":
@@ -874,6 +875,7 @@ def configure(**kwargs):
     global query_group
     global ssl
     global suppress_cw
+    global cw
 
     # set variables
     for key, value in kwargs.iteritems():
@@ -1154,7 +1156,7 @@ def main(argv):
             else:
                 args[config_constants.SUPPRESS_CLOUDWATCH] = False
         else:
-            assert False, "Unsupported Argument " + arg
+            print("Unsupported Argument " + arg)
             usage()
 
     # Validate that we've got all the args needed
