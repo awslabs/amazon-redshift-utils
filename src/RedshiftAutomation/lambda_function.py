@@ -9,6 +9,7 @@ try:
     sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
     sys.path.append(os.path.join(os.path.dirname(__file__), "lib/ColumnEncodingUtility"))
     sys.path.append(os.path.join(os.path.dirname(__file__), "lib/AnalyzeVacuumUtility"))
+    sys.path.append(os.path.join(os.path.dirname(__file__), "lib/SystemTablePersistence"))
     sys.path.append(os.path.join(os.path.dirname(__file__), "lib/amazon-redshift-monitoring"))
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 except:
@@ -21,6 +22,7 @@ import analyze_schema_compression
 import analyze_vacuum
 import redshift_monitoring
 import config_constants
+import snapshot_system_stats
 
 region_key = 'AWS_REGION'
 COLUMN_ENCODING = "ColumnEncodingUtility"
@@ -28,6 +30,7 @@ ANALYZE_VACUUM = "AnalyzeVacuumUtility"
 ANALYZE = "Analyze"
 VACUUM = "Vacuum"
 MONITORING = "Monitoring"
+TABLE_PERSISTENCE = "SystemTablePersistence"
 LOCAL_CONFIG = "config.json"
 debug = False if config_constants.DEBUG not in os.environ else os.environ[config_constants.DEBUG]
 
@@ -129,6 +132,8 @@ def event_handler(event, context):
             run_utilities.append(VACUUM)
         elif event["ExecuteUtility"] == MONITORING:
             run_utilities.append(MONITORING)
+        elif event["ExecuteUtility"] == TABLE_PERSISTENCE:
+            run_utilities.append(TABLE_PERSISTENCE)
     elif 'utilities' in config:
         # run each utility, if requested
         if COLUMN_ENCODING in config["utilities"]:
@@ -145,6 +150,9 @@ def event_handler(event, context):
 
         if MONITORING in config["utilities"]:
             run_utilities.append(MONITORING)
+
+        if TABLE_PERSISTENCE in config["utilities"]:
+            run_utilities.append(TABLE_PERSISTENCE)
     else:
         print("No Utilities configured to run. Exiting!")
         return
@@ -182,6 +190,9 @@ def event_handler(event, context):
         elif util == MONITORING:
             print("Running %s" % util)
             redshift_monitoring.monitor_cluster([config_detail, os.environ])
+        elif util == TABLE_PERSISTENCE:
+            print("Running %s" % util)
+            snapshot_system_stats.snapshot([config_detail, os.environ])
 
     print("Processing Complete")
     return results

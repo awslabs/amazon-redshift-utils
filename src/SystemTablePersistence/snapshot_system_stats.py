@@ -52,7 +52,7 @@ def get_config_value(labels, configs):
 
 def create_schema_objects(cursor, conn):
     table_creation = None
-    with open('lib/sample_history_table_creation.sql','r') as sql_file:
+    with open(os.path.dirname(__file__) + '/lib/history_table_creation.sql','r') as sql_file:
         table_creation = sql_file.read()
 
     for s in table_creation.split(";"):
@@ -72,15 +72,15 @@ def create_schema_objects(cursor, conn):
 
 
 def snapshot_system_tables(cursor, conn):
-    snap = json.load(open('lib/sample_history_table_population.json','r'))
+    snap = json.load(open(os.path.dirname(__file__) + '/lib/history_table_population.json','r'))
 
     rowcounts = {}
     for s in snap['statements']:
         for statement_name in s.keys():
             stmt = s[statement_name]
             if debug:
-                print("%s: %s" % statement_name, stmt)
-            cursor.execute(stmt);
+                print("%s: %s" % (statement_name, stmt))
+            cursor.execute(stmt)
             c = cursor.rowcount
             rowcounts[statement_name] = c
 
