@@ -6,7 +6,7 @@ This project includes code that is able to run several of the Amazon Redshift Ut
 
 This utility creates a Lambda function which imports other Redshift Utils modules, and then invokes them against a cluster. It runs within your VPC, and should be configured to connect via a Subnet which is either the same, or can route to the subnet where your Redshift cluster is running. It should also be configured with a Security Group which is trusted by your [Redshift Cluster Security Configuration](http://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html).
 
-Currently the [Column Encoding Utility](src/ColumnEncodingUtility), [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility), and [Redshift Advanced Monitoring](https://github.com/awslabs/amazon-redshift-monitoring) are supported for automated invocation:
+Currently the [Column Encoding Utility](src/ColumnEncodingUtility), [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility), [Redshift Advanced Monitoring](https://github.com/awslabs/amazon-redshift-monitoring), and [System Table Persistence](src/SystemTablePersistence) are supported for automated invocation:
 
 ![what it does](WhatItDoes.png)
 
@@ -148,6 +148,11 @@ __To run the Monitoring Utility__
 ```javascript
 {"ExecuteUtility":"Monitoring","ConfigLocation":"s3//mybucket/myprefix/config.json"}
 ```
+
+__To run the System Table Persistence Utility__
+
+```javascript
+{"ExecuteUtility":"SystemTablePersistence","ConfigLocation":"s3//mybucket/myprefix/config.json"}
 
 You can change the CRON schedule for each event so they don't run at the same time, if you prefer.
 
