@@ -67,6 +67,11 @@ Parameters:
     Description: Cron expression for when to run Monitoring (default 5 minutes past every hour)
     Type: String
     AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+  SysTablesCronExpression:
+    Default: * 0 * * ? *
+    Description: Cron expression for when to run System Table Persistence (nightly at midnight)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
 Resources:
   LambdaRedshiftAutomation:
     Type: AWS::Serverless::Function
@@ -117,6 +122,7 @@ Resources:
                     - "kms:Decrypt"
                     - "cloudwatch:PutMetricData"
                   Resource: "*"
+
   AnalyzeEventRule:
     Type: "AWS::Events::Rule"
     Properties:
@@ -133,6 +139,15 @@ Resources:
                   "ExecuteUtility":"Analyze",
                   "ConfigLocation":"${S3ConfigPath}"
                 }
+  CWEventsInvokeAnalyzePermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt AnalyzeEventRule.Arn
+
   VacuumEventRule:
     Type: "AWS::Events::Rule"
     Properties:
@@ -149,14 +164,6 @@ Resources:
                   "ExecuteUtility":"Vacuum",
                   "ConfigLocation":"${S3ConfigPath}"
                 }
-  CWEventsInvokeAnalyzePermission:
-    Type: 'AWS::Lambda::Permission'
-    Properties:
-      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
-      Action: 'lambda:InvokeFunction'
-      Principal: events.amazonaws.com
-      SourceAccount: !Ref 'AWS::AccountId'
-      SourceArn: !GetAtt AnalyzeEventRule.Arn
   CWEventsInvokeVacuumPermission:
     Type: 'AWS::Lambda::Permission'
     Properties:
@@ -165,6 +172,7 @@ Resources:
       Principal: events.amazonaws.com
       SourceAccount: !Ref 'AWS::AccountId'
       SourceArn: !GetAtt VacuumEventRule.Arn
+
   ColumnEncodingEventRule:
     Type: "AWS::Events::Rule"
     Properties:
@@ -214,3 +222,28 @@ Resources:
       Principal: events.amazonaws.com
       SourceAccount: !Ref 'AWS::AccountId'
       SourceArn: !GetAtt MonitoringEventRule.Arn
+
+  SystablesEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to invoke Redshift Automation - System Tables Persistence
+      Name: InvokeLambdaRedshiftRunner-SystemTablesPersistence
+      ScheduleExpression: !Sub cron(${SysTablesCronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: SystemTablePersistenceUtility
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"SystemTablePersistence",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeSystablesPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt SystablesEventRule.Arn
