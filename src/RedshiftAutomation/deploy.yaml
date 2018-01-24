@@ -18,6 +18,7 @@ Metadata:
           - MonitorCronExpression
           - AnalyzeCronExpression
           - VacuumCronExpression
+          - SysTablesCronExpression
     ParameterLabels:
       S3ConfigPath:
         default: S3 Config File
@@ -33,6 +34,8 @@ Metadata:
         default: Table Statistics Analysis
       VacuumCronExpression:
         default: Table Vacuum
+      SysTablesCronExpression:
+        default: System Tables Persistence
 Parameters:
   S3ConfigPath:
     Default: s3://my-bucket/prefix/config-file.json
@@ -68,7 +71,7 @@ Parameters:
     Type: String
     AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
   SysTablesCronExpression:
-    Default: * 0 * * ? *
+    Default: 0 0 * * ? *
     Description: Cron expression for when to run System Table Persistence (nightly at midnight)
     Type: String
     AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
