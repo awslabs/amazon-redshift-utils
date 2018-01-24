@@ -11,6 +11,7 @@ Parameters:
       - AnalyzeVacuumUtility
       - ColumnEncodingUtility
       - Monitoring
+      - SystemTablePersistence
   SecurityGroups:
     Default: mygroup1, mygroup2
     Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
