@@ -35,6 +35,7 @@ MAX_TBL_SIZE_MB = "max_table_size_mb"
 MIN_INTERLEAVED_SKEW = "min_interleaved_skew"
 MIN_INTERLEAVED_COUNT = "min_interleaved_count"
 KMS_AUTH_CONTEXT = "kms_auth_context"
+CLEANUP_AFTER_DAYS = "cleanup_after_days"
 
 config_aliases = {
     "db": ["db", "DatabaseName"],
@@ -105,6 +106,7 @@ def normalise_config(config):
     add_to_config(MIN_INTERLEAVED_SKEW)
     add_to_config(MIN_INTERLEAVED_COUNT)
     add_to_config(KMS_AUTH_CONTEXT)
+    add_to_config(CLEANUP_AFTER_DAYS)
 
     return config_out
 

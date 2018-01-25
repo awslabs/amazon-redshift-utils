@@ -1,21 +1,24 @@
 from __future__ import print_function
 
+import os
+import sys
+
 # Copyright 2016-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
 # http://aws.amazon.com/apache2.0/
 # or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
-import os
-import sys
-
 # add the lib directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 import boto3
 import base64
 import pg8000
 import datetime
+from datetime import timedelta
 import json
+import config_constants
 
 #### Static Configuration
 ssl = True
@@ -52,7 +55,7 @@ def get_config_value(labels, configs):
 
 def create_schema_objects(cursor, conn):
     table_creation = None
-    with open(os.path.dirname(__file__) + '/lib/history_table_creation.sql','r') as sql_file:
+    with open(os.path.dirname(__file__) + '/lib/history_table_creation.sql', 'r') as sql_file:
         table_creation = sql_file.read()
 
     for s in table_creation.split(";"):
@@ -72,7 +75,7 @@ def create_schema_objects(cursor, conn):
 
 
 def snapshot_system_tables(cursor, conn):
-    snap = json.load(open(os.path.dirname(__file__) + '/lib/history_table_population.json','r'))
+    snap = json.load(open(os.path.dirname(__file__) + '/lib/history_table_population.json', 'r'))
 
     rowcounts = {}
     for s in snap['statements']:
@@ -89,6 +92,38 @@ def snapshot_system_tables(cursor, conn):
 
     if snap['commit'].lower() == "true":
         conn.commit()
+
+    return rowcounts
+
+
+def cleanup_snapshots(cursor, conn, cleanup_after_days):
+    tables = json.load(open(os.path.dirname(__file__) + '/lib/history_table_cleanup.json', 'r'))
+
+    delete_after = (datetime.datetime.now() + timedelta(days=-cleanup_after_days)).strftime('%Y-%m-%d %H:%M:%S')
+
+    if debug:
+        print("Deleting history table data older than %s" % delete_after)
+
+    rowcounts = {}
+    for s in tables:
+        t = s['table']
+        if 'override_sql' in s:
+            stmt = s['override_sql'] % delete_after
+        else:
+            stmt = "delete from history.%s where %s < to_timestamp('%s','yyyy-mm-dd HH:MI:SS')" % (
+                t, s['archiveColumn'], delete_after)
+
+        if debug:
+            print(stmt)
+
+        cursor.execute(stmt)
+        c = cursor.rowcount
+        rowcounts[t] = c
+
+        if debug:
+            print("%s: %s Rows Deleted" % (t, c))
+
+    conn.commit()
 
     return rowcounts
 
@@ -111,7 +146,6 @@ def snapshot(config_sources):
     host = get_config_value(['HostName', 'cluster_endpoint', 'dbHost', 'db_host'], config_sources)
     port = int(get_config_value(['HostPort', 'db_port', 'dbPort'], config_sources))
     database = get_config_value(['DatabaseName', 'db_name', 'db'], config_sources)
-
 
     # we may have been passed the password in the configuration, so extract it if we can
     pwd = get_config_value(['db_pwd'], config_sources)
@@ -166,10 +200,22 @@ def snapshot(config_sources):
     create_schema_objects(cursor, conn)
 
     # snapshot stats into history tables
-    rowcounts = snapshot_system_tables(cursor, conn)
+    insert_rowcounts = snapshot_system_tables(cursor, conn)
 
-    if debug:
-        print(rowcounts)
+    # cleanup history tables if requested in the configuration
+    delete_rowcounts = None
+    cleanup_after_days = get_config_value([config_constants.CLEANUP_AFTER_DAYS], config_sources)
+    if cleanup_after_days is not None:
+        try:
+            cleanup_after_days = int(cleanup_after_days)
+        except ValueError:
+            print("Configuration value '%s' must be an integer" % config_constants.CLEANUP_AFTER_DAYS)
+            raise
 
-    cursor.close()
-    conn.close()
+        if cleanup_after_days > 0:
+            delete_rowcounts = cleanup_snapshots(cursor, conn, cleanup_after_days)
+
+        cursor.close()
+        conn.close()
+
+    return {"inserted": insert_rowcounts, "deleted": delete_rowcounts}
