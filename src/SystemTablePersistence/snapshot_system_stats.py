@@ -54,7 +54,6 @@ def get_config_value(labels, configs):
 
 
 def create_schema_objects(cursor, conn):
-    table_creation = None
     with open(os.path.dirname(__file__) + '/lib/history_table_creation.sql', 'r') as sql_file:
         table_creation = sql_file.read()
 
@@ -74,54 +73,50 @@ def create_schema_objects(cursor, conn):
         print("Successfully verified schema HISTORY & storage tables")
 
 
-def snapshot_system_tables(cursor, conn):
-    snap = json.load(open(os.path.dirname(__file__) + '/lib/history_table_population.json', 'r'))
-
+def snapshot_system_tables(cursor, conn, table_config):
     rowcounts = {}
-    for s in snap['statements']:
-        for statement_name in s.keys():
-            stmt = s[statement_name]
-            if debug:
-                print("%s: %s" % (statement_name, stmt))
-            cursor.execute(stmt)
-            c = cursor.rowcount
-            rowcounts[statement_name] = c
+    for t in table_config:
+        table = t['table']
+        stmt = t['insert']
+        if debug:
+            print("%s: %s" % (table, stmt))
+        cursor.execute(stmt)
+        c = cursor.rowcount
+        rowcounts[table] = c
 
-            if debug:
-                print("%s: %s Rows Created" % (statement_name, c))
+        if debug:
+            print("%s: %s Rows Created" % (table, c))
 
-    if snap['commit'].lower() == "true":
-        conn.commit()
+    conn.commit()
 
     return rowcounts
 
 
-def cleanup_snapshots(cursor, conn, cleanup_after_days):
-    tables = json.load(open(os.path.dirname(__file__) + '/lib/history_table_cleanup.json', 'r'))
-
+def cleanup_snapshots(cursor, conn, cleanup_after_days, table_config):
     delete_after = (datetime.datetime.now() + timedelta(days=-cleanup_after_days)).strftime('%Y-%m-%d %H:%M:%S')
 
     if debug:
         print("Deleting history table data older than %s" % delete_after)
 
     rowcounts = {}
-    for s in tables:
-        t = s['table']
+    for s in table_config:
+        table = s['table']
+
         if 'override_sql' in s:
             stmt = s['override_sql'] % delete_after
         else:
             stmt = "delete from history.%s where %s < to_timestamp('%s','yyyy-mm-dd HH:MI:SS')" % (
-                t, s['archiveColumn'], delete_after)
+                table, s['archiveColumn'], delete_after)
 
         if debug:
             print(stmt)
 
         cursor.execute(stmt)
         c = cursor.rowcount
-        rowcounts[t] = c
+        rowcounts[table] = c
 
         if debug:
-            print("%s: %s Rows Deleted" % (t, c))
+            print("%s: %s Rows Deleted" % (table, c))
 
     conn.commit()
 
@@ -137,7 +132,6 @@ def snapshot(config_sources):
         debug = True
 
     kms = boto3.client('kms', region_name=aws_region)
-    cw = boto3.client('cloudwatch', region_name=aws_region)
 
     if debug:
         print("Connected to AWS KMS & CloudWatch in %s" % aws_region)
@@ -196,11 +190,14 @@ def snapshot(config_sources):
 
     cursor.execute(set_name)
 
+    # load the table configuration
+    table_config = json.load(open(os.path.dirname(__file__) + '/lib/history_table_config.json', 'r'))
+
     # create the dependent objects if we need to
     create_schema_objects(cursor, conn)
 
     # snapshot stats into history tables
-    insert_rowcounts = snapshot_system_tables(cursor, conn)
+    insert_rowcounts = snapshot_system_tables(cursor, conn, table_config)
 
     # cleanup history tables if requested in the configuration
     delete_rowcounts = None
@@ -213,7 +210,7 @@ def snapshot(config_sources):
             raise
 
         if cleanup_after_days > 0:
-            delete_rowcounts = cleanup_snapshots(cursor, conn, cleanup_after_days)
+            delete_rowcounts = cleanup_snapshots(cursor, conn, cleanup_after_days, table_config)
 
         cursor.close()
         conn.close()
