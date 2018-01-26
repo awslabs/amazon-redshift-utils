@@ -201,12 +201,12 @@ def snapshot(config_sources):
 
     # cleanup history tables if requested in the configuration
     delete_rowcounts = None
-    cleanup_after_days = get_config_value([config_constants.CLEANUP_AFTER_DAYS], config_sources)
+    cleanup_after_days = get_config_value([config_constants.SYSTABLE_CLEANUP_AFTER_DAYS], config_sources)
     if cleanup_after_days is not None:
         try:
             cleanup_after_days = int(cleanup_after_days)
         except ValueError:
-            print("Configuration value '%s' must be an integer" % config_constants.CLEANUP_AFTER_DAYS)
+            print("Configuration value '%s' must be an integer" % config_constants.SYSTABLE_CLEANUP_AFTER_DAYS)
             raise
 
         if cleanup_after_days > 0:
