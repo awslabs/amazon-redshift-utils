@@ -1,0 +1,1891 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "DatabaseName": {
+            "Description": "The name of the first database to be created when the cluster is created param=DBNAME",
+            "Type": "String",
+            "Default": "dev",
+            "AllowedPattern": "([a-z]|[0-9])+"
+        },
+        "ClusterType": {
+            "Description": "The type of cluster",
+            "Type": "String",
+            "Default": "single-node",
+            "AllowedValues": [
+                "single-node",
+                "multi-node"
+            ]
+        },
+        "SourceClusterSnapshot": {
+            "Description": "The snapshot that should be used to recover the source cluster",
+            "Type": "String",
+            "Default": "unload-copy-test-cluster"
+        },
+        "NumberOfNodes": {
+            "Description": "The number of compute nodes in the cluster. For multi-node clusters, the NumberOfNodes parameter must be greater than 1",
+            "Type": "Number",
+            "Default": "1"
+        },
+        "NodeType": {
+            "Description": "The type of node to be provisioned",
+            "Type": "String",
+            "Default": "dc1.large",
+            "AllowedValues": [
+                "ds2.xlarge",
+                "ds2.8xlarge",
+                "dc1.large",
+                "dc1.8xlarge"
+            ]
+        },
+        "MasterUsername": {
+            "Description": "The user name that is associated with the master user account for the cluster that is being created param=USERNAME",
+            "Type": "String",
+            "Default": "defaultuser",
+            "AllowedPattern": "([a-z])([a-z]|[0-9])*"
+        },
+        "MasterUserPassword": {
+            "Description": "The password that is associated with the master user account for the cluster that is being created. This is for test purposes only and the password will be available in plaintext on the test instance so do not use an existing password.",
+            "Type": "String",
+            "NoEcho": "true"
+        },
+        "InboundTrafficForEc2": {
+            "Description": "Allow inbound traffic to the cluster from this CIDR range.",
+            "Type": "String",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "Default": "0.0.0.0/0",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "must be a valid CIDR range of the form x.x.x.x/x."
+        },
+        "SSHKeyForEc2": {
+            "Description": "SSH key used for authentication to EC2 host",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "Default": "EC2key",
+            "ConstraintDescription": "Must be a valid EC2 Keypair name."
+        },
+        "AMIForEC2": {
+            "Description": "The ami used for the EC2 instance",
+            "Type": "String",
+            "Default": "ami-1a962263"
+        },
+        "RedshiftPortNumber": {
+            "Description": "The port number on which the cluster accepts incoming connections. param=PORT",
+            "Type": "Number",
+            "Default": "5439"
+        },
+        "GitHubUrl": {
+            "Description": "GitHub Url of repro to be bootstrapped on Ec2",
+            "Type": "String",
+            "Default": "https://github.com/awslabs/amazon-redshift-utils.git"
+        },
+        "GitHubBranch": {
+            "Description": "The branch to checkout for the repro to be bootstrapped on Ec2",
+            "Type": "String",
+            "Default": "master"
+        },
+        "ReportBucket": {
+            "Description": "The bucket in which to put the test report (expected to be in the same region)",
+            "Type": "String",
+            "Default": "copy-unload"
+        }
+    },
+    "Conditions": {
+        "IsMultiNodeCluster": {
+            "Fn::Equals": [
+                {
+                    "Ref": "ClusterType"
+                },
+                "multi-node"
+            ]
+        }
+    },
+    "Resources": {
+        "RedshiftClusterSource": {
+            "Type": "AWS::Redshift::Cluster",
+            "Properties": {
+                "ClusterType": {
+                    "Ref": "ClusterType"
+                },
+                "SnapshotIdentifier": {
+                    "Ref": "SourceClusterSnapshot"
+                },
+                "NumberOfNodes": {
+                    "Fn::If": [
+                        "IsMultiNodeCluster",
+                        {
+                            "Ref": "NumberOfNodes"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                },
+                "NodeType": {
+                    "Ref": "NodeType"
+                },
+                "DBName": {
+                    "Ref": "DatabaseName"
+                },
+                "MasterUsername": {
+                    "Ref": "MasterUsername"
+                },
+                "MasterUserPassword": {
+                    "Ref": "MasterUserPassword"
+                },
+                "ClusterSubnetGroupName": {
+                    "Ref": "RedshiftClusterSubnetGroup"
+                },
+                "PubliclyAccessible": "true",
+                "Port": {
+                    "Ref": "RedshiftPortNumber"
+                },
+                "VpcSecurityGroupIds": [
+                    {
+                        "Ref": "SGAllowAllTrafficWithinSecurityGroup"
+                    }
+                ],
+                "IamRoles": [
+                    {
+                        "Fn::GetAtt": [
+                            "S3Role",
+                            "Arn"
+                        ]
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "e92d8375-62a1-4cff-97b6-dcc35bd9b402"
+                }
+            },
+            "DependsOn": [
+                "S3CopyUnloadBucket"
+            ]
+        },
+        "RedshiftClusterParameterGroup": {
+            "Type": "AWS::Redshift::ClusterParameterGroup",
+            "Properties": {
+                "Description": "Cluster parameter group",
+                "ParameterGroupFamily": "redshift-1.0",
+                "Parameters": [
+                    {
+                        "ParameterName": "enable_user_activity_logging",
+                        "ParameterValue": "true"
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "4b98dffa-20b8-476f-9435-d46f1070a51b"
+                }
+            }
+        },
+        "RedshiftClusterSubnetGroup": {
+            "Type": "AWS::Redshift::ClusterSubnetGroup",
+            "Properties": {
+                "Description": "Cluster subnet group",
+                "SubnetIds": [
+                    {
+                        "Ref": "PublicSubnet"
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "c3b7906b-b128-4741-acaa-f3d9b577f3ca"
+                }
+            }
+        },
+        "VPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": "10.0.0.0/16",
+                "EnableDnsSupport": true,
+                "EnableDnsHostnames": true
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "f63b650b-a467-4002-b732-39c9a67cd76d"
+                }
+            }
+        },
+        "PublicSubnet": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "CidrBlock": "10.0.0.0/24",
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "943687ae-e88e-41e4-96b0-0a9a0c45adc0"
+                }
+            }
+        },
+        "myInternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "06f22f37-0ad0-4a3d-8692-9028b2092789"
+                }
+            }
+        },
+        "AttachGateway": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "InternetGatewayId": {
+                    "Ref": "myInternetGateway"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "2ef8585c-caae-484a-a62d-0baf9c31d8ce"
+                }
+            }
+        },
+        "PublicRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad"
+                }
+            }
+        },
+        "PublicRoute": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "AttachGateway",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "myInternetGateway"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "522f4e05-7243-4e28-85e9-06f610e309cf"
+                }
+            }
+        },
+        "PublicSubnetRouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PublicSubnet"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "b65ceb8f-f750-4b8d-917e-1aee250b1657"
+                }
+            }
+        },
+        "EC2InstanceUnloadCopy": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "IamInstanceProfile": {
+                    "Ref": "Ec2InstanceProfile"
+                },
+                "KeyName": {
+                    "Ref": "SSHKeyForEc2"
+                },
+                "NetworkInterfaces": [
+                    {
+                        "AssociatePublicIpAddress": "true",
+                        "DeviceIndex": "0",
+                        "SubnetId": {
+                            "Ref": "PublicSubnet"
+                        },
+                        "GroupSet": [
+                            {
+                                "Ref": "SecurityGroupEC2"
+                            },
+                            {
+                                "Ref": "SGAllowAllTrafficWithinSecurityGroup"
+                            }
+                        ]
+                    }
+                ],
+                "ImageId": {
+                    "Ref": "AMIForEC2"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -xe\n",
+                                "yum install -y git\n",
+                                "cd /home/ec2-user\n",
+                                "git clone ",
+                                {
+                                    "Ref": "GitHubUrl"
+                                },
+                                "\n",
+                                "cd /home/ec2-user/amazon-redshift-utils\n",
+                                "git checkout ",
+                                {
+                                    "Ref": "GitHubBranch"
+                                },
+                                "\n",
+                                "cd /home/ec2-user\n",
+                                "aws kms encrypt",
+                                " --key-id \"alias/RedshiftUnloadCopyUtility\"",
+                                " --plaintext ",
+                                {
+                                    "Ref": "MasterUserPassword"
+                                },
+                                " --region ",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                " --query CiphertextBlob",
+                                " --output text >PASSWORD_KMS.txt\n",
+                                "chown -R ec2-user /home/ec2-user\n",
+                                "su - ec2-user -c 'bash /home/ec2-user/amazon-redshift-utils/src/UnloadCopyUtility/tests/cloudformation/bootstrap_",
+                                {
+                                    "Ref": "AMIForEC2"
+                                },
+                                ".sh'\n"
+                            ]
+                        ]
+                    }
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "ad2e4fc6-135b-460c-beed-209c5cfffb6b"
+                }
+            },
+            "DependsOn": [
+                "PublicSubnet",
+                "EC2InstanceRole",
+                "SecurityGroupEC2",
+                "SGAllowAllTrafficWithinSecurityGroup"
+            ]
+        },
+        "RedshiftClusterTarget": {
+            "Type": "AWS::Redshift::Cluster",
+            "Properties": {
+                "ClusterType": {
+                    "Ref": "ClusterType"
+                },
+                "NumberOfNodes": {
+                    "Fn::If": [
+                        "IsMultiNodeCluster",
+                        {
+                            "Ref": "NumberOfNodes"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                },
+                "NodeType": {
+                    "Ref": "NodeType"
+                },
+                "DBName": {
+                    "Ref": "DatabaseName"
+                },
+                "MasterUsername": {
+                    "Ref": "MasterUsername"
+                },
+                "MasterUserPassword": {
+                    "Ref": "MasterUserPassword"
+                },
+                "ClusterSubnetGroupName": {
+                    "Ref": "RedshiftClusterSubnetGroup"
+                },
+                "PubliclyAccessible": "true",
+                "Port": {
+                    "Ref": "RedshiftPortNumber"
+                },
+                "VpcSecurityGroupIds": [
+                    {
+                        "Ref": "SGAllowAllTrafficWithinSecurityGroup"
+                    }
+                ],
+                "IamRoles": [
+                    {
+                        "Fn::GetAtt": [
+                            "S3Role",
+                            "Arn"
+                        ]
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "305bfec0-0886-4f27-ae4c-e77620bfae73"
+                }
+            },
+            "DependsOn": [
+                "S3CopyUnloadBucket"
+            ]
+        },
+        "SGAllowAllTrafficWithinSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Security group for traffic within the stack",
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "c077a6bc-3d4c-4886-b95d-a73b93066e88"
+                }
+            }
+        },
+        "SGAllowAllTrafficWithinSecurityGroupIngressICMP": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "DependsOn": "SGAllowAllTrafficWithinSecurityGroup",
+            "Properties": {
+                "GroupId": {
+                    "Ref": "SGAllowAllTrafficWithinSecurityGroup"
+                },
+                "IpProtocol": "icmp",
+                "FromPort": "-1",
+                "ToPort": "-1",
+                "SourceSecurityGroupId": {
+                    "Ref": "SGAllowAllTrafficWithinSecurityGroup"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "7bde4ae6-686a-41eb-812c-49c37e89349f"
+                }
+            }
+        },
+        "SGAllowAllTrafficWithinSecurityGroupIngressTCP": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "DependsOn": "SGAllowAllTrafficWithinSecurityGroup",
+            "Properties": {
+                "GroupId": {
+                    "Ref": "SGAllowAllTrafficWithinSecurityGroup"
+                },
+                "IpProtocol": "tcp",
+                "FromPort": "0",
+                "ToPort": "65535",
+                "SourceSecurityGroupId": {
+                    "Ref": "SGAllowAllTrafficWithinSecurityGroup"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "9d43bda0-dd1c-49ae-9499-f27876114337"
+                }
+            }
+        },
+        "SGAllowAllTrafficWithinSecurityGroupIngressUDP": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "DependsOn": "SGAllowAllTrafficWithinSecurityGroup",
+            "Properties": {
+                "GroupId": {
+                    "Ref": "SGAllowAllTrafficWithinSecurityGroup"
+                },
+                "IpProtocol": "udp",
+                "FromPort": "0",
+                "ToPort": "65535",
+                "SourceSecurityGroupId": {
+                    "Ref": "SGAllowAllTrafficWithinSecurityGroup"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "36bc05ce-e80e-468d-ac67-46fe84c08c54"
+                }
+            }
+        },
+        "SecurityGroupEC2": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Security group inbound for Ec2",
+                "SecurityGroupIngress": [
+                    {
+                        "CidrIp": {
+                            "Ref": "InboundTrafficForEc2"
+                        },
+                        "FromPort": 22,
+                        "ToPort": 22,
+                        "IpProtocol": "tcp"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "e14cc528-132e-4f54-9d00-30d404865923"
+                }
+            }
+        },
+        "S3CopyUnloadBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {},
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "8a5bb457-a935-4c26-83f4-ba6aafdd813d"
+                }
+            }
+        },
+        "S3Policy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "Roles": [
+                    {
+                        "Ref": "S3Role"
+                    },
+                    {
+                        "Ref": "EC2InstanceRole"
+                    }
+                ],
+                "PolicyName": "PolicyForS3AccessToBucket",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": "s3:ListBucket",
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "S3CopyUnloadBucket",
+                                        "Arn"
+                                    ]
+                                },
+                                "arn:aws:s3:::awssampledbuswest2"
+                            ]
+                        },
+                        {
+                            "Sid": "VisualEditor1",
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:ListAllMyBuckets",
+                                "s3:HeadBucket",
+                                "s3:ListObjects"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "VisualEditor2",
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:*"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "/",
+                                        [
+                                            {
+                                                "Fn::GetAtt": [
+                                                    "S3CopyUnloadBucket",
+                                                    "Arn"
+                                                ]
+                                            },
+                                            "*"
+                                        ]
+                                    ]
+                                },
+                                "arn:aws:s3:::awssampledbuswest2/*"
+                            ]
+                        }
+                    ]
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "4d12d15a-a2ca-426e-8aef-84d7c000cc3d"
+                }
+            },
+            "DependsOn": [
+                "S3CopyUnloadBucket"
+            ]
+        },
+        "S3ReportPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "Roles": [
+                    {
+                        "Ref": "EC2InstanceRole"
+                    }
+                ],
+                "PolicyName": "PolicyForS3ReportAccessToBucket",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": "s3:ListBucket",
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Ref": "ReportBucket"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Sid": "VisualEditor1",
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:ListAllMyBuckets",
+                                "s3:HeadBucket",
+                                "s3:ListObjects"
+                            ],
+                            "Resource": "*"
+                        },
+                        {
+                            "Sid": "VisualEditor2",
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:*"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:s3:::",
+                                            {
+                                                "Ref": "ReportBucket"
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "78467a28-e634-4785-93b1-1cfef8b3675f"
+                }
+            }
+        },
+        "KMSAccessToKeyPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "Roles": [
+                    {
+                        "Ref": "S3Role"
+                    },
+                    {
+                        "Ref": "EC2InstanceRole"
+                    }
+                ],
+                "PolicyName": "PolicyForKMSAccessToKey",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": [
+                                "kms:EnableKeyRotation",
+                                "kms:EnableKey",
+                                "kms:ImportKeyMaterial",
+                                "kms:Decrypt",
+                                "kms:GenerateRandom",
+                                "kms:UpdateKeyDescription",
+                                "kms:GetKeyPolicy",
+                                "kms:GenerateDataKeyWithoutPlaintext",
+                                "kms:CancelKeyDeletion",
+                                "kms:ListResourceTags",
+                                "kms:ReEncryptFrom",
+                                "kms:ListGrants",
+                                "kms:GetParametersForImport",
+                                "kms:GetKeyRotationStatus",
+                                "kms:Encrypt",
+                                "kms:ScheduleKeyDeletion",
+                                "kms:GenerateDataKey",
+                                "kms:ReEncryptTo",
+                                "kms:DescribeKey"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "KMSKey",
+                                        "Arn"
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:kms:*:*:",
+                                            {
+                                                "Ref": "KMSALiasRedshiftUnloadCopyUtility"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "614b665b-8a85-4d7d-9e93-af14f55e9a40"
+                }
+            },
+            "DependsOn": [
+                "KMSALiasRedshiftUnloadCopyUtility"
+            ]
+        },
+        "CloudFormationPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "Roles": [
+                    {
+                        "Ref": "EC2InstanceRole"
+                    }
+                ],
+                "PolicyName": "PolicyForCloudFormationAccess",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": [
+                                "cloudformation:GetStackPolicy",
+                                "cloudformation:DescribeStackEvents",
+                                "cloudformation:GetTemplate",
+                                "cloudformation:DescribeStackResources",
+                                "cloudformation:DescribeStackResource",
+                                "cloudformation:GetTemplateSummary",
+                                "cloudformation:ListChangeSets",
+                                "cloudformation:DescribeStacks",
+                                "cloudformation:ListStackResources"
+                            ],
+                            "Resource": {
+                                "Fn::Join": [
+                                    ":",
+                                    [
+                                        "arn:aws:cloudformation",
+                                        {
+                                            "Ref": "AWS::Region"
+                                        },
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        {
+                                            "Fn::Join": [
+                                                "/",
+                                                [
+                                                    "stack",
+                                                    {
+                                                        "Ref": "AWS::StackName"
+                                                    },
+                                                    "*"
+                                                ]
+                                            ]
+                                        }
+                                    ]
+                                ]
+                            }
+                        },
+                        {
+                            "Sid": "VisualEditor1",
+                            "Effect": "Allow",
+                            "Action": [
+                                "cloudformation:EstimateTemplateCost",
+                                "cloudformation:PreviewStackUpdate",
+                                "cloudformation:ListStacks",
+                                "cloudformation:DescribeAccountLimits",
+                                "cloudformation:DescribeChangeSet",
+                                "ec2:DescribeRegions"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "1db48044-3eb4-4afc-a92c-9c126cacdf9e"
+                }
+            }
+        },
+        "RedshiftAccessPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "Roles": [
+                    {
+                        "Ref": "EC2InstanceRole"
+                    }
+                ],
+                "PolicyName": "PolicyRedshiftAccess",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "VisualEditor0",
+                            "Effect": "Allow",
+                            "Action": [
+                                "redshift:DescribeResize",
+                                "redshift:DescribeLoggingStatus",
+                                "redshift:GetClusterCredentials",
+                                "redshift:JoinGroup",
+                                "redshift:CreateClusterUser",
+                                "redshift:ModifyCluster"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        ":",
+                                        [
+                                            "arn:aws:redshift",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            "dbgroup",
+                                            {
+                                                "Fn::Join": [
+                                                    "/",
+                                                    [
+                                                        {
+                                                            "Ref": "RedshiftClusterSource"
+                                                        },
+                                                        "*"
+                                                    ]
+                                                ]
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        ":",
+                                        [
+                                            "arn:aws:redshift",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            "dbname",
+                                            {
+                                                "Fn::Join": [
+                                                    "/",
+                                                    [
+                                                        {
+                                                            "Ref": "RedshiftClusterSource"
+                                                        },
+                                                        "*"
+                                                    ]
+                                                ]
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        ":",
+                                        [
+                                            "arn:aws:redshift",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            "dbuser",
+                                            {
+                                                "Fn::Join": [
+                                                    "/",
+                                                    [
+                                                        {
+                                                            "Ref": "RedshiftClusterSource"
+                                                        },
+                                                        "*"
+                                                    ]
+                                                ]
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        ":",
+                                        [
+                                            "arn:aws:redshift",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            "cluster",
+                                            {
+                                                "Ref": "RedshiftClusterSource"
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        ":",
+                                        [
+                                            "arn:aws:redshift",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            "dbgroup",
+                                            {
+                                                "Fn::Join": [
+                                                    "/",
+                                                    [
+                                                        {
+                                                            "Ref": "RedshiftClusterTarget"
+                                                        },
+                                                        "*"
+                                                    ]
+                                                ]
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        ":",
+                                        [
+                                            "arn:aws:redshift",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            "dbname",
+                                            {
+                                                "Fn::Join": [
+                                                    "/",
+                                                    [
+                                                        {
+                                                            "Ref": "RedshiftClusterTarget"
+                                                        },
+                                                        "*"
+                                                    ]
+                                                ]
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        ":",
+                                        [
+                                            "arn:aws:redshift",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            "dbuser",
+                                            {
+                                                "Fn::Join": [
+                                                    "/",
+                                                    [
+                                                        {
+                                                            "Ref": "RedshiftClusterTarget"
+                                                        },
+                                                        "*"
+                                                    ]
+                                                ]
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        ":",
+                                        [
+                                            "arn:aws:redshift",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            "cluster",
+                                            {
+                                                "Ref": "RedshiftClusterTarget"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Sid": "VisualEditor1",
+                            "Effect": "Allow",
+                            "Action": [
+                                "redshift:DescribeHsmConfigurations",
+                                "redshift:CreateTags",
+                                "redshift:DescribeClusterSecurityGroups",
+                                "redshift:DescribeEventSubscriptions",
+                                "redshift:DescribeOrderableClusterOptions",
+                                "redshift:DescribeEvents",
+                                "redshift:DescribeHsmClientCertificates",
+                                "redshift:DescribeTags",
+                                "redshift:DescribeClusterSubnetGroups",
+                                "redshift:DescribeEventCategories",
+                                "redshift:DescribeReservedNodeOfferings",
+                                "redshift:DescribeSnapshotCopyGrants",
+                                "redshift:DescribeReservedNodes",
+                                "redshift:DescribeClusterSnapshots",
+                                "redshift:DescribeClusterVersions",
+                                "redshift:DescribeClusters",
+                                "redshift:DescribeTableRestoreStatus"
+                            ],
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "2b389ab4-4920-49e7-b556-c0637456c136"
+                }
+            }
+        },
+        "S3Role": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "redshift.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "4000cf92-50fe-4fa9-a609-a6fa5f9e322d"
+                }
+            }
+        },
+        "EC2InstanceRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "sid",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "ec2.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "266c9d73-3ca4-43d0-b954-dcdf6990c671"
+                }
+            }
+        },
+        "Ec2InstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Roles": [
+                    {
+                        "Ref": "EC2InstanceRole"
+                    }
+                ],
+                "Path": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "/",
+                            {
+                                "Ref": "AWS::StackName"
+                            },
+                            "/"
+                        ]
+                    ]
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "388bd912-1f42-44dd-be37-05edfffbffe0"
+                }
+            }
+        },
+        "KMSKey": {
+            "Type": "AWS::KMS::Key",
+            "Properties": {
+                "Description": "Key created by cloud formation for Unload-Copy-testing, should not be considered well protected",
+                "KeyPolicy": {
+                    "Version": "2012-10-17",
+                    "Id": "key-default-1",
+                    "Statement": [
+                        {
+                            "Sid": "Enable IAM User Permissions",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:aws:iam::",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ":root"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "Action": "kms:*",
+                            "Resource": "*"
+                        }
+                    ]
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "0ef28748-109e-430b-9a58-15cc2fec2388"
+                }
+            }
+        },
+        "KMSALiasRedshiftUnloadCopyUtility": {
+            "Type": "AWS::KMS::Alias",
+            "Properties": {
+                "AliasName": "alias/RedshiftUnloadCopyUtility",
+                "TargetKeyId": {
+                    "Ref": "KMSKey"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "e2271e3c-ff91-48e3-b71e-e54418d8ffde"
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "S3CopyUnloadBucketArn": {
+            "Description": "S3 bucket voor unload-copy param=BUCKET_ARN",
+            "Value": {
+                "Fn::GetAtt": [
+                    "S3CopyUnloadBucket",
+                    "Arn"
+                ]
+            }
+        },
+        "S3ReportBucketArn": {
+            "Description": "S3 bucket voor unload-copy param=REPORT_BUCKET_ARN",
+            "Value": {
+                "Fn::Join": [
+                    "",
+                    [
+                        "arn:aws:s3:::",
+                        {
+                            "Ref": "ReportBucket"
+                        }
+                    ]
+                ]
+            }
+        },
+        "S3CopyRole": {
+            "Description": "Role-arn that will be used for S3 access param=COPY_ROLE",
+            "Value": {
+                "Fn::GetAtt": [
+                    "S3Role",
+                    "Arn"
+                ]
+            }
+        },
+        "SourceClusterEndpoint": {
+            "Description": "Source Cluster endpoint param=SOURCE_CLUSTER",
+            "Value": {
+                "Fn::Join": [
+                    ":",
+                    [
+                        {
+                            "Fn::GetAtt": [
+                                "RedshiftClusterSource",
+                                "Endpoint.Address"
+                            ]
+                        },
+                        {
+                            "Fn::GetAtt": [
+                                "RedshiftClusterSource",
+                                "Endpoint.Port"
+                            ]
+                        }
+                    ]
+                ]
+            }
+        },
+        "EC2IP": {
+            "Description": "EC2 IP address",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2InstanceUnloadCopy",
+                    "PublicDnsName"
+                ]
+            }
+        },
+        "SourceClusterName": {
+            "Description": "Name of Source cluster",
+            "Value": {
+                "Ref": "RedshiftClusterSource"
+            }
+        },
+        "TargetClusterEndpoint": {
+            "Description": "Target Cluster endpoint param=TARGET_CLUSTER",
+            "Value": {
+                "Fn::Join": [
+                    ":",
+                    [
+                        {
+                            "Fn::GetAtt": [
+                                "RedshiftClusterTarget",
+                                "Endpoint.Address"
+                            ]
+                        },
+                        {
+                            "Fn::GetAtt": [
+                                "RedshiftClusterTarget",
+                                "Endpoint.Port"
+                            ]
+                        }
+                    ]
+                ]
+            }
+        },
+        "TargetClusterName": {
+            "Description": "Name of Target cluster",
+            "Value": {
+                "Ref": "RedshiftClusterTarget"
+            }
+        },
+        "ParameterGroupName": {
+            "Description": "Name of parameter group",
+            "Value": {
+                "Ref": "RedshiftClusterParameterGroup"
+            }
+        },
+        "RedshiftClusterSubnetGroupName": {
+            "Description": "Name of cluster subnet group",
+            "Value": {
+                "Ref": "RedshiftClusterSubnetGroup"
+            }
+        }
+    },
+    "Metadata": {
+        "AWS::CloudFormation::Designer": {
+            "06f22f37-0ad0-4a3d-8692-9028b2092789": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -220,
+                    "y": 280
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "f63b650b-a467-4002-b732-39c9a67cd76d": {
+                "size": {
+                    "width": 600,
+                    "height": 800
+                },
+                "position": {
+                    "x": -1120,
+                    "y": 390
+                },
+                "z": 1,
+                "embeds": [
+                    "c077a6bc-3d4c-4886-b95d-a73b93066e88",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0"
+                ]
+            },
+            "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad": {
+                "size": {
+                    "width": 250,
+                    "height": 140
+                },
+                "position": {
+                    "x": -1090,
+                    "y": 390
+                },
+                "z": 2,
+                "parent": "f63b650b-a467-4002-b732-39c9a67cd76d",
+                "embeds": [
+                    "522f4e05-7243-4e28-85e9-06f610e309cf"
+                ],
+                "iscontainedinside": [
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d"
+                ]
+            },
+            "2ef8585c-caae-484a-a62d-0baf9c31d8ce": {
+                "source": {
+                    "id": "f63b650b-a467-4002-b732-39c9a67cd76d"
+                },
+                "target": {
+                    "id": "06f22f37-0ad0-4a3d-8692-9028b2092789"
+                },
+                "z": 1
+            },
+            "522f4e05-7243-4e28-85e9-06f610e309cf": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -970,
+                    "y": 450
+                },
+                "z": 3,
+                "parent": "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                "embeds": [],
+                "isassociatedwith": [
+                    "06f22f37-0ad0-4a3d-8692-9028b2092789"
+                ],
+                "iscontainedinside": [
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad",
+                    "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad"
+                ],
+                "dependson": [
+                    "2ef8585c-caae-484a-a62d-0baf9c31d8ce"
+                ]
+            },
+            "e14cc528-132e-4f54-9d00-30d404865923": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -1240,
+                    "y": 570
+                },
+                "z": 0,
+                "embeds": [],
+                "iscontainedinside": [
+                    "f63b650b-a467-4002-b732-39c9a67cd76d"
+                ]
+            },
+            "943687ae-e88e-41e4-96b0-0a9a0c45adc0": {
+                "size": {
+                    "width": 440,
+                    "height": 500
+                },
+                "position": {
+                    "x": -1090,
+                    "y": 570
+                },
+                "z": 2,
+                "parent": "f63b650b-a467-4002-b732-39c9a67cd76d",
+                "embeds": [
+                    "ad2e4fc6-135b-460c-beed-209c5cfffb6b",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca"
+                ],
+                "iscontainedinside": [
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d"
+                ]
+            },
+            "b65ceb8f-f750-4b8d-917e-1aee250b1657": {
+                "source": {
+                    "id": "dfc5a36e-3ece-4e3b-8051-dae96a4e4bad"
+                },
+                "target": {
+                    "id": "943687ae-e88e-41e4-96b0-0a9a0c45adc0"
+                },
+                "z": 2
+            },
+            "c3b7906b-b128-4741-acaa-f3d9b577f3ca": {
+                "size": {
+                    "width": 250,
+                    "height": 250
+                },
+                "position": {
+                    "x": -1020,
+                    "y": 760
+                },
+                "z": 3,
+                "parent": "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                "embeds": [
+                    "305bfec0-0886-4f27-ae4c-e77620bfae73",
+                    "e92d8375-62a1-4cff-97b6-dcc35bd9b402"
+                ],
+                "isassociatedwith": [
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0"
+                ],
+                "iscontainedinside": [
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0"
+                ]
+            },
+            "4b98dffa-20b8-476f-9435-d46f1070a51b": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -40,
+                    "y": -30
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "e92d8375-62a1-4cff-97b6-dcc35bd9b402": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -980,
+                    "y": 880
+                },
+                "z": 4,
+                "parent": "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                "embeds": [],
+                "isassociatedwith": [
+                    "c077a6bc-3d4c-4886-b95d-a73b93066e88",
+                    "4000cf92-50fe-4fa9-a609-a6fa5f9e322d"
+                ],
+                "iscontainedinside": [
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca"
+                ],
+                "dependson": [
+                    "8a5bb457-a935-4c26-83f4-ba6aafdd813d"
+                ]
+            },
+            "ad2e4fc6-135b-460c-beed-209c5cfffb6b": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -730,
+                    "y": 630
+                },
+                "z": 3,
+                "parent": "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                "embeds": [],
+                "dependson": [
+                    "943687ae-e88e-41e4-96b0-0a9a0c45adc0",
+                    "266c9d73-3ca4-43d0-b954-dcdf6990c671"
+                ]
+            },
+            "305bfec0-0886-4f27-ae4c-e77620bfae73": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -980,
+                    "y": 800
+                },
+                "z": 4,
+                "parent": "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                "embeds": [],
+                "isassociatedwith": [
+                    "c077a6bc-3d4c-4886-b95d-a73b93066e88",
+                    "4000cf92-50fe-4fa9-a609-a6fa5f9e322d"
+                ],
+                "iscontainedinside": [
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca",
+                    "c3b7906b-b128-4741-acaa-f3d9b577f3ca"
+                ],
+                "dependson": [
+                    "8a5bb457-a935-4c26-83f4-ba6aafdd813d"
+                ]
+            },
+            "c077a6bc-3d4c-4886-b95d-a73b93066e88": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -1020,
+                    "y": 630
+                },
+                "z": 3,
+                "parent": "f63b650b-a467-4002-b732-39c9a67cd76d",
+                "embeds": [],
+                "iscontainedinside": [
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d",
+                    "f63b650b-a467-4002-b732-39c9a67cd76d"
+                ]
+            },
+            "36bc05ce-e80e-468d-ac67-46fe84c08c54": {
+                "source": {
+                    "id": "c077a6bc-3d4c-4886-b95d-a73b93066e88"
+                },
+                "target": {
+                    "id": "c077a6bc-3d4c-4886-b95d-a73b93066e88"
+                },
+                "z": 3
+            },
+            "9d43bda0-dd1c-49ae-9499-f27876114337": {
+                "source": {
+                    "id": "c077a6bc-3d4c-4886-b95d-a73b93066e88"
+                },
+                "target": {
+                    "id": "c077a6bc-3d4c-4886-b95d-a73b93066e88"
+                },
+                "z": 3
+            },
+            "7bde4ae6-686a-41eb-812c-49c37e89349f": {
+                "source": {
+                    "id": "c077a6bc-3d4c-4886-b95d-a73b93066e88"
+                },
+                "target": {
+                    "id": "c077a6bc-3d4c-4886-b95d-a73b93066e88"
+                },
+                "z": 3
+            },
+            "8a5bb457-a935-4c26-83f4-ba6aafdd813d": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -30,
+                    "y": 100
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "4d12d15a-a2ca-426e-8aef-84d7c000cc3d": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -620,
+                    "y": -30
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "4000cf92-50fe-4fa9-a609-a6fa5f9e322d",
+                    "266c9d73-3ca4-43d0-b954-dcdf6990c671"
+                ]
+            },
+            "4000cf92-50fe-4fa9-a609-a6fa5f9e322d": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -810,
+                    "y": 120
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "266c9d73-3ca4-43d0-b954-dcdf6990c671": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -640,
+                    "y": 130
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "388bd912-1f42-44dd-be37-05edfffbffe0": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -640,
+                    "y": 230
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "266c9d73-3ca4-43d0-b954-dcdf6990c671"
+                ]
+            },
+            "1db48044-3eb4-4afc-a92c-9c126cacdf9e": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -530,
+                    "y": -30
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "266c9d73-3ca4-43d0-b954-dcdf6990c671"
+                ]
+            },
+            "2b389ab4-4920-49e7-b556-c0637456c136": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -380,
+                    "y": -30
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "266c9d73-3ca4-43d0-b954-dcdf6990c671"
+                ]
+            },
+            "0ef28748-109e-430b-9a58-15cc2fec2388": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -190,
+                    "y": -130
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "614b665b-8a85-4d7d-9e93-af14f55e9a40": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -280,
+                    "y": 30
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "4000cf92-50fe-4fa9-a609-a6fa5f9e322d",
+                    "266c9d73-3ca4-43d0-b954-dcdf6990c671"
+                ]
+            },
+            "e2271e3c-ff91-48e3-b71e-e54418d8ffde": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -300,
+                    "y": -130
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "0ef28748-109e-430b-9a58-15cc2fec2388"
+                ]
+            },
+            "78467a28-e634-4785-93b1-1cfef8b3675f": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -770,
+                    "y": -20
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "266c9d73-3ca4-43d0-b954-dcdf6990c671"
+                ]
+            },
+            "7f129aad-8d22-44a0-b66a-acce0573d74b": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -460,
+                    "y": -30
+                },
+                "z": 0,
+                "embeds": [],
+                "isassociatedwith": [
+                    "266c9d73-3ca4-43d0-b954-dcdf6990c671"
+                ]
+            }
+        }
+    }
+}
