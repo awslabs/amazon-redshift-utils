@@ -11,7 +11,8 @@ History:
 **********************************************************************************************/
 
 create view admin.v_my_last_query_summary as 
-select maxtime, 
+select query,
+       maxtime, 
        avgtime, 
        rows, 
        bytes, 
