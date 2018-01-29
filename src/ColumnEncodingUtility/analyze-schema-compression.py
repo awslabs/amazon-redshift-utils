@@ -878,7 +878,7 @@ def configure(**kwargs):
     global cw
 
     # set variables
-    for key, value in kwargs.iteritems():
+    for key, value in kwargs.items():
         setattr(thismodule, key, value)
 
         if debug:
