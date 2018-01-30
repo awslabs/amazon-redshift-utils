@@ -86,9 +86,10 @@ SELECT
    n.nspname AS schemaname,
    p.proname AS udfname,
       p.oid AS udfoid,
-8000 as seq, CASE WHEN prolang = 100068 THEN '$$ LANGUAGE plpythonu;' ELSE '$$ LANGUAGE sql;' END as ddl
+8000 as seq, '$$ LANGUAGE ' + lang.lanname as ddl
 FROM pg_proc p
 LEFT JOIN pg_namespace n on n.oid = p.pronamespace
+LEFT JOIN (select oid, lanname FROM pg_language) lang on p.prolang = lang.oid
 WHERE p.proowner != 1
 )
 ORDER BY udfoid,seq;
