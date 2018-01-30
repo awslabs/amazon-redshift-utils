@@ -4,9 +4,9 @@ Purpose: Returns the per-hour Resources usage per queue for the past 2 days.
     
 Columns:
 
-   exec_hour: 	Hour of execution of queries
-   q: 				ID for the service class, defined in the WLM configuration file. 
-   n_q:				Number of queries executed on that queue/hour
+   exec_hour: 		Hour of execution of queries
+   q: 			ID for the service class, defined in the WLM configuration file. 
+   n_cp:		Number of queries executed on that queue/hour
    avg_q_sec:		Average Queueing time in seconds
    avg_e_sec:		Averagte Executiong time in seconds
    avg_pct_cpu:		Average percentage of CPU used by the query. Value can be more than 100% for multi-cpu/slice systems
@@ -14,7 +14,7 @@ Columns:
    sum_spill_mb:	Sum of Spill usage by that queue on that hour
    sum_row_scan:	Sum of rows scanned on that queue/hour
    sum_join_rows:	Sum of rows joined on that queue/hour
-   sum_nl_join_rows:Sum of rows Joined using Nested Loops on that queue/hour
+   sum_nl_join_rows:	Sum of rows Joined using Nested Loops on that queue/hour
    sum_ret_rows:	Sum of rows returned to the leader/client on that queue/hour
    sum_spec_mb:		Sum of Megabytes scanned by a Spectrum query on that queue/hour
    
