@@ -268,7 +268,7 @@ def run_vacuum(conn,
                               JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                             WHERE l.userid > 1
                             AND   l.event_time >= dateadd(DAY,%s,CURRENT_DATE)
-                            AND   regexp_instr(solution,'.*VACUUM.*') > 0
+                            AND   regexp_instr(solution,'.*VACUUM.reclaim deleted.') > 0
                             GROUP BY TRIM(n.nspname),
                                      TRIM(c.relname)) anlyz_tbl
                       WHERE anlyz_tbl.qry_rnk <%s) feedback_tbl
