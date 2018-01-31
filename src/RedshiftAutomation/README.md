@@ -127,7 +127,7 @@ When completed, it will deploy the following objects:
 * `InvokeLambdaRedshiftRunner-MonitoringUtility`: The CloudWatch Scheduled Event which runs the [Redshift Advanced Monitoring Utility](https://github.com/awslabs/amazon-redshift-monitoring/)
 * _3 AWS Lambda Permissions are also created so that CloudWatch Events can call the Lambda function_
 
-## Running the Modules
+## Manually executing the Lambda Function
 
 These utilites are configured to run via CloudWatch Scheduled Events. You will see that each of the scheduled events includes a payload of input which enables the function to download the configuration and run the correct utility per-instance:
 
@@ -153,8 +153,25 @@ __To run the System Table Persistence Utility__
 
 ```javascript
 {"ExecuteUtility":"SystemTablePersistence","ConfigLocation":"s3//mybucket/myprefix/config.json"}
+```
 
 You can change the CRON schedule for each event so they don't run at the same time, if you prefer.
+
+## But I don't want to use Lambda!
+
+If you don't want to deploy this module using AWS Lambda, then we've also provided a command line based mechanism that will allow you to run all utilities using a host command or through a Cron job. You still need to go through the configuration step to create a config file and place this on S3, then you need to build the RedshiftAutomation project, so that it downloads all its dependencies:
+
+```./build.sh```
+
+You can then invoke the automation unified client `ra`:
+
+```./ra <utility> <config>
+
+Redshift Automation CLI - Automation Utilities for Amazon Redshift
+ra <utility> <config>
+<utility>: Available Utilities: (ColumnEncodingUtility, AnalyzeVacuumUtility, Analyze, Vacuum, Monitoring, SystemTablePersistence)
+<config>: Path to configuration file on Amazon S3, for example 's3://my-bucket/my-prefix/config.json'
+```
 
 ## Rebuilding the Project 
 

@@ -28,7 +28,8 @@ def usage():
     print("ra <utility> <config>")
     utilities = [config_constants.COLUMN_ENCODING, config_constants.ANALYZE_VACUUM, config_constants.ANALYZE,
                  config_constants.VACUUM, config_constants.MONITORING, config_constants.TABLE_PERSISTENCE]
-    print("Available Utilities: (%s)" % ", ".join(utilities))
+    print("<utility>: Available Utilities: (%s)" % ", ".join(utilities))
+    print("<config>: Path to configuration file on Amazon S3, for example 's3://my-bucket/my-prefix/config.json'")
 
     sys.exit(-1)
 
