@@ -1,3 +1,11 @@
+COLUMN_ENCODING = "ColumnEncodingUtility"
+ANALYZE_VACUUM = "AnalyzeVacuumUtility"
+ANALYZE = "Analyze"
+VACUUM = "Vacuum"
+MONITORING = "Monitoring"
+TABLE_PERSISTENCE = "SystemTablePersistence"
+LOCAL_CONFIG = "config.json"
+
 DB_NAME = "db"
 DB_HOST = "db_host"
 DB_PORT = "db_port"
