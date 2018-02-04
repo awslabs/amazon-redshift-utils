@@ -49,7 +49,7 @@ def event_handler(event, context):
     if event is not None and 'ConfigLocation' in event:
         config_location = event['ConfigLocation']
 
-    config = common.get_config(config_location)
+    config = common.get_config(config_location, current_region)
 
     if config_constants.DEBUG in config and config[config_constants.DEBUG]:
         debug = True
