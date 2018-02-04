@@ -55,7 +55,7 @@ config_aliases = {
     "table_name": ["analyzeTable"],
     "schema_name": ["analyzeSchema"],
     "target_schema": ["targetSchema"],
-    "cluster_name": ["ClusterName, clusterName"],
+    "cluster_name": ["ClusterName", "clusterName"],
     "do_analyze": ["doAnalyze", "analyze_flag", "analyze-flag"],
     "do_vacuum": ["doVacuum", "vacuum_flag", 'vacuum-flag'],
     "do_execute": ["do-execute"],
