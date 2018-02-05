@@ -2,7 +2,7 @@
 import psycopg2
 from dbconstring import connstring
 from datetime import datetime
-import variables
+import queries
 import argparse
 
 
@@ -173,19 +173,19 @@ def main():
         tgtcon = psycopg2.connect(tgtconstring)
         tgtcur = tgtcon.cursor()
 
-        createobjs('database', variables.dblist, tgtcon, srccur, tgtcur, tgtclusterid)
-        createobjs('schema', variables.schemalist, tgtcon, srccur, tgtcur, tgtclusterid)
-        grperr = createobjs('group', variables.grouplist, tgtcon, srccur, tgtcur, tgtclusterid)
-        usrerr = createobjs('user', variables.userlist, tgtcon, srccur, tgtcur, tgtclusterid)
+        createobjs('database', queries.dblist, tgtcon, srccur, tgtcur, tgtclusterid)
+        createobjs('schema', queries.schemalist, tgtcon, srccur, tgtcur, tgtclusterid)
+        grperr = createobjs('group', queries.grouplist, tgtcon, srccur, tgtcur, tgtclusterid)
+        usrerr = createobjs('user', queries.userlist, tgtcon, srccur, tgtcur, tgtclusterid)
 
         if not usrerr and not grperr:
-            objconfig(srccur, tgtcur, variables.addusrtogrp, 'usrtogrp', tgtdbname, tgtcon)
-            objconfig(srccur, tgtcur, variables.usrprofile, 'usrprofile', tgtdbname, tgtcon)
-            objconfig(srccur, tgtcur, variables.usrconfig, 'usrconfig', tgtdbname, tgtcon)
+            objconfig(srccur, tgtcur, queries.addusrtogrp, 'usrtogrp', tgtdbname, tgtcon)
+            objconfig(srccur, tgtcur, queries.usrprofile, 'usrprofile', tgtdbname, tgtcon)
+            objconfig(srccur, tgtcur, queries.usrconfig, 'usrconfig', tgtdbname, tgtcon)
         else:
             print "[%s] ERROR: Error while creating users or groups. Please fix and retry" % (str(datetime.now()))
 
-        transferprivs(srccur, tgtcur, variables.sourcetables, variables.usrgrants, tgtdbname)
+        transferprivs(srccur, tgtcur, queries.sourcetables, queries.usrgrants, tgtdbname)
 
         cleanup(tgtcur, tgtcon, 'target')
         cleanup(srccur, srccon, 'source')
