@@ -762,6 +762,8 @@ def analyze(table_info):
                                                                             table_name)
                 if len(table_sortkeys) > 0:
                     insert = "%s order by %s;" % (insert, ",".join(table_sortkeys))
+                else:
+                    insert = "%s;" % (insert)
 
                 statements.extend([insert])
 
