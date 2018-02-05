@@ -509,7 +509,7 @@ def analyze(table_info):
                 if analyze_col_width and "character varying" in col_type:
                     curr_col_length = int(re.search(r'\d+', col_type).group())
                     if curr_col_length > 255:
-                        col_len_statement = 'select /* computing max column length */ max(len(%s)) from %s."%s"' % (
+                        col_len_statement = 'select /* computing max column length */ max(len("%s")) from %s."%s"' % (
                             descr[col][0], schema_name, table_name)
                         try:
                             if debug:
@@ -565,7 +565,7 @@ def analyze(table_info):
 
                 # check whether number columns are too wide
                 if analyze_col_width and "int" in col_type:
-                    col_len_statement = 'select max(%s) from %s."%s"' % (descr[col][0], schema_name, table_name)
+                    col_len_statement = 'select max("%s") from %s."%s"' % (descr[col][0], schema_name, table_name)
                     try:
                         if debug:
                             comment(col_len_statement)
