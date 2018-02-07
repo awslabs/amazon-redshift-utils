@@ -166,7 +166,7 @@ def run_commands(conn, commands, cw=None, cluster_name=None):
                 # cowardly bail on errors
                 conn.rollback()
                 print(traceback.format_exc())
-                return False
+                raise
 
             # emit a cloudwatch metric for the statement
             if cw is not None and cluster_name is not None:
