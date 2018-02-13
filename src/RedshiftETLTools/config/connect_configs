@@ -1,0 +1,28 @@
+{
+	"redshiftCreds": {
+		"clusterEndpoint": "clustername.aseczpony.us-west-2.redshift.amazonaws.com",
+		"clusterPort": 5439,
+		"connectPwd": "super_secret",
+		"connectUser": "etl_user",
+		"db": "dev",
+		"schemaName": "public"
+	},
+	"s3Creds": {
+	  "awsIamRole": "",
+		"awsAccessKeyId": "AKIAXXXXXXXXX",
+		"awsSecretAccessKey": "ASDFEDGHJKLIOPTjelemosenSDFEAD",
+		"path": "s3://analytics-s3.company.com/",
+		"region": "us-west-1"
+	},
+	"defLoadCopyConfigs": {
+		"addquotes": "True",
+		"gzip": "",
+		"escape": "True",
+		"manifest": "",
+		"allowoverwrite": "True",
+		"delimiter": ","
+	},
+	"defLogConfigs": {
+		"logdirectory": "~/git/amazon-redshift-utils/RedshiftETLTools/logs/"
+	}
+}

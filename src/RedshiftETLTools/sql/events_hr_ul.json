@@ -1,0 +1,6 @@
+{
+"queryDetails": {
+"queryName": "events_hr",
+"query": "select * from events where timestamp >= (select date_trunc(''hour'',max(timestamp)) from events)"
+ }
+}
