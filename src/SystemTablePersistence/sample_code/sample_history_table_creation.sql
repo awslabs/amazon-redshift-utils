@@ -1,3 +1,5 @@
+create schema if not exists history;
+
 CREATE TABLE IF NOT EXISTS history.hist_stl_load_errors (LIKE STL_LOAD_ERRORS);
 CREATE TABLE IF NOT EXISTS history.hist_stl_query (LIKE stl_query);
 CREATE TABLE IF NOT EXISTS history.hist_stl_wlm_query (LIKE stl_wlm_query);
