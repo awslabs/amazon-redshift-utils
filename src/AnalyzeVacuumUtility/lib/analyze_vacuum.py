@@ -17,7 +17,7 @@ except:
 import aws_utils
 import config_constants
 
-__version__ = ".9.1.5"
+__version__ = ".9.1.6"
 
 # set default values to vacuum, analyze variables
 goback_no_of_days = -1
@@ -108,13 +108,15 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
         comment(search_path)
 
     try:
-        run_commands(conn, [search_path])
+        run_commands(conn, [search_path], suppress_errors=True)
     except pg8000.ProgrammingError as e:
         if re.match('schema "%s" does not exist' % (schema_name,), e.message) is not None:
             print('Schema %s does not exist' % (schema_name,))
+        elif re.match('syntax error.*', e.message):
+            # this will be because a pattern was used for the search path, no worries
+            pass
         else:
             print(e.message)
-        return None
 
     if query_group is not None and query_group != '':
         set_query_group = 'set query_group to %s' % query_group
@@ -154,7 +156,7 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
     return conn
 
 
-def run_commands(conn, commands, cw=None, cluster_name=None):
+def run_commands(conn, commands, cw=None, cluster_name=None, suppress_errors=False):
     for idx, c in enumerate(commands, start=1):
         if c is not None:
             comment('[%s] Running %s out of %s commands: %s' % (str(os.getpid()), idx, len(commands), c))
@@ -165,7 +167,8 @@ def run_commands(conn, commands, cw=None, cluster_name=None):
             except Exception:
                 # cowardly bail on errors
                 conn.rollback()
-                print(traceback.format_exc())
+                if not suppress_errors:
+                    print(traceback.format_exc())
                 raise
 
             # emit a cloudwatch metric for the statement
@@ -215,7 +218,7 @@ def run_vacuum(conn,
                                   FROM svv_table_info
                                   WHERE (unsorted > %s or stats_off > %s)
                                     AND   size < %s
-                                    AND  "schema" = '%s'
+                                    AND  "schema" ~ '%s'
                                     AND  "table" = '%s';
                                         ''' % (
             vacuum_parameter, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
@@ -232,7 +235,7 @@ def run_vacuum(conn,
                                   FROM svv_table_info
                                   WHERE (unsorted > %s or stats_off > %s)
                                     AND   size < %s
-                                    AND  "schema" = '%s'
+                                    AND  "schema" ~ '%s'
                                     AND  "table" NOT IN (%s);
                                         ''' % (
             vacuum_parameter, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name,
@@ -277,7 +280,7 @@ def run_vacuum(conn,
                    AND info_tbl.table = feedback_tbl.table_name
                 WHERE (info_tbl.unsorted > %s OR info_tbl.stats_off > %s)
                 AND   info_tbl.size < %s
-                AND   TRIM(info_tbl.schema) = '%s'
+                AND   TRIM(info_tbl.schema) ~ '%s'
                 ORDER BY info_tbl.size,
                          info_tbl.skew_rows
                             ''' % (vacuum_parameter,
@@ -312,9 +315,10 @@ def run_vacuum(conn,
                                                    + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                                    + ',  Unsorted_pct : ' + coalesce(info_tbl.unsorted :: varchar(10),'N/A')
                                                    + ' */ ;' as statement,
-                                         info_tbl."table" as table_name
+                                         info_tbl."table" as table_name,
+                                         info_tbl."schema" as schema_name
                                         FROM svv_table_info info_tbl
-                                        WHERE "schema" = '%s'
+                                        WHERE "schema" ~ '%s'
                                                 AND
                                                  (
                                                 --If the size of the table is less than the max_table_size_mb then , run vacuum based on condition: >min_unsorted_pct
@@ -343,7 +347,7 @@ def run_vacuum(conn,
 
         for vs in vacuum_statements:
             statements.append(vs[0])
-            statements.append("analyze %s.\"%s\"" % (schema_name, vs[1]))
+            statements.append("analyze %s.\"%s\"" % (vs[2], vs[1]))
 
         if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
             if not ignore_errors:
@@ -356,8 +360,8 @@ def run_vacuum(conn,
         # query for all tables in the schema for vacuum reindex
         comment("Extracting Candidate Tables for vacuum reindex ...")
         get_vacuum_statement = ''' SELECT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" ; ' + '/* Rows : ' + CAST("rows" AS VARCHAR(10))
-                                    + ',  Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10))
-                                    + ' ,  Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;' AS statement, table_name
+                                    + ', Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10))
+                                    + ', Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;' AS statement, table_name, schema_name
                                 FROM (SELECT TRIM(n.nspname) schema_name, TRIM(t.relname) table_name,
                                                  MAX(v.interleaved_skew) max_skew, MAX(c.count) AS rows,
                                                  CASE
@@ -374,7 +378,7 @@ def run_vacuum(conn,
                                             JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
                                             GROUP BY 1, 2)
                                 WHERE reindex_flag = 'Yes'
-                                    AND schema_name = '%s'
+                                    AND schema_name ~ '%s'
                                         ''' % (min_interleaved_skew, min_interleaved_count, schema_name)
 
         if debug:
@@ -385,7 +389,7 @@ def run_vacuum(conn,
 
         for vs in vacuum_statements:
             statements.append(vs[0])
-            statements.append("analyze %s.\"%s\"" % (schema_name, vs[1]))
+            statements.append("analyze %s.\"%s\"" % (vs[2], vs[1]))
 
         if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
             if not ignore_errors:
@@ -419,7 +423,7 @@ def run_analyze(conn,
                                                    + '/* Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
                                                 FROM svv_table_info
                                                 WHERE   stats_off::DECIMAL (32,4) > %s ::DECIMAL (32,4)
-                                                AND  trim("schema") = '%s'
+                                                AND  trim("schema") ~ '%s'
                                                 AND  trim("table") = '%s';
                                                 ''' % (predicate_cols_option, stats_off_pct, schema_name, table_name,)
 
@@ -479,7 +483,7 @@ def run_analyze(conn,
                                         ON info_tbl.schema = feedback_tbl.schema_name
                                        AND info_tbl.table = feedback_tbl.table_name
                                     WHERE info_tbl.stats_off::DECIMAL(32,4) > %s::DECIMAL(32,4)
-                                    AND   TRIM(info_tbl.schema) = '%s'
+                                    AND   TRIM(info_tbl.schema) ~ '%s'
                                     AND   info_tbl.table NOT IN (%s)
                                     ORDER BY info_tbl.size ASC;
                             ''' % (predicate_cols_option,
@@ -548,7 +552,7 @@ def run_analyze(conn,
                                         ON info_tbl.schema = feedback_tbl.schema_name
                                        AND info_tbl.table = feedback_tbl.table_name
                                     WHERE info_tbl.stats_off::DECIMAL(32,4) > %s::DECIMAL(32,4)
-                                    AND   TRIM(info_tbl.schema) = '%s' 
+                                    AND   TRIM(info_tbl.schema) ~ '%s' 
                                     ORDER BY info_tbl.size ASC
                             ''' % (predicate_cols_option,
                                    goback_no_of_days,
@@ -583,7 +587,7 @@ def run_analyze(conn,
                                             + '/* Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
                                             FROM svv_table_info
                                             WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
-                                            AND  trim("schema") = '%s'
+                                            AND  trim("schema") ~ '%s'
                                             AND "table" NOT IN (%s)
                                             ORDER BY "size" ASC ;
                                             ''' % (predicate_cols_option,
@@ -596,7 +600,7 @@ def run_analyze(conn,
                                             + '/* Stats_Off : ' + CAST("stats_off" AS VARCHAR(10)) + ' */ ;'
                                             FROM svv_table_info
                                             WHERE   stats_off::DECIMAL (32,4) > %s::DECIMAL (32,4)
-                                            AND  trim("schema") = '%s'
+                                            AND  trim("schema") ~ '%s'
                                             ORDER BY "size" ASC ;
                                             ''' % (predicate_cols_option, stats_off_pct, schema_name)
 
