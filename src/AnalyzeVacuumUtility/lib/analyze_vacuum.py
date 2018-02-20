@@ -277,7 +277,7 @@ def run_vacuum(conn,
                    AND info_tbl.table = feedback_tbl.table_name
                 WHERE (info_tbl.unsorted > %s OR info_tbl.stats_off > %s)
                 AND   info_tbl.size < %s
-                AND   TRIM(info_tbl.schema) ~ '%s'
+                AND   TRIM(info_tbl.schema) = '%s'
                 ORDER BY info_tbl.size,
                          info_tbl.skew_rows
                             ''' % (vacuum_parameter,
@@ -548,7 +548,7 @@ def run_analyze(conn,
                                         ON info_tbl.schema = feedback_tbl.schema_name
                                        AND info_tbl.table = feedback_tbl.table_name
                                     WHERE info_tbl.stats_off::DECIMAL(32,4) > %s::DECIMAL(32,4)
-                                    AND   TRIM(info_tbl.schema) ~ '%s' 
+                                    AND   TRIM(info_tbl.schema) = '%s' 
                                     ORDER BY info_tbl.size ASC
                             ''' % (predicate_cols_option,
                                    goback_no_of_days,
