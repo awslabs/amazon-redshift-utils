@@ -62,7 +62,7 @@ import config_constants
 
 thismodule = sys.modules[__name__]
 
-__version__ = ".9.3.1"
+__version__ = ".9.3.2"
 
 OK = 0
 ERROR = 1
@@ -158,6 +158,34 @@ def print_statements(statements):
                 print(s)
 
 
+def set_search_paths(conn, schema_names, set_target_schema):
+    get_schemas_statement = '''
+        select schema_name 
+        from information_schema.schemata
+        where schema_name ~ '%s'
+    ''' % schema_names
+
+    # set default search path
+    search_path = 'set search_path = \'$user\',public'
+
+    # add the target schema to the search path
+    if set_target_schema is not None and set_target_schema != schema_name:
+        search_path = search_path + ', %s' % set_target_schema
+
+    # add all matched schemas to the search path - this could be a single schema, or a pattern
+    c = conn.cursor()
+    c.execute(get_schemas_statement)
+    results = c.fetchall()
+
+    for r in results:
+        search_path = search_path + ', %s' % r[0]
+
+    if debug:
+        comment(search_path)
+
+    run_commands(conn, [search_path])
+
+
 def get_pg_conn():
     global db_connections
     pid = str(os.getpid())
@@ -182,30 +210,14 @@ def get_pg_conn():
             # For future reference: https://github.com/mfenniak/pg8000/issues/149
             # TCP keepalives still need to be configured appropriately on OS level as well
             conn._usock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            conn.autocommit = True
         except Exception as e:
             print(e)
             print('Unable to connect to Cluster Endpoint')
             cleanup(conn)
             return ERROR
 
-            # set default search path
-        search_path = 'set search_path = \'$user\',public,%s' % schema_name
-        if target_schema is not None and target_schema != schema_name:
-            search_path = search_path + ', %s' % target_schema
-
-        if debug:
-            comment(search_path)
-
-        cursor = None
-        try:
-            cursor = conn.cursor()
-            cursor.execute(search_path)
-        except pg8000.Error as e:
-            if re.match('schema "%s" does not exist' % schema_name, e.message) is not None:
-                print('Schema %s does not exist' % schema_name)
-            else:
-                print(e.message)
-            return None
+        set_search_paths(conn, schema_name, target_schema)
 
         if query_group is not None:
             set_query_group = 'set query_group to %s' % query_group
@@ -213,7 +225,7 @@ def get_pg_conn():
             if debug:
                 comment(set_query_group)
 
-            cursor.execute(set_query_group)
+            run_commands(conn, [set_query_group])
 
         if query_slot_count is not None and query_slot_count != 1:
             set_slot_count = 'set wlm_query_slot_count = %s' % query_slot_count
@@ -221,14 +233,14 @@ def get_pg_conn():
             if debug:
                 comment(set_slot_count)
 
-            cursor.execute(set_slot_count)
+            run_commands(conn,[set_slot_count])
 
         # set a long statement timeout
         set_timeout = "set statement_timeout = '1200000'"
         if debug:
             comment(set_timeout)
 
-        cursor.execute(set_timeout)
+        run_commands(conn, [set_timeout])
 
         # set application name
         set_name = "set application_name to 'ColumnEncodingUtility-v%s'" % __version__
@@ -236,7 +248,10 @@ def get_pg_conn():
         if debug:
             comment(set_name)
 
-        cursor.execute(set_name)
+        run_commands(conn, [set_name])
+
+        # turn off autocommit for the rest of the executions
+        conn.autocommit = False
 
         # cache the connection
         db_connections[pid] = conn
@@ -256,7 +271,7 @@ def get_identity(adsrc):
         return None
 
 
-def get_foreign_keys(schema_name, target_schema, table_name):
+def get_foreign_keys(schema_name, set_target_schema, table_name):
     has_fks = False
 
     fk_statement = '''SELECT /* fetching foreign key relations */ conname,
@@ -280,9 +295,9 @@ def get_foreign_keys(schema_name, target_schema, table_name):
 
     for fk in foreign_keys:
         has_fks = True
-        references_clause = fk[1].replace('REFERENCES ', 'REFERENCES %s.' % target_schema)
+        references_clause = fk[1].replace('REFERENCES ', 'REFERENCES %s.' % set_target_schema)
         fk_statements.append(
-            'alter table %s."%s" add constraint %s %s;' % (target_schema, table_name, fk[0], references_clause))
+            'alter table %s."%s" add constraint %s %s;' % (set_target_schema, table_name, fk[0], references_clause))
 
     if has_fks:
         return fk_statements
@@ -290,8 +305,8 @@ def get_foreign_keys(schema_name, target_schema, table_name):
         return None
 
 
-def get_primary_key(table_schema, target_schema, original_table, new_table):
-    pk_statement = 'alter table %s."%s" add primary key (' % (target_schema, new_table)
+def get_primary_key(schema_name, set_target_schema, original_table, new_table):
+    pk_statement = 'alter table %s."%s" add primary key (' % (set_target_schema, new_table)
     has_pks = False
 
     # get the primary key columns
@@ -308,7 +323,7 @@ WHERE
   and attnum > 0
   AND ind.indisprimary
 order by att.attnum;
-''' % (original_table, table_schema)
+''' % (original_table, schema_name)
 
     if debug:
         comment(statement)
@@ -327,7 +342,7 @@ order by att.attnum;
         return None
 
 
-def get_table_desc(table_name):
+def get_table_desc(schema_name, table_name):
     # get the table definition from the dictionary so that we can get relevant details for each column
     statement = '''select /* fetching column descriptions for table */ "column", type, encoding, distkey, sortkey, "notnull", ad.adsrc
  from pg_table_def de, pg_attribute at LEFT JOIN pg_attrdef ad ON (at.attrelid, at.attnum) = (ad.adrelid, ad.adnum)
@@ -351,7 +366,7 @@ def get_table_desc(table_name):
     return descr
 
 
-def get_count_raw_columns(table_name):
+def get_count_raw_columns(schema_name, table_name):
     # count the number of raw encoded columns which are not the sortkey, from the dictionary
     statement = '''select /* getting count of raw columns in table */ count(9) count_raw_columns
       from pg_table_def 
@@ -370,9 +385,10 @@ def get_count_raw_columns(table_name):
 
 
 def run_commands(conn, commands):
+    cursor = conn.cursor()
+
     for c in commands:
         if c is not None:
-            cursor = conn.cursor()
             comment('[%s] Running %s' % (str(os.getpid()), c))
             try:
                 if c.count(';') > 1:
@@ -394,16 +410,17 @@ def run_commands(conn, commands):
 
 
 def analyze(table_info):
-    table_name = table_info[0]
-    dist_style = table_info[3]
-    owner = table_info[4]
-    table_comment = table_info[5]
+    schema_name = table_info[0]
+    table_name = table_info[1]
+    dist_style = table_info[4]
+    owner = table_info[5]
+    table_comment = table_info[6]
 
     # get the count of columns that have raw encoding applied
     table_unoptimised = False
     count_unoptimised = 0
     encodings_modified = False
-    output = get_count_raw_columns(table_name)
+    output = get_count_raw_columns(schema_name, table_name)
 
     if output is None:
         print("Unable to determine potential RAW column encoding for %s" % table_name)
@@ -415,10 +432,10 @@ def analyze(table_info):
                 count_unoptimised += row[0]
 
     if not table_unoptimised and not force:
-        comment("Table %s does not require encoding optimisation" % table_name)
+        comment("Table %s.%s does not require encoding optimisation" % (schema_name,table_name))
         return OK
     else:
-        comment("Table %s contains %s unoptimised columns" % (table_name, count_unoptimised))
+        comment("Table %s.%s contains %s unoptimised columns" % (schema_name,table_name, count_unoptimised))
         if force:
             comment("Using Force Override Option")
 
@@ -431,7 +448,7 @@ def analyze(table_info):
             if debug:
                 comment(statement)
 
-            comment("Analyzing Table '%s'" % (table_name,))
+            comment("Analyzing Table '%s.%s'" % (schema_name,table_name,))
 
             # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
             analyze_compression_result = None
@@ -460,16 +477,21 @@ def analyze(table_info):
                     print("Unknown Error")
                 return ERROR
 
-            if target_schema == schema_name:
+            if target_schema is None:
+                set_target_schema = schema_name
+            else:
+                set_target_schema = target_schema
+
+            if set_target_schema == schema_name:
                 target_table = '%s_$mig' % table_name
             else:
                 target_table = table_name
 
             create_table = 'begin;\nlock table %s."%s";\ncreate table %s."%s"(' % (
-                schema_name, table_name, target_schema, target_table,)
+                schema_name, table_name, set_target_schema, target_table,)
 
             # query the table column definition
-            descr = get_table_desc(table_name)
+            descr = get_table_desc(schema_name, table_name)
 
             encode_columns = []
             statements = []
@@ -502,7 +524,7 @@ def analyze(table_info):
                         comment("Column %s will be modified from %s encoding to %s encoding" % (
                             col, old_encoding, new_encoding))
 
-                # fix datatypesj from the description type to the create type
+                # fix datatypes from the description type to the create type
                 col_type = descr[col][1]
 
                 # check whether varchars columns are too wide
@@ -518,7 +540,8 @@ def analyze(table_info):
                             comment("Analyzing max length of character column '%s' for table '%s.%s' " % (
                                 col, schema_name, table_name))
 
-                            # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
+                            # run the analyze in a loop, because it could be locked by another process modifying rows
+                            # and get a timeout
                             col_len_result = None
                             col_len_retry = 10
                             col_len_attempt_count = 0
@@ -572,7 +595,8 @@ def analyze(table_info):
 
                         comment("Analyzing max column '%s' for table '%s.%s' " % (col, schema_name, table_name))
 
-                        # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
+                        # run the analyze in a loop, because it could be locked by another process modifying rows and
+                        # get a timeout
                         col_len_result = None
                         col_len_retry = 10
                         col_len_attempt_count = 0
@@ -705,7 +729,8 @@ def analyze(table_info):
             else:
                 comment("Column Encoding will be modified for %s.%s" % (schema_name, table_name))
 
-                # add all the column encoding statements on to the create table statement, suppressing the leading comma on the first one
+                # add all the column encoding statements on to the create table statement, suppressing the leading
+                # comma on the first one
                 for i, s in enumerate(encode_columns):
                     create_table += '\n%s%s' % ('' if i == 0 else ',', s)
 
@@ -736,14 +761,14 @@ def analyze(table_info):
                 statements.extend([create_table])
 
                 # get the primary key statement
-                statements.extend([get_primary_key(schema_name, target_schema, table_name, target_table)])
+                statements.extend([get_primary_key(schema_name, set_target_schema, table_name, target_table)])
 
                 # set the table owner
-                statements.extend(['alter table %s."%s" owner to %s;' % (target_schema, target_table, owner)])
+                statements.extend(['alter table %s."%s" owner to %s;' % (set_target_schema, target_table, owner)])
 
                 if table_comment is not None:
                     statements.extend(
-                        ['comment on table %s."%s" is \'%s\';' % (target_schema, target_table, table_comment)])
+                        ['comment on table %s."%s" is \'%s\';' % (set_target_schema, target_table, table_comment)])
 
                 # insert the old data into the new table
                 # if we have identity column(s), we can't insert data from them, so do selective insert
@@ -754,7 +779,7 @@ def analyze(table_info):
                     source_columns = '*'
                     mig_columns = ''
 
-                insert = 'insert into %s."%s" %s select %s from %s."%s"' % (target_schema,
+                insert = 'insert into %s."%s" %s select %s from %s."%s"' % (set_target_schema,
                                                                             target_table,
                                                                             mig_columns,
                                                                             source_columns,
@@ -768,27 +793,28 @@ def analyze(table_info):
                 statements.extend([insert])
 
                 # analyze the new table
-                analyze = 'analyze %s."%s";' % (target_schema, target_table)
+                analyze = 'analyze %s."%s";' % (set_target_schema, target_table)
                 statements.extend([analyze])
 
-                if target_schema == schema_name:
+                if set_target_schema == schema_name:
                     # rename the old table to _$old or drop
                     if drop_old_data:
-                        drop = 'drop table %s."%s" cascade;' % (target_schema, table_name)
+                        drop = 'drop table %s."%s" cascade;' % (set_target_schema, table_name)
                     else:
-                        # the alter table statement for the current data will use the first 104 characters of the original table name, the current datetime as YYYYMMDD and a 10 digit random string
+                        # the alter table statement for the current data will use the first 104 characters of the
+                        # original table name, the current datetime as YYYYMMDD and a 10 digit random string
                         drop = 'alter table %s."%s" rename to "%s_%s_%s_$old";' % (
-                            target_schema, table_name, table_name[0:104], datetime.date.today().strftime("%Y%m%d"),
+                            set_target_schema, table_name, table_name[0:104], datetime.date.today().strftime("%Y%m%d"),
                             shortuuid.ShortUUID().random(length=10))
 
                     statements.extend([drop])
 
                     # rename the migrate table to the old table name
-                    rename = 'alter table %s."%s" rename to "%s";' % (target_schema, target_table, table_name)
+                    rename = 'alter table %s."%s" rename to "%s";' % (set_target_schema, target_table, table_name)
                     statements.extend([rename])
 
                 # add foreign keys
-                fks = get_foreign_keys(schema_name, target_schema, table_name)
+                fks = get_foreign_keys(schema_name, set_target_schema, table_name)
 
                 statements.extend(['commit;'])
 
@@ -940,14 +966,15 @@ def run():
         pass
 
     # process the table name to support multiple items
-    tables = ""
-    if table_name is not None and ',' in table_name:
-        for t in table_name.split(','):
-            tables = tables + "'" + t + "',"
+    if table_name is not None:
+        tables = ""
+        if table_name is not None and ',' in table_name:
+            for t in table_name.split(','):
+                tables = tables + "'" + t + "',"
 
-        tables = tables[:-1]
-    else:
-        tables = "'" + table_name + "'"
+            tables = tables[:-1]
+        else:
+            tables = "'" + table_name + "'"
 
 
     if table_name is not None:
@@ -959,13 +986,13 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-and pgn.nspname = '%s' and pgc.relname in (%s)        
+and pgn.nspname::text ~ '%s' and pgc.relname in (%s)        
         ''' % (schema_name, tables)
     else:
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Table List...")
 
-        statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
+        statement = '''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
 left outer join pg_description pgd ON pgd.objoid = pgc.oid
@@ -973,7 +1000,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner 
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-where pgn.nspname = '%s'
+where pgn.nspname::text ~ '%s'
   and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
 order by 2;
         ''' % (schema_name,)
@@ -1177,8 +1204,6 @@ def main(argv):
         usage("Missing Parameter 'db-port'")
     if config_constants.SCHEMA_NAME not in args:
         args[config_constants.SCHEMA_NAME] = 'public'
-    if config_constants.TARGET_SCHEMA not in args:
-        args[config_constants.TARGET_SCHEMA] = args[config_constants.SCHEMA_NAME]
 
     # Reduce to 1 thread if we're analyzing a single table
     if config_constants.TABLE_NAME in args:
