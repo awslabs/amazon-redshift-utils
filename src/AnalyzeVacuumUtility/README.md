@@ -87,6 +87,10 @@ As VACUUM & ANALYZE operations are resource intensive, you should ensure that th
 
 ### Parameter Guidance
 
+### Schema Name
+
+The utility will accept a valid schema name, or alternative a regular expression pattern which will be used to match to all schemas in the database. This uses Posix regular expression syntax.
+
 #### Slot Count
 
 Sets the number of query slots a query will use.

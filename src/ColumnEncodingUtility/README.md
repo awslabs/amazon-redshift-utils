@@ -36,21 +36,21 @@ This utility was built and tested on Python 2.7x, but may work with other versio
 Usage: analyze-schema-compression.py
        Generates a script to optimise Redshift column encodings on all tables in a schema
 
-Arguments: --db                  - The Database to Use
-           --db-user             - The Database User to connect to
-           --db-pwd              - The Password for the Database User to connect to
-           --db-host             - The Cluster endpoint
-           --db-port             - The Cluster endpoint port (default 5439)
-           --analyze-schema      - The Schema to be Analyzed (default public)
+Arguments: --db                  - The database to use
+           --db-user             - The database user to connect to
+           --db-pwd              - The password for the database user to connect to
+           --db-host             - The cluster endpoint
+           --db-port             - The cluster endpoint port (default 5439)
+           --analyze-schema      - The schema name or a regular expression pattern to resolve schemas for processing.
            --analyze-table       - A specific table or list of tables to be Analyzed, if --analyze-schema is not desired
            --analyze-cols        - Analyze column width and reduce the column width if needed
-           --new-dist-key        - Set a new Distribution Key (only used if --analyze-table is specified)
-           --new-sort-keys       - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)
-           --target-schema       - Name of a Schema into which the newly optimised tables and data should be created, rather than in place
+           --new-dist-key        - Set a new distribution key (only used if --analyze-table is specified)
+           --new-sort-keys       - Set a new sort key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)
+           --target-schema       - Name of a single schema into which the newly optimised tables and data should be created, rather than in place
            --threads             - The number of concurrent connections to use during analysis (default 2)
            --output-file         - The full path to the output file to be generated
            --report-file         - The full path to the report file to be generated
-           --debug               - Generate Debug Output including SQL Statements being run
+           --debug               - Generate debug output including SQL Statements being run
            --do-execute          - Run the compression encoding optimisation
            --slot-count          - Modify the wlm_query_slot_count from the default of 1
            --ignore-errors       - Ignore errors raised in threads when running and continue processing
