@@ -19,6 +19,7 @@ import datetime
 from datetime import timedelta
 import json
 import config_constants
+import pgpasslib
 
 #### Static Configuration
 ssl = True
@@ -143,6 +144,12 @@ def snapshot(config_sources):
 
     # we may have been passed the password in the configuration, so extract it if we can
     pwd = get_config_value(['db_pwd'], config_sources)
+
+    # override the password with the contents of .pgpass or environment variables
+    try:
+        pwd = pgpasslib.getpass(host,port, database,user)
+    except pgpasslib.FileNotFound as e:
+        pass
 
     if pwd is None:
         enc_password = get_config_value(['EncryptedPassword', 'encrypted_password', 'encrypted_pwd', 'dbPassword'],
