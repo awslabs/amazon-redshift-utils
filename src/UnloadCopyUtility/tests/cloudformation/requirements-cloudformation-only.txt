@@ -1,0 +1,3 @@
+boto3
+botocore
+paramiko==2.4.0
