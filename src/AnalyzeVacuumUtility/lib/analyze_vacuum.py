@@ -8,6 +8,7 @@ import socket
 import boto3
 import datetime
 import pg8000
+import pgpasslib
 
 try:
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -102,22 +103,8 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
 
         return None
 
-    # set default search path
-    search_path = 'set search_path = \'$user\',public,%s' % schema_name
-
-    if debug:
-        comment(search_path)
-
-    try:
-        run_commands(conn, [search_path], suppress_errors=True)
-    except pg8000.ProgrammingError as e:
-        if re.match('schema "%s" does not exist' % (schema_name,), e.message) is not None:
-            print('Schema %s does not exist' % (schema_name,))
-        elif re.match('syntax error.*', e.message):
-            # this will be because a pattern was used for the search path, no worries
-            pass
-        else:
-            print(e.message)
+    # set search paths
+    aws_utils.set_search_paths(conn, schema_name)
 
     if query_group is not None and query_group != '':
         set_query_group = 'set query_group to %s' % query_group
@@ -663,11 +650,21 @@ def run_analyze_vacuum(**kwargs):
         comment("Supplied Args:")
         print(kwargs)
 
+    # get the password using .pgpass, environment variables, and then fall back to config
+    db_pwd = None
+    try:
+        db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST],kwargs[config_constants.DB_PORT], kwargs[config_constants.DB_NAME],kwargs[config_constants.DB_USER])
+    except pgpasslib.FileNotFound as e:
+        pass
+
+    if db_pwd is None:
+        db_pwd = kwargs[config_constants.DB_PASSWORD]
+
     # get a connection for the controlling processes
     master_conn = get_pg_conn(kwargs[config_constants.DB_HOST],
                               kwargs[config_constants.DB_NAME],
                               kwargs[config_constants.DB_USER],
-                              kwargs[config_constants.DB_PASSWORD],
+                              db_pwd,
                               kwargs[config_constants.SCHEMA_NAME],
                               kwargs[config_constants.DB_PORT],
                               None if config_constants.QUERY_GROUP not in kwargs else kwargs[config_constants.QUERY_GROUP],

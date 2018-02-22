@@ -44,7 +44,7 @@ import sys
 import traceback
 import socket
 from multiprocessing import Pool
-
+import pgpasslib
 import boto3
 import datetime
 import math
@@ -158,34 +158,6 @@ def print_statements(statements):
                 print(s)
 
 
-def set_search_paths(conn, schema_names, set_target_schema):
-    get_schemas_statement = '''
-        select schema_name 
-        from information_schema.schemata
-        where schema_name ~ '%s'
-    ''' % schema_names
-
-    # set default search path
-    search_path = 'set search_path = \'$user\',public'
-
-    # add the target schema to the search path
-    if set_target_schema is not None and set_target_schema != schema_name:
-        search_path = search_path + ', %s' % set_target_schema
-
-    # add all matched schemas to the search path - this could be a single schema, or a pattern
-    c = conn.cursor()
-    c.execute(get_schemas_statement)
-    results = c.fetchall()
-
-    for r in results:
-        search_path = search_path + ', %s' % r[0]
-
-    if debug:
-        comment(search_path)
-
-    run_commands(conn, [search_path])
-
-
 def get_pg_conn():
     global db_connections
     pid = str(os.getpid())
@@ -217,7 +189,7 @@ def get_pg_conn():
             cleanup(conn)
             return ERROR
 
-        set_search_paths(conn, schema_name, target_schema)
+        aws_utils.set_search_paths(conn, schema_name, target_schema)
 
         if query_group is not None:
             set_query_group = 'set query_group to %s' % query_group
@@ -916,6 +888,16 @@ def configure(**kwargs):
 
         if debug:
             comment("%s = %s" % (key, value))
+
+    # override the password with the contents of .pgpass or environment variables
+    pwd = None
+    try:
+        pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST],kwargs[config_constants.DB_PORT], kwargs[config_constants.DB_NAME],kwargs[config_constants.DB_USER])
+    except pgpasslib.FileNotFound as e:
+        pass
+
+    if pwd is not None:
+        db_pwd = pwd
 
     # create a cloudwatch client
     region_key = 'AWS_REGION'
