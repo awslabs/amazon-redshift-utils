@@ -23,12 +23,7 @@ The script generated will take advantage of one of two data migration options. T
 
 ## Running the Column Encoding Utility
 
-This utility was built and tested on Python 2.7x, but may work with other versions of Python. After cloning this Github project, you must ensure that you have installed following modules:
-
-| Module  | License  |
-| :------ | :------- |
-| [pg8000](https://pypi.python.org/pypi/pg8000) | BSD |
-| [shortuuid](https://pypi.python.org/pypi/shortuuid) | BSD |
+This utility was built and tested on Python 2.7x, but may work with other versions of Python. After cloning this Github project, you must ensure that you have installed the dependencies from [requirements.txt](src/requirements.txt).
  
  You can then run the column encoding utility by typing ```python analyze-schema-compression.py``` or ```./analyze-schema-compression.py```. This will generate the following Usage instructions:
 
@@ -90,6 +85,10 @@ This option will cause the encoding utility to run the generated script as it go
 ### Metrics
 
 The module will export CloudWatch metrics for the number of tables that are modified if the `do-execute` option is provided. Data is indexed by the cluster name. You can suppress this by adding option `--suppress-cloudwatch` from the command line, or argument `suppress_cw` in the `configure()` method.
+
+### Authentication
+
+You can provide the password as a base64 encoded KMS encrypted string in the configuration, or alternatively you can use `.pgpass` file based authentication, which will require that you rebuild the module using the `build.sh` script, but then should work as expected.
 
 # Version Notes
 
