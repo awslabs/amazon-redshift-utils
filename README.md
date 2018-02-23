@@ -63,6 +63,10 @@ We included a presentation which describes main features of the Amazon-Redshift-
 # Investigations
 This project includes a number of detailed investigations into various types of Redshift edge cases, nuances, and workload scenarios. 
 
+# Authentication
+
+You can provide a Redshift password as a base64 encoded KMS encrypted string in most tool configurations, or alternatively you can use `.pgpass` file based authentication. In each module, or to package all of the modules for Lambda based automation, the use of `.pgpass`  will require that you rebuild the module using the `build.sh` script, but then should work as expected.
+
 # Docker executions
 The Dockerfile provides an environment to execute the following utilities without having to install any dependencies locally:
 * Analyze & Vacuum Utility
