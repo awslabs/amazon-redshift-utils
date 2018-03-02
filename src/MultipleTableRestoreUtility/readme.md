@@ -1,5 +1,6 @@
 # Multiple Table restore utility
 This utility enables the end user to automate the restore of multiple tables using a list of tables in json format. In order to restore several tables you would need to create a list of tables to restore as a json list. See the example json below:
+
 ```
 {
     "TableRestoreList": [
@@ -18,13 +19,15 @@ This utility enables the end user to automate the restore of multiple tables usi
     ]
 }
 ```
+
 The keys 'TableRestoreList' , 'Schemaname' and 'Tablename' must be used in order for the utility to work. The utility is compatible with python 2.7. 
 
 ## Usage
 python multitablerestore.py --target-database-name <target database> --source-database-name <source database> --snapshot-identifier <snapshot name> --cluster-identifier <cluster name> --listfile <filename>
 
-The source and target databases can be the same. 
+The source and target databases can be the same however, the table must not exist in the target 
 
 ## Limitations
 The table cannot be restored to a different schema.
 The table can only be restored to the same cluster the snapshot was taken from.
+Script does not currently check if cluster has enough space, make sure enough space is available when restoring several tables.

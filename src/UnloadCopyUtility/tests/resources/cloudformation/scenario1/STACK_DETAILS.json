@@ -1,0 +1,117 @@
+{
+    "Stacks": [
+        {
+            "StackId": "arn:aws:cloudformation:eu-west-1:012345678910:stack/rscopyunloadtest3/8abb1ba0-d544-11e7-b544-50faeb52f036",
+            "Parameters": [
+                {
+                    "ParameterValue": "dev",
+                    "ParameterKey": "DatabaseName"
+                },
+                {
+                    "ParameterValue": "1",
+                    "ParameterKey": "NumberOfNodes"
+                },
+                {
+                    "ParameterValue": "https://github.com/pvbouwel/amazon-redshift-utils.git",
+                    "ParameterKey": "GitHubUrl"
+                },
+                {
+                    "ParameterValue": "single-node",
+                    "ParameterKey": "ClusterType"
+                },
+                {
+                    "ParameterValue": "0.0.0.0/0",
+                    "ParameterKey": "InboundTrafficForEc2"
+                },
+                {
+                    "ParameterValue": "ami-1a962263",
+                    "ParameterKey": "AMIForEC2"
+                },
+                {
+                    "ParameterValue": "unload-copy-test-cluster",
+                    "ParameterKey": "SourceClusterSnapshot"
+                },
+                {
+                    "ParameterValue": "****",
+                    "ParameterKey": "MasterUserPassword"
+                },
+                {
+                    "ParameterValue": "dc1.large",
+                    "ParameterKey": "NodeType"
+                },
+                {
+                    "ParameterValue": "defaultuser",
+                    "ParameterKey": "MasterUsername"
+                },
+                {
+                    "ParameterValue": "5439",
+                    "ParameterKey": "RedshiftPortNumber"
+                },
+                {
+                    "ParameterValue": "global",
+                    "ParameterKey": "SSHKeyForEc2"
+                },
+                {
+                    "ParameterValue": "pvbouwel-test-rs-unload-copy",
+                    "ParameterKey": "GitHubBranch"
+                }
+            ],
+            "Tags": [],
+            "Outputs": [
+                {
+                    "Description": "S3 bucket voor unload-copy param=BUCKET_ARN",
+                    "OutputKey": "S3CopyUnloadBucketArn",
+                    "OutputValue": "arn:aws:s3:::rscopyunloadtest3-s3copyunloadbucket-t60htt2ludj1"
+                },
+                {
+                    "Description": "EC2 IP address",
+                    "OutputKey": "EC2IP",
+                    "OutputValue": "ec2-34-253-209-84.eu-west-1.compute.amazonaws.com"
+                },
+                {
+                    "Description": "Name of Source cluster",
+                    "OutputKey": "SourceClusterName",
+                    "OutputValue": "rscopyunloadtest3-redshiftclustersource-1so4t2ip0ei3a"
+                },
+                {
+                    "Description": "Name of parameter group",
+                    "OutputKey": "ParameterGroupName",
+                    "OutputValue": "rscopyunloadtest3-redshiftclusterparametergroup-dmqq5q4ly5o7"
+                },
+                {
+                    "Description": "Role-arn that will be used for S3 access param=COPY_ROLE",
+                    "OutputKey": "S3CopyRole",
+                    "OutputValue": "arn:aws:iam::012345678910:role/rscopyunloadtest3-S3Role-WH7U48ALN2A3"
+                },
+                {
+                    "Description": "Target Cluster endpoint param=TARGET_CLUSTER",
+                    "OutputKey": "TargetClusterEndpoint",
+                    "OutputValue": "rscopyunloadtest3-redshiftclustertarget-oaw35zvu02h.cmycczwsval6.eu-west-1.redshift.amazonaws.com:5439"
+                },
+                {
+                    "Description": "Name of cluster subnet group",
+                    "OutputKey": "RedshiftClusterSubnetGroupName",
+                    "OutputValue": "rscopyunloadtest3-redshiftclustersubnetgroup-1e8w22jwc5iro"
+                },
+                {
+                    "Description": "Name of Target cluster",
+                    "OutputKey": "TargetClusterName",
+                    "OutputValue": "rscopyunloadtest3-redshiftclustertarget-oaw35zvu02h"
+                },
+                {
+                    "Description": "Source Cluster endpoint param=SOURCE_CLUSTER",
+                    "OutputKey": "SourceClusterEndpoint",
+                    "OutputValue": "rscopyunloadtest3-redshiftclustersource-1so4t2ip0ei3a.cmycczwsval6.eu-west-1.redshift.amazonaws.com:5439"
+                }
+            ],
+            "CreationTime": "2017-11-29T20:33:22.102Z",
+            "Capabilities": [
+                "CAPABILITY_IAM"
+            ],
+            "StackName": "rscopyunloadtest3",
+            "NotificationARNs": [],
+            "StackStatus": "CREATE_COMPLETE",
+            "DisableRollback": false
+        }
+    ]
+}

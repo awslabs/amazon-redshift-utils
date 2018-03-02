@@ -41,6 +41,7 @@ History:
 2015-10-31 ericfe Added cast tp increase size of returning constraint name
 2016-05-24 chriz-bigdata Added support for BACKUP NO tables
 2017-05-03 pvbouwel Change table & schemaname of Foreign key constraints to allow for filters
+2018-01-15 pvbouwel Add QUOTE_IDENT for identifiers (schema,table and column names)
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
@@ -63,7 +64,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,0 AS seq
-   ,'--DROP TABLE "' + n.nspname + '"."' + c.relname + '";' AS ddl
+   ,'--DROP TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ';' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
@@ -72,7 +73,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,2 AS seq
-   ,'CREATE TABLE IF NOT EXISTS "' + n.nspname + '"."' + c.relname + '"' AS ddl
+   ,'CREATE TABLE IF NOT EXISTS ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + '' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
@@ -94,7 +95,7 @@ FROM
     ,c.relname AS tablename
     ,100000000 + a.attnum AS seq
     ,CASE WHEN a.attnum > 1 THEN ',' ELSE '' END AS col_delim
-    ,'"' + a.attname + '"' AS col_name
+    ,QUOTE_IDENT(a.attname) AS col_name
     ,CASE WHEN STRPOS(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER VARYING') > 0
       THEN REPLACE(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER VARYING', 'VARCHAR')
      WHEN STRPOS(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER') > 0
@@ -183,7 +184,7 @@ FROM pg_namespace AS n
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,400000000 + a.attnum AS seq
-   ,'DISTKEY ("' + a.attname + '")' AS ddl
+   ,'DISTKEY (' + QUOTE_IDENT(a.attname) + ')' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   INNER JOIN pg_attribute AS a ON c.oid = a.attrelid
@@ -209,8 +210,8 @@ from (SELECT
    ,c.relname AS tablename
    ,500000000 + abs(a.attsortkeyord) AS seq
    ,CASE WHEN abs(a.attsortkeyord) = 1
-    THEN '\t"' + a.attname + '"'
-    ELSE '\t, "' + a.attname + '"'
+    THEN '\t' + QUOTE_IDENT(a.attname)
+    ELSE '\t, ' + QUOTE_IDENT(a.attname)
     END AS ddl
   FROM  pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
@@ -239,7 +240,7 @@ from (SELECT
     SELECT 'zzzzzzzz' || n.nspname AS schemaname,
        'zzzzzzzz' || c.relname AS tablename,
        700000000 + CAST(con.oid AS INT) AS seq,
-       'ALTER TABLE ' + n.nspname + '.' + c.relname + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
+       'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
     FROM pg_constraint AS con
       INNER JOIN pg_class AS c
              ON c.relnamespace = con.connamespace

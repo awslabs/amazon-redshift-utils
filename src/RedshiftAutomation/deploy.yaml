@@ -1,0 +1,252 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: Configuration
+        Parameters:
+          - S3ConfigPath
+          - SecurityGroups
+          - SubnetIds
+      -
+        Label:
+          default: Run Schedule Cron Expressions
+        Parameters:
+          - ColumnEncodingCronExpression
+          - MonitorCronExpression
+          - AnalyzeCronExpression
+          - VacuumCronExpression
+          - SysTablesCronExpression
+    ParameterLabels:
+      S3ConfigPath:
+        default: S3 Config File
+      SecurityGroups:
+        default: VPC Security Group ID
+      SubnetIds:
+        default: VPC Subnet ID's for Networking
+      ColumnEncodingCronExpression:
+        default: Column Encoding
+      MonitorCronExpression:
+        default: Enhanced Monitoring
+      AnalyzeCronExpression:
+        default: Table Statistics Analysis
+      VacuumCronExpression:
+        default: Table Vacuum
+      SysTablesCronExpression:
+        default: System Tables Persistence
+Parameters:
+  S3ConfigPath:
+    Default: s3://my-bucket/prefix/config-file.json
+    Description: Configuration File for this Utility instance
+    Type: String
+    AllowedPattern: ^s3:\/\/([A-z\-]+)\/(.*)$
+  SecurityGroups:
+    Default: mygroup1, mygroup2
+    Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
+    Type: CommaDelimitedList
+  SubnetIds:
+    Default: subnet1, subnet2, subnet3
+    Description: List of private Subnets in VPC in which the function will egress network connections
+    Type: CommaDelimitedList
+  ColumnEncodingCronExpression:
+    Default: 0 0 * * ? *
+    Description: Cron expression for when to run the Column Encoding Utility (default midnight daily)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+  AnalyzeCronExpression:
+    Default: 0 1 * * ? *
+    Description: Cron expression for when to run the Analyze  Utility (default 1 am daily)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+  VacuumCronExpression:
+    Default: 0 2 * * ? *
+    Description: Cron expression for when to run the Vacuum Utility (default 2 am daily)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+  MonitorCronExpression:
+    Default: 5 * * * ? *
+    Description: Cron expression for when to run Monitoring (default 5 minutes past every hour)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+  SysTablesCronExpression:
+    Default: 0 0 * * ? *
+    Description: Cron expression for when to run System Table Persistence (nightly at midnight)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+Resources:
+  LambdaRedshiftAutomation:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: lambda_function.event_handler
+      Runtime: python2.7
+      CodeUri:
+        Bucket: !Sub awslabs-code-${AWS::Region}
+        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.3.zip
+      MemorySize: 192
+      Timeout: 300
+      Tags:
+        Name: LambdaRedshiftRunner
+      Role: !GetAtt RedshiftAutomationIAMRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          !Ref SecurityGroups
+        SubnetIds:
+          !Ref SubnetIds
+  RedshiftAutomationIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+        RoleName: "LambdaRedshiftAutomationRole"
+        Path: "/"
+        ManagedPolicyArns:
+            - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            -
+              Sid: "AllowLambdaServiceToAssumeRole"
+              Effect: "Allow"
+              Action:
+                - "sts:AssumeRole"
+              Principal:
+                Service:
+                  - "lambda.amazonaws.com"
+        Policies:
+          -
+            PolicyName: "LambdaRedshiftRunnerPolicy"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                -
+                  Effect: "Allow"
+                  Action:
+                    - "s3:GetObject"
+                    - "kms:Decrypt"
+                    - "cloudwatch:PutMetricData"
+                  Resource: "*"
+
+  AnalyzeEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to invoke Redshift Automation - Analyze Utility
+      Name: InvokeLambdaRedshiftRunner-Analyze
+      ScheduleExpression: !Sub cron(${AnalyzeCronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: RedshiftAnalyze
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"Analyze",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeAnalyzePermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt AnalyzeEventRule.Arn
+
+  VacuumEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to invoke Redshift Automation - Vacuum Utility
+      Name: InvokeLambdaRedshiftRunner-Vacuum
+      ScheduleExpression: !Sub cron(${VacuumCronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: RedshiftVacuum
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"Vacuum",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeVacuumPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt VacuumEventRule.Arn
+
+  ColumnEncodingEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to invoke Redshift Automation - Column Encoding Utility
+      Name: InvokeLambdaRedshiftRunner-ColumnEncodingUtility
+      ScheduleExpression: !Sub cron(${ColumnEncodingCronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: RedshiftColumnEncodingUtility
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"ColumnEncodingUtility",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeColumnEncodingPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt ColumnEncodingEventRule.Arn
+
+  MonitoringEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to invoke Redshift Automation - Redshift Monitoring
+      Name: InvokeLambdaRedshiftRunner-MonitoringUtility
+      ScheduleExpression: !Sub cron(${MonitorCronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: RedshiftMonitoringUtility
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"Monitoring",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeMonitoringPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt MonitoringEventRule.Arn
+
+  SystablesEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to invoke Redshift Automation - System Tables Persistence
+      Name: InvokeLambdaRedshiftRunner-SystemTablesPersistence
+      ScheduleExpression: !Sub cron(${SysTablesCronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: SystemTablePersistenceUtility
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"SystemTablePersistence",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeSystablesPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt SystablesEventRule.Arn

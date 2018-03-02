@@ -33,7 +33,6 @@ FROM stl_vacuum vac_start
     ON vac_start.userid = vac_end.userid
    AND vac_start.table_id = vac_end.table_id
    AND vac_start.xid = vac_end.xid
-   AND vac_start.status = 'Started'
    AND vac_end.status = 'Finished'
 
   JOIN (SELECT DISTINCT TRIM(pgn.nspname) AS schema_name,
@@ -42,4 +41,5 @@ FROM stl_vacuum vac_start
         FROM stv_tbl_perm tbl
           JOIN pg_class pgc ON pgc.oid = tbl.id
           JOIN pg_namespace pgn ON pgn.oid = pgc.relnamespace) tab ON tab.table_id = vac_start.table_id
+WHERE vac_start.status != 'Finished'
 ORDER BY rows_deleted DESC;
