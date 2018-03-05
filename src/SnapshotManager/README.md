@@ -27,13 +27,71 @@ That's where this module comes in - by supplying a simple configuration, you can
 
 ## Getting Started
 
+### Deploy the Lambda Function
+
+You can deploy this AWS Lambda function by hand using the AWS Console or Command Line tools, or alternatively you can use the below links which deploy using AWS SAM:
+
+| Region | Stack |
+| ---- | ---- |
+|ap-south-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-south-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-ap-south-1.amazonaws.com/awslabs-code-ap-south-1/RedshiftSnapshotManager/deploy.yaml) |
+|eu-west-3 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-west-3#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-eu-west-3.amazonaws.com/awslabs-code-eu-west-3/RedshiftSnapshotManager/deploy.yaml) |
+|eu-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-west-2#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-eu-west-2.amazonaws.com/awslabs-code-eu-west-2/RedshiftSnapshotManager/deploy.yaml) |
+|eu-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-west-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-eu-west-1.amazonaws.com/awslabs-code-eu-west-1/RedshiftSnapshotManager/deploy.yaml) |
+|ap-northeast-3 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-3#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-ap-northeast-3.amazonaws.com/awslabs-code-ap-northeast-3/RedshiftSnapshotManager/deploy.yaml) |
+|ap-northeast-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-2#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-ap-northeast-2.amazonaws.com/awslabs-code-ap-northeast-2/RedshiftSnapshotManager/deploy.yaml) |
+|ap-northeast-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-ap-northeast-1.amazonaws.com/awslabs-code-ap-northeast-1/RedshiftSnapshotManager/deploy.yaml) |
+|sa-east-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=sa-east-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-sa-east-1.amazonaws.com/awslabs-code-sa-east-1/RedshiftSnapshotManager/deploy.yaml) |
+|ca-central-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ca-central-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-ca-central-1.amazonaws.com/awslabs-code-ca-central-1/RedshiftSnapshotManager/deploy.yaml) |
+|ap-southeast-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-ap-southeast-1.amazonaws.com/awslabs-code-ap-southeast-1/RedshiftSnapshotManager/deploy.yaml) |
+|ap-southeast-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-ap-southeast-2.amazonaws.com/awslabs-code-ap-southeast-2/RedshiftSnapshotManager/deploy.yaml) |
+|eu-central-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-eu-central-1.amazonaws.com/awslabs-code-eu-central-1/RedshiftSnapshotManager/deploy.yaml) |
+|us-east-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-us-east-1.amazonaws.com/awslabs-code-us-east-1/RedshiftSnapshotManager/deploy.yaml) |
+|us-east-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-2#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-us-east-2.amazonaws.com/awslabs-code-us-east-2/RedshiftSnapshotManager/deploy.yaml) |
+|us-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-us-west-1.amazonaws.com/awslabs-code-us-west-1/RedshiftSnapshotManager/deploy.yaml) |
+|us-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-us-west-2.amazonaws.com/awslabs-code-us-west-2/RedshiftSnapshotManager/deploy.yaml) |
+
+You only need to deploy the function once to support a virtually unlimited number of clusters. The function will be configured with:
+
+* Max Runtime: 60 Seconds (each function only runs for 1 cluster, so this is plenty long enough - you can even reduce it)
+* Memory Size: 128 MB (the minimum)
+* Runtime: Node.js 4.3
+
+Please note that the current account limit for Redshift manual snapshots is 20 per region. This module will create `24/snapshotIntervalHours * snapshotRetentionDays` snapshots, and so if this number is greater than 20 please open an AWS support case to have the limit increased. For example, an RPO of 2 hours with 7 days retention (as shown above) will create `24/2 * 7 = 84` snapshots.
+
+### What's Created
+
+After completion, you'll notice a Lambda Function called `RedshiftUtilsSnapshotManager`, plus there will be a CloudWatch Events Rule called `RedshiftUtilsSnapshotManager-<namespace>-15-mins` which runs every 15 minutes.
+
+If you require additional clusters be snapshotted, you can either redeploy the function as above, or instead create a new CloudWatch Event Rule which contains the configuration required to invoke the function:
+
+```
+{
+  "snapshotIntervalHours": "${SnapshotIntervalHours}",
+  "targetResource": "${TargetClusterName}",
+  "namespace": "${Namespace}",
+  "region": "${Region}",
+  "snapshotRetentionDays": "${SnapshotRetentionDays}"
+}
+```
+
+### Confirm Execution
+
+Once running, you will see that existing automatic snapshots, or new manual snapshots are created within the ```snapshotIntervalHours```. These snapshots are called ```rs-snapman-<cluster-name>-<yyyy>-<mm>-<dd>t<hh><mi><ss>```, and are tagged with:
+
+* ```createdBy=AWS Redshift Utils Snapshot Manager```
+* ```creationTimestamp=YYYY-MM-DD-HHmmss```
+* ```scheduleNamespace=<config.namespace>```
+
+
+__Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the Lambda function's CloudWatch Log Streams for execution details, which include output about what the function is doing.
+
+## Making Changes
+
+If you'd like to make changes, then great - we love open source. You can code your changes, and then you'll need to pull in the Node.js dependencies in order to test or deploy. From the `src/SnapshotManager` folder, run `npm install`, which will perform this download. You can then create a new Lambda zip archive by running `./build.sh assemble`, which will create `RedshiftSnapshotManager-<version>.zip` in the the `dist` folder. You can then run `./build.sh deploy...schedule...` as before.
+
 ### Install Pre-requisites
 
 The included build script requires that you be able to use a terminal/command line, and have the [aws-cli](https://aws.amazon.com/cli), python (2.7x), [boto3](https://github.com/boto/boto3), and [shortuuid](https://pypi.python.org/pypi/shortuuid) installed. Alternatively you can deploy the zip file in the ['dist'](dist/RedshiftSnapshotManager-1.0.0.zip) folder and configure through the AWS Console.
-
-### Deploy the Lambda Function
-
-You can deploy this AWS Lambda function by hand using the AWS Console or Command Line tools, or alternatively you can run:
 
 ```build.sh deploy <role-arn>```
 
@@ -70,65 +128,6 @@ where `<role-arn>` is the Amazon Resource Name for the IAM you want the function
 }
 
 ```
-
-You only need to deploy the function once to support a virtually unlimited number of clusters. The function will be configured with:
-
-* Max Runtime: 60 Seconds (each function only runs for 1 cluster, so this is plenty long enough - you can even reduce it)
-* Memory Size: 128 MB (the minimum)
-* Runtime: Node.js 4.3
-
-### Schedule Execution
-
-This Lambda function can be run by any scheduler, but [AWS CloudWatch Scheduled Events](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html) are a great way to ensure your function runs on a fixed schedule, without the need for any servers. You can configure CloudWatch Events to be used as the event source for your function, and this can include the configuration for which cluster to work on! To do this, you can add the `schedule` directive to the previous deploy command:
-
-
-```build.sh deploy <role-arn> schedule <config.json>```
-
-The supplied configuration file must include:
-
-* `namespace` A unique namespace for the backup schedule that will be used to identify the snapshots created
-* `targetResource` The name of your Redshift Cluster, excluding `<region>.amazonaws.com`
-* `region` The region where your Redshift Cluster resides
-* `snapshotIntervalHours` The Recovery Point Objective that is used to ensure you take snapshots on the specified interval
-* `snapshotRetentionDays` How long snapshots should be retained before being deleted. Manual snapshots (which can be restored into new clusters) will be kept forever by default. This is an optional parameter, and when omitted all snapshots will be retained.
-
-```
-{
-	"namespace": "my-every-2-hour-schedule",
-	"targetResource": "my-redshift-cluster",
-	"region": "us-east-1",
-	"snapshotIntervalHours": 2,
-	"snapshotRetentionDays": 7
-}
-```
-
-Once deployed, you can edit the above configuration from the definition of the CloudWatch Events Rule.
-
-Please note that the current account limit for Redshift manual snapshots is 20 per region. This module will create `24/snapshotIntervalHours * snapshotRetentionDays` snapshots, and so if this number is greater than 20 please open an AWS support case to have the limit increased. For example, an RPO of 2 hours with 7 days retention (as shown above) will create `24/2 * 7 = 84` snapshots.
-
-Running the schedule command will create a CloudWatch Events Schedule that runs your function every __15 Minutes__. This means that your snapshots will be taken within 15 minutes of the specified snapshots interval.
-
-### What's Created
-
-After completion, you'll notice a Lambda Function called `RedshiftUtilsSnapshotManager`, plus there will be a CloudWatch Events Rule called `RedshiftUtilsSnapshotManager-<namespace>-15-mins` which runs every 15 minutes.
-
-You can run `./build.sh schedule <config.json>` as many times as you need to create additional schedules or modify existing schedules (based on the namespace supplied in the config file).
-
-### Confirm Execution
-
-Once running, you will see that existing automatic snapshots, or new manual snapshots are created within the ```snapshotIntervalHours```. These snapshots are called ```rs-snapman-<cluster-name>-<yyyy>-<mm>-<dd>t<hh><mi><ss>```, and are tagged with:
-
-* ```createdBy=AWS Redshift Utils Snapshot Manager```
-* ```creationTimestamp=YYYY-MM-DD-HHmmss```
-* ```scheduleNamespace=<config.namespace>```
-
-
-__Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the Lambda function's CloudWatch Log Streams for execution details, which include output about what the function is doing.
-
-## Making Changes
-
-IF you'd like to make changes, then great - we love open source. You can code your changes, and then you'll need to pull in the Node.js dependencies in order to test or deploy. From the `src/SnapshotManager` folder, run `npm install`, which will perform this download. You can then create a new Lambda zip archive by running `./build.sh assemble`, which will create `RedshiftSnapshotManager-<version>.zip` in the the `dist` folder. You can then run `./build.sh deploy...schedule...` as before.
-
 ----
 
 Amazon Redshift Utils Snapshot Manager
