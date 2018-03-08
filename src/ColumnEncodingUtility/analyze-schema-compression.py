@@ -386,7 +386,8 @@ def analyze(table_info):
     table_name = table_info[1]
     dist_style = table_info[4]
     owner = table_info[5]
-    table_comment = table_info[6]
+    if len(table_info) > 6:
+        table_comment = table_info[6]
 
     # get the count of columns that have raw encoding applied
     table_unoptimised = False
