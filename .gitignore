@@ -59,7 +59,3 @@ target/
 # Virtual environments
 venv/
 .venv/
-
-# IDE's
-.project
-.idea
