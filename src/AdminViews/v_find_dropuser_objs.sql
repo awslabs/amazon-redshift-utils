@@ -17,6 +17,7 @@ History:
 2017-03-27 adedotua created
 2017-04-06 adedotua improvements
 2018-01-06 adedotua added ddl column to generate ddl for transferring object ownership
+2018-01-15 pvbouwel Add QUOTE_IDENT for identifiers
 **********************************************************************************************/
 
 CREATE OR REPLACE VIEW admin.v_find_dropuser_objs as 
@@ -29,7 +30,7 @@ SELECT owner.objtype,
 FROM (
 -- Functions owned by the user
      SELECT 'Function',pgu.usename,pgu.usesysid,nc.nspname,textin (regprocedureout (pproc.oid::regprocedure)),
-     'alter function ' ||nc.nspname|| '.' ||textin (regprocedureout (pproc.oid::regprocedure)) || ' owner to ' 
+     'alter function ' || QUOTE_IDENT(nc.nspname) || '.' ||textin (regprocedureout (pproc.oid::regprocedure)) || ' owner to ' 
      FROM pg_proc pproc,pg_user pgu,pg_namespace nc
 WHERE pproc.pronamespace = nc.oid
 AND   pproc.proowner = pgu.usesysid
@@ -40,7 +41,7 @@ SELECT 'Database',
        pgu.usesysid,
        NULL,
        pgd.datname,
-       'alter database ' ||pgd.datname|| ' owner to '
+       'alter database ' || QUOTE_IDENT(pgd.datname) || ' owner to '
 FROM pg_database pgd,
      pg_user pgu
 WHERE pgd.datdba = pgu.usesysid
@@ -51,7 +52,7 @@ SELECT 'Schema',
        pgu.usesysid,
        NULL,
        pgn.nspname,
-       'alter schema '||pgn.nspname||' owner to '
+       'alter schema '|| QUOTE_IDENT(pgn.nspname) ||' owner to '
 FROM pg_namespace pgn,
      pg_user pgu
 WHERE pgn.nspowner = pgu.usesysid
@@ -65,7 +66,7 @@ SELECT decode(pgc.relkind,
        pgu.usesysid,
        nc.nspname,
        pgc.relname,
-       'alter table ' ||nc.nspname|| '.' ||pgc.relname|| ' owner to '
+       'alter table ' || QUOTE_IDENT(nc.nspname) || '.' || QUOTE_IDENT(pgc.relname) || ' owner to '
 FROM pg_class pgc,
      pg_user pgu,
      pg_namespace nc

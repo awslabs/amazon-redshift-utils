@@ -1,18 +1,53 @@
 --DROP VIEW admin.v_generate_tbl_ddl;
 /**********************************************************************************************
 Purpose: View to get the DDL for a table.  This will contain the distkey, sortkey, constraints,
-	not null, defaults, etc.
+         not null, defaults, etc.
+
+Notes:   Default view ordering causes foreign keys to be created at the end.
+         This is needed due to dependencies of the foreign key constraint and the tables it
+         links.  Due to this one should not manually order the output if you are expecting to
+         be able to replay the SQL directly from the VIEW query result. It is still possible to
+         order if you filter out the FOREIGN KEYS and then apply them later.
+
+         The following filters are useful:
+           where ddl not like 'ALTER TABLE %'  -- do not return FOREIGN KEY CONSTRAINTS
+           where ddl like 'ALTER TABLE %'      -- only get FOREIGN KEY CONSTRAINTS
+           where tablename in ('t1', 't2')     -- only get DDL for specific tables
+           where schemaname in ('s1', 's2')    -- only get DDL for specific schemas
+
+         So for example if you want to order DDL on tablename and only want the tables 't1', 't2'
+         and 't4' you can do so by using a query like:
+           select ddl from (
+             (
+               select
+                 *
+               from admin.v_generate_tbl_ddl
+               where ddl not like 'ALTER TABLE %'
+               order by tablename
+             )
+             UNION ALL
+             (
+               select
+                 *
+               from admin.v_generate_tbl_ddl
+               where ddl like 'ALTER TABLE %'
+               order by tablename
+             )
+           ) where tablename in ('t1', 't2', 't4');
+
 History:
 2014-02-10 jjschmit Created
 2015-05-18 ericfe Added support for Interleaved sortkey
 2015-10-31 ericfe Added cast tp increase size of returning constraint name
 2016-05-24 chriz-bigdata Added support for BACKUP NO tables
+2017-05-03 pvbouwel Change table & schemaname of Foreign key constraints to allow for filters
+2018-01-15 pvbouwel Add QUOTE_IDENT for identifiers (schema,table and column names)
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
 SELECT
- schemaname
- ,tablename
+ REGEXP_REPLACE (schemaname, '^zzzzzzzz', '') AS schemaname
+ ,REGEXP_REPLACE (tablename, '^zzzzzzzz', '') AS tablename
  ,seq
  ,ddl
 FROM
@@ -29,7 +64,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,0 AS seq
-   ,'--DROP TABLE "' + n.nspname + '"."' + c.relname + '";' AS ddl
+   ,'--DROP TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ';' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
@@ -38,7 +73,7 @@ FROM
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,2 AS seq
-   ,'CREATE TABLE IF NOT EXISTS "' + n.nspname + '"."' + c.relname + '"' AS ddl
+   ,'CREATE TABLE IF NOT EXISTS ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + '' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
@@ -60,7 +95,7 @@ FROM
     ,c.relname AS tablename
     ,100000000 + a.attnum AS seq
     ,CASE WHEN a.attnum > 1 THEN ',' ELSE '' END AS col_delim
-    ,'"' + a.attname + '"' AS col_name
+    ,QUOTE_IDENT(a.attname) AS col_name
     ,CASE WHEN STRPOS(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER VARYING') > 0
       THEN REPLACE(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER VARYING', 'VARCHAR')
      WHEN STRPOS(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER') > 0
@@ -149,7 +184,7 @@ FROM pg_namespace AS n
    n.nspname AS schemaname
    ,c.relname AS tablename
    ,400000000 + a.attnum AS seq
-   ,'DISTKEY ("' + a.attname + '")' AS ddl
+   ,'DISTKEY (' + QUOTE_IDENT(a.attname) + ')' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   INNER JOIN pg_attribute AS a ON c.oid = a.attrelid
@@ -175,8 +210,8 @@ from (SELECT
    ,c.relname AS tablename
    ,500000000 + abs(a.attsortkeyord) AS seq
    ,CASE WHEN abs(a.attsortkeyord) = 1
-    THEN '\t"' + a.attname + '"'
-    ELSE '\t, "' + a.attname + '"'
+    THEN '\t' + QUOTE_IDENT(a.attname)
+    ELSE '\t, ' + QUOTE_IDENT(a.attname)
     END AS ddl
   FROM  pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
@@ -202,17 +237,17 @@ from (SELECT
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r' )
   UNION (
-    SELECT 'zzzzzzzz' AS schemaname,
-       'zzzzzzzz' AS tablename,
+    SELECT 'zzzzzzzz' || n.nspname AS schemaname,
+       'zzzzzzzz' || c.relname AS tablename,
        700000000 + CAST(con.oid AS INT) AS seq,
-       'ALTER TABLE ' + n.nspname + '.' + c.relname + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
+       'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
     FROM pg_constraint AS con
       INNER JOIN pg_class AS c
-              ON c.relnamespace = con.connamespace
+             ON c.relnamespace = con.connamespace
              AND c.oid = con.conrelid
       INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
     WHERE c.relkind = 'r'
-    AND   pg_get_constraintdef (con.oid) LIKE 'FOREIGN KEY%'
+    AND con.contype = 'f'
     ORDER BY seq
   )
  ORDER BY schemaname, tablename, seq

@@ -1,5 +1,4 @@
 /*************************************************************************************************************************
-<<<<<<< HEAD
 Purpose:      View to generate grant or revoke ddl for users and groups. This is useful for 
               recreating users or group privileges or for revoking privileges before dropping 
               a user or group. For the older version of this view see 
@@ -28,47 +27,13 @@ History:
 2018-03-04 	  adedotua added column grantseq to help return the DDLs in the order they need to be granted or revoked
 2018-03-04 	  adedotua renamed column sequence to objseq and username to grantee
 2018-03-09	  adedotua added logic to handle function name generation when there are non-alphabets in the function schemaname
-=======
-Purpose:	View to generate grant or revoke ddl for users and groups. This is useful for 
-              	recreating users or group privileges or for revoking privileges before dropping 
-              	a user or group. For the older version of this view see 
-              	https://github.com/adedotua/amazon-redshift-utils/blob/master/src/AdminViews/v_generate_user_grant_revoke_ddl_v101.sql
-
-Version:      	1.02
-
-Columns -
-objowner:     	Object owner 
-schemaname:   	Object schema if applicable
-objname:      	Name of the object the privilege is granted on
-grantor:      	User that granted the privilege
-grantee:      	User/Group the privilege is granted to
-objtype:      	Type of object user has privilege on. Object types are Function,Schema,
-              	Table or View, Database, Language or Default ACL
-ddltype:      	Type of ddl generated i.e grant or revoke
-grantseq:     	Sequence number to order the DDLs by hierarchy
-objseq:      	Sequence number to order the objects by hierarchy
-ddl:          	DDL text
-Notes:           
-                
-History:
-2017-03-01	adedotua created
-2018-03-04    	adedotua completely refactored the view to minimize nested loop joins. View is now significantly 
-		faster on clusters with a large number of users and privileges
-2018-03-04	adedotua added column grantseq to help return the DDLs in the order they need to be granted or revoked
-2018-03-04	adedotua renamed column sequence to objseq and username to grantee
-2018-03-09	adedotua added logic to handle function name generation when there are non-alphabets in the function schemaname
->>>>>>> parent of c1ac470... Complete rewrite of v_generate_user_grant_revoke_ddl
 
               
               
               
 Steps to revoking grants before dropping a user:
 1. Find all grants by granted by user to drop and regrant them as another user (superuser preferably).
-<<<<<<< HEAD
 select regexp_replace(ddl,grantor,'<superuser>') from v_generate_user_grant_revoke_ddl where grantor='<username>' and ddltype='grant' and objtype <>'default acl' order by objseq,grantseq;
-=======
-select regexp_replace(ddl,grantor,'<superuser>') from v_generate_user_grant_revoke_ddl where grantor='<username>' and ddltype='grant' and objtype <>'default acl' order by objseq, grantseq;
->>>>>>> parent of c1ac470... Complete rewrite of v_generate_user_grant_revoke_ddl
 2. Find all grants granted to user to drop and revoke them.
 select ddl from v_generate_user_grant_revoke_ddl where ddltype='revoke' and (grantee='<username>' or grantor='<username>') order by objseq, grantseq desc;              
 ************************************************************************************************************************/

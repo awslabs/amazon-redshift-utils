@@ -45,19 +45,57 @@ regular maintenance/housekeeping activities, when there are less database activi
 
 The [Redshift Unload/Copy Utility](src/UnloadCopyUtility) helps you to migrate data between Redshift Clusters or Databases. It exports data from a source cluster to a location on S3, and all data is encrypted with Amazon Key Management Service. It then automatically imports the data into the configured Redshift Cluster, and will cleanup S3 if required. This utility is intended to be used as part of an ongoing scheduled activity, for instance run as part of a Data Pipeline Shell Activity (http://docs.aws.amazon.com/datapipeline/latest/DeveloperGuide/dp-object-shellcommandactivity.html).
 
-# Lambda Runner
+# Automation Module
 
-This [project](src/LambdaRunner) includes code that is able to run a subset of the Amazon Redshift Utilities via AWS Lambda. By using a Lambda function scheduled via a CloudWatch Event (http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html), you can ensure that these valuable utilities run automatically and keep your Redshift cluster running well.
+This [project](src/RedshiftAutomation) includes code that is able to run the Amazon Redshift Utilities via AWS Lambda. By using a Lambda function scheduled via a CloudWatch Event (http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html), you can ensure that these valuable utilities run automatically and keep your Redshift cluster running well.
 
 # Snapshot Manager
 
 This [project](src/SnapshotManager) includes a Lambda function that will ensure that your Redshift cluster is backed up as frequently as you require, and that the snapshots that it creates are cleaned up automatically when they are no longer needed.
+
+# WLM Query Monitoring Rule (QMR) Action Notification Utility
+
+This [project](src/QMRNotificationUtility) enables a scheduled Lambda function to pull records from the QMR action system log table (stl_wlm_rule_action) and publish them to an SNS topic. This utility can be used to send periodic notifications based on the WLM query monitoring rule actions taken for your unique workload and rules configuration.
 
 # Presentation
 We included a presentation which describes main features of the Amazon-Redshift-Utils including some examples, tips and best practices: Redshift_DBA_Commands.pptx
 
 # Investigations
 This project includes a number of detailed investigations into various types of Redshift edge cases, nuances, and workload scenarios. 
+
+# Authentication
+
+You can provide a Redshift password as a base64 encoded KMS encrypted string in most tool configurations, or alternatively you can use `.pgpass` file or `$PGPASS` environment variable based authentication. In each module, or to package all of the modules for Lambda based automation, the use of `.pgpass`  will require that you rebuild the module using the `build.sh` script, but then should work as expected.
+
+Please note that this feature was added due to requests by customers, but does not represent the most secure solution. It stores the password in plaintext, which depending on how modules are deployed may be a security threat. Please use with caution!
+
+# Docker executions
+The Dockerfile provides an environment to execute the following utilities without having to install any dependencies locally:
+* Analyze & Vacuum Utility
+* Unload/Copy Utility
+* Column Encoding Utility
+
+You can do this by building the image like so:
+```bash
+docker build -t amazon-redshift-utils .
+```
+
+And then executing any one of the 3 following commands (filling in the -e parameters as needed):
+```bash
+docker run --net host --rm -it -e DB=my-database .... amazon-redshift-utils analyze-vacuum
+docker run --net host --rm -it -e DB=my-database .... amazon-redshift-utils column-encoding
+docker run --net host --rm -it -e CONFIG_FILE=s3://.... amazon-redshift-utils unload-copy
+```
+
+The docker [entrypoint scripts](src/bin/) work off of environment variables, so you'd want to provide those in your run scripts above.
+
+For convenience, you can create a `.env` file locally and upload them to the docker container via the `--env-file` argument. E.g.:
+
+```bash
+docker run --net host --rm -it --env-file .env .... amazon-redshift-utils analyze-vacuum
+```
+
+Please see the [entrypoint scripts](src/bin/) for the environment variable configuration references that are needed.
 
 ----
 Copyright 2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.

@@ -14,6 +14,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!src/AnalyzeVacuumUtility/lib/analyze_vacuum.py
 lib64/
 parts/
 sdist/
@@ -58,8 +59,3 @@ target/
 # Virtual environments
 venv/
 .venv/
-src/.DS_Store
-src/metadatatransfer/.DS_Store
-src/metadatatransfer/.idea/inspectionProfiles/Project_Default.xml
-src/metadatatransfer/.idea/metadatatransfer.iml
-*.xml

@@ -15,14 +15,43 @@ Notes:
 History:
 2015-02-09 ericfe created
 2015-04-17 ericfe Added detail information on distributions and broadcasts. Added rows column
+2017-08-11 andrewgross Added schema and query text information.
 **********************************************************************************************/
-select trim(s.perm_table_name) as table , (sum(abs(datediff(seconds, coalesce(b.starttime,d.starttime,s.starttime), case when coalesce(b.endtime,d.endtime,s.endtime) > coalesce(b.starttime,d.starttime,s.starttime) THEN coalesce(b.endtime,d.endtime,s.endtime) ELSE coalesce(b.starttime,d.starttime,s.starttime) END )))/60)::numeric(24,0) as minutes,
-       sum(coalesce(b.rows,d.rows,s.rows)) as rows, trim(split_part(l.event,':',1)) as event,  substring(trim(l.solution),1,60) as solution , max(l.query) as sample_query, count(distinct l.query)
-from stl_alert_event_log as l
-left join stl_scan as s on s.query = l.query and s.slice = l.slice and s.segment = l.segment
-left join stl_dist as d on d.query = l.query and d.slice = l.slice and d.segment = l.segment
-left join stl_bcast as b on b.query = l.query and b.slice = l.slice and b.segment = l.segment
-where l.userid >1
-and  l.event_time >=  dateadd(day, -7, current_Date)
--- and s.perm_table_name not like 'volt_tt%'
-group by 1,4,5 order by 2 desc,6 desc;
+SELECT t.schema AS SCHEMA,
+       trim(s.perm_table_name) AS TABLE,
+       (sum(abs(datediff(seconds, coalesce(b.starttime,d.starttime,s.starttime), CASE WHEN coalesce(b.endtime,d.endtime,s.endtime) > coalesce(b.starttime,d.starttime,s.starttime) THEN coalesce(b.endtime,d.endtime,s.endtime) ELSE coalesce(b.starttime,d.starttime,s.starttime) END)))/60)::numeric(24,0) AS minutes,
+       sum(coalesce(b.rows,d.rows,s.rows)) AS ROWS,
+       trim(split_part(l.event,':',1)) AS event,
+       substring(trim(l.solution),1,60) AS solution,
+       max(l.query) AS sample_query,
+       count(DISTINCT l.query),
+       q.text AS query_text
+FROM stl_alert_event_log AS l
+LEFT JOIN stl_scan AS s ON s.query = l.query
+AND s.slice = l.slice
+AND s.segment = l.segment
+LEFT JOIN stl_dist AS d ON d.query = l.query
+AND d.slice = l.slice
+AND d.segment = l.segment
+LEFT JOIN stl_bcast AS b ON b.query = l.query
+AND b.slice = l.slice
+AND b.segment = l.segment
+LEFT JOIN
+  (SELECT query,
+          LISTAGG(text) WITHIN
+   GROUP (
+          ORDER BY sequence) AS text
+   FROM stl_querytext
+   WHERE sequence < 100
+   GROUP BY query) AS q ON q.query = l.query
+LEFT JOIN svv_table_info AS t ON t.table_id = s.tbl
+WHERE l.userid >1
+  AND l.event_time >= dateadd(DAY, -7, CURRENT_DATE)
+  AND s.perm_table_name NOT LIKE 'volt_tt%'
+  AND SCHEMA IS NOT NULL
+GROUP BY 1,
+         2,
+         5,
+         6,
+         query_text
+ORDER BY 3 DESC, 7 DESC;
