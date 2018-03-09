@@ -961,7 +961,7 @@ def run():
 
 
     if table_name is not None:
-        statement = '''select trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
+        statement = '''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
 left outer join pg_description pgd ON pgd.objoid = pgc.oid
