@@ -2,8 +2,10 @@
 /*************************************************************************************************************************
 Purpose:      View to generate grant or revoke ddl for users and groups. This is useful for 
               recreating users or group privileges or for revoking privileges before dropping 
-              a user or group
+              a user or group.
               
+Version:      1.01 
+
 Columns -
 objowner:     Object owner 
 schemaname:   Object schema if applicable
