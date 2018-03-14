@@ -143,8 +143,8 @@ python analyze-vacuum-schema.py  --db <> --db-user <> --db-pwd <> --db-port 8192
 ## Install Notes
 
 ```
-sudo easy_install pip  
-sudo pip install 
+cd ~/amazon-redshift-utils/src/AnalyzeVacuumUtility
+python make.py
 ```
 
 ## Limitations
