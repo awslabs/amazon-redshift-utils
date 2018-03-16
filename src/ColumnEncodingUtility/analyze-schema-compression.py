@@ -106,6 +106,7 @@ query_group = None
 ssl = False
 suppress_cw = None
 cw = None
+statement_timeout = '1200000'
 
 
 def execute_query(string):
@@ -208,7 +209,7 @@ def get_pg_conn():
             run_commands(conn,[set_slot_count])
 
         # set a long statement timeout
-        set_timeout = "set statement_timeout = '1200000'"
+        set_timeout = "set statement_timeout = '%s'" % statement_timeout
         if debug:
             comment(set_timeout)
 
@@ -882,6 +883,7 @@ def configure(**kwargs):
     global ssl
     global suppress_cw
     global cw
+    global statement_timeout
 
     # set variables
     for key, value in kwargs.items():
@@ -1074,7 +1076,7 @@ order by 2;
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch= statement-timeout="""
 
     # extract the command line arguments
     try:
@@ -1172,6 +1174,12 @@ def main(argv):
                 args[config_constants.SUPPRESS_CLOUDWATCH] = True
             else:
                 args[config_constants.SUPPRESS_CLOUDWATCH] = False
+        elif arg == "--statement-timeout":
+            if value != '' and value is not None:
+                try:
+                    args[config_constants.STATEMENT_TIMEOUT] = str(int(value))
+                except ValueError:
+                    pass
         else:
             print("Unsupported Argument " + arg)
             usage()
@@ -1184,7 +1192,7 @@ def main(argv):
     if config_constants.DB_HOST not in args:
         usage("Missing Parameter 'db-host'")
     if config_constants.DB_PORT not in args:
-        usage("Missing Parameter 'db-port'")
+        args[config_constants.DB_PORT] = 5439
     if config_constants.SCHEMA_NAME not in args:
         args[config_constants.SCHEMA_NAME] = 'public'
 
