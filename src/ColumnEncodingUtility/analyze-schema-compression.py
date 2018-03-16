@@ -852,6 +852,7 @@ def usage(with_message):
     print('           --comprows            - Set the number of rows to use for Compression Encoding Analysis')
     print('           --query_group         - Set the query_group for all queries')
     print('           --ssl-option          - Set SSL to True or False (default False)')
+    print('           --statement_timeout   - Set the runtime statement timeout in milliseconds (default 1200000)')
     print(
         '           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True')
     sys.exit(INVALID_ARGS)
