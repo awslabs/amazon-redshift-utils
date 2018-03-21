@@ -4,6 +4,7 @@ ANALYZE = "Analyze"
 VACUUM = "Vacuum"
 MONITORING = "Monitoring"
 TABLE_PERSISTENCE = "SystemTablePersistence"
+WLM_SCHEDULER = "WlmScheduler"
 LOCAL_CONFIG = "config.json"
 
 DB_NAME = "db"

@@ -9,6 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib/ColumnEncodingUtility"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib/AnalyzeVacuumUtility"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib/SystemTablePersistence"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib/WorkloadManagementScheduler"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib/amazon-redshift-monitoring"))
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -17,6 +18,7 @@ import analyze_vacuum
 import redshift_monitoring
 import config_constants
 import snapshot_system_stats
+import wlm_scheduler
 import common
 import boto3
 
@@ -40,6 +42,8 @@ def cli(utility, config_loc, use_region):
     # extract the configuration
     config = common.get_config(config_loc, use_region)
 
+    debug = False
+
     if config_constants.DEBUG in config and config[config_constants.DEBUG]:
         debug = True
 
@@ -48,8 +52,9 @@ def cli(utility, config_loc, use_region):
         print(config)
 
     # decrypt the password
-    use_password = common.get_password(kms_connection, config, debug)
-    config[config_constants.DB_PASSWORD] = use_password
+    if config_constants.ENCRYPTED_PASSWORD in config:
+        use_password = common.get_password(kms_connection, config, debug)
+        config[config_constants.DB_PASSWORD] = use_password
 
     # run the requested utilities
     results = []
@@ -85,7 +90,11 @@ def cli(utility, config_loc, use_region):
         print("Running %s" % utility)
         redshift_monitoring.monitor_cluster([config, os.environ])
     elif utility.lower() == config_constants.TABLE_PERSISTENCE.lower():
+        print("Running %s" % utility)
         snapshot_system_stats.snapshot([config, os.environ])
+    elif utility.lower() == config_constants.WLM_SCHEDULER.lower():
+        print("Running %s" % utility)
+        wlm_scheduler.run_scheduler(config)
     else:
         usage()
 
@@ -97,7 +106,7 @@ if __name__ == "__main__":
         use_region = os.environ[REGION_KEY]
     parser = argparse.ArgumentParser(description='cli args')
     parser.add_argument('--utility', dest='utility', required=True,
-                        help='Utility to invoke (encode, analyze, vacuum, monitor, systable)')
+                        help='Utility to invoke (ColumnEncodingUtility, Analyze, Vacuum, Monitor, SystemTablePersistence, WlmScheduler)')
     parser.add_argument('--config', dest='config', required=True,
                         help='Config File location (s3://bucket/prefix/file.json)')
     args = parser.parse_args()

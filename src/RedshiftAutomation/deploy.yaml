@@ -10,6 +10,7 @@ Metadata:
           - S3ConfigPath
           - SecurityGroups
           - SubnetIds
+          - WlmSchedulerConfigLocation
       -
         Label:
           default: Run Schedule Cron Expressions
@@ -19,6 +20,7 @@ Metadata:
           - AnalyzeCronExpression
           - VacuumCronExpression
           - SysTablesCronExpression
+          - WlmSchedulerCronExpression
     ParameterLabels:
       S3ConfigPath:
         default: S3 Config File
@@ -36,6 +38,10 @@ Metadata:
         default: Table Vacuum
       SysTablesCronExpression:
         default: System Tables Persistence
+      WlmSchedulerCronExpression:
+        default: WLM Scheduler
+      WlmSchedulerConfigLocation:
+        default: WLM Scheduler Configuration
 Parameters:
   S3ConfigPath:
     Default: s3://my-bucket/prefix/config-file.json
@@ -75,6 +81,15 @@ Parameters:
     Description: Cron expression for when to run System Table Persistence (nightly at midnight)
     Type: String
     AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+  WlmSchedulerCronExpression:
+    Default: 2 * * * ? *
+    Description: Cron expression for when to run the WLM Scheduler Daemon (2 minutes past every hour)
+    Type: String
+    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
+  WlmSchedulerConfigLocation:
+    Default: s3://mybucket/prefix/config.json
+    Description: Configuration File Location for the WLM Scheduler
+    Type: String
 Resources:
   LambdaRedshiftAutomation:
     Type: AWS::Serverless::Function
@@ -250,3 +265,28 @@ Resources:
       Principal: events.amazonaws.com
       SourceAccount: !Ref 'AWS::AccountId'
       SourceArn: !GetAtt SystablesEventRule.Arn
+
+  WlmSchedulerEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to invoke Redshift Automation - WLM Scheduler
+      Name: InvokeLambdaRedshiftRunner-WlmScheduler
+      ScheduleExpression: !Sub cron(${WlmSchedulerCronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: WlmScheduler
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"WlmScheduler",
+                  "ConfigLocation":"${WlmSchedulerConfigLocation}"
+                }
+  CWEventsInvokeWlmSchedulerPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt WlmSchedulerEventRule.Arn
