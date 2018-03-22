@@ -141,7 +141,7 @@ class S3Details:
                 role = s3_staging_conf['aws_iam_role']
                 self.access_credentials = S3AccessCredentialsRole(role)
             elif 'aws_access_key_id' in s3_staging_conf and 'aws_secret_access_key' in s3_staging_conf:
-                kms_helper = KMSHelper(config_helper.region_name)
+                kms_helper = KMSHelper(config_helper.s3_helper.region_name)
                 key_id = kms_helper.decrypt(s3_staging_conf['aws_access_key_id'])
                 secret_key = kms_helper.decrypt(s3_staging_conf['aws_secret_access_key'])
                 self.access_credentials = S3AccessCredentialsKey(key_id, secret_key)
