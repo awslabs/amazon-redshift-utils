@@ -212,7 +212,7 @@ def run_vacuum(conn,
             vacuum_parameter, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
 
     elif blacklisted_tables is not None:
-        comment("Extracting Candidate Tables for vacuum based on stl_alert_event_log...")
+        comment("Extracting Candidate Tables for Vacuum...")
         blacklisted_tables_array = blacklisted_tables.split(',')
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
                                          + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
@@ -231,7 +231,7 @@ def run_vacuum(conn,
 
     else:
         # query for all tables in the schema ordered by size descending
-        comment("Extracting Candidate Tables for vacuum based on stl_alert_event_log...")
+        comment("Extracting Candidate Tables for Vacuum...")
 
         get_vacuum_statement = '''
                 SELECT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" ; ' 
@@ -298,7 +298,7 @@ def run_vacuum(conn,
     statements = []
     if table_name is None and blacklisted_tables is None:
         # query for all tables in the schema ordered by size descending
-        comment("Extracting Candidate Tables for vacuum ...")
+        comment("Extracting Candidate Tables for Vacuum ...")
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
                                                    + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                                    + ',  Unsorted_pct : ' + coalesce(info_tbl.unsorted :: varchar(10),'N/A')
@@ -346,7 +346,7 @@ def run_vacuum(conn,
     statements = []
     if table_name is None and blacklisted_tables is None:
         # query for all tables in the schema for vacuum reindex
-        comment("Extracting Candidate Tables for vacuum reindex ...")
+        comment("Extracting Candidate Tables for Vacuum reindex of Interleaved Sort Keys...")
         get_vacuum_statement = ''' SELECT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" ; ' + '/* Rows : ' + CAST("rows" AS VARCHAR(10))
                                     + ', Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10))
                                     + ', Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;' AS statement, table_name, schema_name

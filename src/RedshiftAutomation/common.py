@@ -61,9 +61,13 @@ def get_config(config_location, current_region):
     else:
         raise Exception("Unsupported configuration location %s" % config_location)
 
-    config_detail = config["configuration"]
+    if "configuration" in config:
+        config_detail = config["configuration"]
 
-    # convert the provided configuration into something that the utilities we're calling will understand
-    config_detail = config_constants.normalise_config(config_detail)
+        # convert the provided configuration into something that the utilities we're calling will understand
+        config_detail = config_constants.normalise_config(config_detail)
 
-    return config_detail
+        return config_detail
+    else:
+        return config
+

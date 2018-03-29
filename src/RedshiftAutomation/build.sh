@@ -41,6 +41,14 @@ cp ../SystemTablePersistence/snapshot_system_stats.py lib/SystemTablePersistence
 cp -R ../SystemTablePersistence/lib lib/SystemTablePersistence
 echo "Imported System Table Persistence Utility"
 
+if [ ! -d lib/WorkloadManagementScheduler ]; then
+	mkdir lib/WorkloadManagementScheduler
+fi
+
+cp ../WorkloadManagementScheduler/wlm_scheduler.py lib/WorkloadManagementScheduler/wlm_scheduler.py
+cp -R ../WorkloadManagementScheduler/lib lib/WorkloadManagementScheduler
+echo "Imported Workload Management"
+
 if [ ! -d lib/amazon-redshift-monitoring ]; then
     cd lib && git clone https://github.com/awslabs/amazon-redshift-monitoring
 else

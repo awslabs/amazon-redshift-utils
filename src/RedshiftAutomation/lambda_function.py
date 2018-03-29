@@ -11,6 +11,7 @@ try:
     sys.path.append(os.path.join(os.path.dirname(__file__), "lib/AnalyzeVacuumUtility"))
     sys.path.append(os.path.join(os.path.dirname(__file__), "lib/SystemTablePersistence"))
     sys.path.append(os.path.join(os.path.dirname(__file__), "lib/amazon-redshift-monitoring"))
+    sys.path.append(os.path.join(os.path.dirname(__file__), "lib/WorkloadManagementScheduler"))
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 except:
     pass
@@ -21,6 +22,7 @@ import analyze_vacuum
 import redshift_monitoring
 import config_constants
 import snapshot_system_stats
+import wlm_scheduler
 import common
 
 region_key = 'AWS_REGION'
@@ -79,6 +81,8 @@ def event_handler(event, context):
             run_utilities.append(config_constants.MONITORING)
         elif event["ExecuteUtility"] == config_constants.TABLE_PERSISTENCE:
             run_utilities.append(config_constants.TABLE_PERSISTENCE)
+        elif event["ExecuteUtility"] == config_constants.WLM_SCHEDULER:
+            run_utilities.append(config_constants.WLM_SCHEDULER)
     elif 'utilities' in config:
         # run each utility, if requested
         if config_constants.COLUMN_ENCODING in config["utilities"]:
@@ -98,6 +102,9 @@ def event_handler(event, context):
 
         if config_constants.TABLE_PERSISTENCE in config["utilities"]:
             run_utilities.append(config_constants.TABLE_PERSISTENCE)
+
+        if config_constants.WLM_SCHEDULER in config["utilities"]:
+            run_utilities.append(config_constants.WLM_SCHEDULER)
     else:
         print("No Utilities configured to run. Exiting!")
         return
@@ -138,6 +145,9 @@ def event_handler(event, context):
         elif util == config_constants.TABLE_PERSISTENCE:
             print("Running %s" % util)
             snapshot_system_stats.snapshot([config, os.environ])
+        elif util == config_constants.WLM_SCHEDULER:
+            print("Running %s" % util)
+            wlm_scheduler.run_scheduler(config)
 
     print("Processing Complete")
     return results
