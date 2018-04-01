@@ -45,12 +45,12 @@ def emit_metrics(cw, namespace, put_metrics):
         except:
             print('Pushing metrics to CloudWatch failed: exception %s' % sys.exc_info()[1])
 
-def set_search_paths(conn, schema_names, set_target_schema=None):
+def set_search_paths(conn, schema_name, set_target_schema=None):
     get_schemas_statement = '''
-        select schema_name 
+        select schema_name
         from information_schema.schemata
         where schema_name ~ '%s'
-    ''' % schema_names
+    ''' % schema_name
 
     # set default search path
     search_path = 'set search_path = \'$user\',public'
@@ -72,4 +72,3 @@ def set_search_paths(conn, schema_names, set_target_schema=None):
 
     c = conn.cursor()
     c.execute(search_path)
-
