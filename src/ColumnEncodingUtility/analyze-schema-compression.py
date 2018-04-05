@@ -36,21 +36,22 @@ Amazon Web Services (2014)
 
 from __future__ import print_function
 
+import datetime
 import getopt
 import getpass
+import math
 import os
 import re
-import sys
-import traceback
 import socket
-from multiprocessing import Pool
-import pgpasslib
-import boto3
-import datetime
-import math
-import pg8000
-import shortuuid
+import sys
 import time
+import traceback
+from multiprocessing import Pool
+
+import boto3
+import pg8000
+import pgpasslib
+import shortuuid
 
 try:
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -62,7 +63,7 @@ import config_constants
 
 thismodule = sys.modules[__name__]
 
-__version__ = ".9.3.2"
+__version__ = ".9.3.3"
 
 OK = 0
 ERROR = 1
@@ -206,7 +207,7 @@ def get_pg_conn():
             if debug:
                 comment(set_slot_count)
 
-            run_commands(conn,[set_slot_count])
+            run_commands(conn, [set_slot_count])
 
         # set a long statement timeout
         set_timeout = "set statement_timeout = '%s'" % statement_timeout
@@ -241,6 +242,54 @@ def get_identity(adsrc):
     if m:
         return m.group('seed'), m.group('step')
     else:
+        return None
+
+
+def get_grants(schema_name, table_name, current_user):
+    sql = '''
+        SELECT usename, sel, ins, upd, del, ref
+        FROM (SELECT schemaname
+                    ,objectname
+                    ,usename
+                    ,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'select') AS sel
+                    ,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'insert') AS ins
+                    ,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'update') AS upd
+                    ,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'delete') AS del
+                    ,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'references') AS ref
+              FROM (SELECT schemaname, 't' AS obj_type, tablename AS objectname, schemaname + '.' + tablename AS fullobj 
+                    FROM pg_tables
+                    WHERE schemaname not in ('pg_internal')) AS objs,
+                   (SELECT usename FROM pg_user) AS usrs
+              ORDER BY fullobj)
+        WHERE (sel = true or ins = true or upd = true or del = true or ref = true)
+        and schemaname='%s'
+        and objectname = '%s'
+        and usename not in ('%s','rdsdb');
+    ''' % (schema_name, table_name, current_user)
+
+    if debug:
+        comment(sql)
+
+    grants = execute_query(sql)
+
+    grant_statements = []
+
+    for grant in grants:
+        def add_grant(grant_value):
+            if grant[1] == True:
+                grant_statements.append("grant %s on %s.%s to %s;" % (grant_value, schema_name, table_name, grant[0]))
+
+        add_grant('select')
+        add_grant('insert')
+        add_grant('update')
+        add_grant('delete')
+        add_grant('references')
+
+    if len(grant_statements) > 0:
+        return grant_statements
+    else:
+        if debug:
+            comment('Found no table grants to extend to the new table')
         return None
 
 
@@ -406,10 +455,10 @@ def analyze(table_info):
                 count_unoptimised += row[0]
 
     if not table_unoptimised and not force:
-        comment("Table %s.%s does not require encoding optimisation" % (schema_name,table_name))
+        comment("Table %s.%s does not require encoding optimisation" % (schema_name, table_name))
         return OK
     else:
-        comment("Table %s.%s contains %s unoptimised columns" % (schema_name,table_name, count_unoptimised))
+        comment("Table %s.%s contains %s unoptimised columns" % (schema_name, table_name, count_unoptimised))
         if force:
             comment("Using Force Override Option")
 
@@ -422,7 +471,7 @@ def analyze(table_info):
             if debug:
                 comment(statement)
 
-            comment("Analyzing Table '%s.%s'" % (schema_name,table_name,))
+            comment("Analyzing Table '%s.%s'" % (schema_name, table_name,))
 
             # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
             analyze_compression_result = None
@@ -790,6 +839,11 @@ def analyze(table_info):
                 # add foreign keys
                 fks = get_foreign_keys(schema_name, set_target_schema, table_name)
 
+                # add grants back
+                grants = get_grants(schema_name, table_name, db_user)
+                if grants is not None:
+                    statements.extend(grants)
+
                 statements.extend(['commit;'])
 
                 if do_execute:
@@ -896,7 +950,8 @@ def configure(**kwargs):
     # override the password with the contents of .pgpass or environment variables
     pwd = None
     try:
-        pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST],kwargs[config_constants.DB_PORT], kwargs[config_constants.DB_NAME],kwargs[config_constants.DB_USER])
+        pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST], kwargs[config_constants.DB_PORT],
+                                kwargs[config_constants.DB_NAME], kwargs[config_constants.DB_USER])
     except pgpasslib.FileNotFound as e:
         pass
 
@@ -961,7 +1016,6 @@ def run():
             tables = tables[:-1]
         else:
             tables = "'" + table_name + "'"
-
 
     if table_name is not None:
         statement = '''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
