@@ -478,6 +478,10 @@ def reduce_column_length(col_type, column_name):
     if "varchar" in col_type:
         new_column_len = int(col_max_len * (1 + COL_LENGTH_EXPANSION_BUFFER))
 
+        # if the new length would be greater than varchar(max) then return the current value - no changes
+        if new_column_len > 65535:
+            return col_type
+
         if debug:
             comment(
                 "Max width of character column '%s' for table '%s.%s' is %d. Current width is %d. Setting new size to %s" % (
