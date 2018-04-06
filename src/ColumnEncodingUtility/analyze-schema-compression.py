@@ -247,24 +247,12 @@ def get_identity(adsrc):
 
 def get_grants(schema_name, table_name, current_user):
     sql = '''
-        SELECT usename, sel, ins, upd, del, ref
-        FROM (SELECT schemaname
-                    ,objectname
-                    ,usename
-                    ,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'select') AS sel
-                    ,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'insert') AS ins
-                    ,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'update') AS upd
-                    ,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'delete') AS del
-                    ,HAS_TABLE_PRIVILEGE(usrs.usename, fullobj, 'references') AS ref
-              FROM (SELECT schemaname, 't' AS obj_type, tablename AS objectname, schemaname + '.' + tablename AS fullobj 
-                    FROM pg_tables
-                    WHERE schemaname not in ('pg_internal')) AS objs,
-                   (SELECT usename FROM pg_user) AS usrs
-              ORDER BY fullobj)
-        WHERE (sel = true or ins = true or upd = true or del = true or ref = true)
-        and schemaname='%s'
-        and objectname = '%s'
-        and usename not in ('%s','rdsdb');
+        SELECT table_schema, table_name, privilege_type, g.groname is not null as is_group, grantee 
+        FROM information_schema.table_privileges tp 
+        LEFT OUTER JOIN pg_group g ON g.groname = tp.grantee
+        where table_schema = '%s'
+          and table_name = '%s'
+        and grantee not in ('%s','rdsdb')
     ''' % (schema_name, table_name, current_user)
 
     if debug:
@@ -275,15 +263,10 @@ def get_grants(schema_name, table_name, current_user):
     grant_statements = []
 
     for grant in grants:
-        def add_grant(grant_value, pos):
-            if grant[pos] == True:
-                grant_statements.append("grant %s on %s.%s to %s;" % (grant_value, schema_name, table_name, grant[0]))
-
-        add_grant('select', 1)
-        add_grant('insert', 2)
-        add_grant('update', 3)
-        add_grant('delete', 4)
-        add_grant('references', 5)
+        if grant[3] == True:
+            grant_statements.append("grant %s on %s.%s to group %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
+        else:
+            grant_statements.append("grant %s on %s.%s to %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
 
     if len(grant_statements) > 0:
         return grant_statements
