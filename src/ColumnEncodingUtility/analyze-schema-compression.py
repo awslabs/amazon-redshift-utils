@@ -275,15 +275,15 @@ def get_grants(schema_name, table_name, current_user):
     grant_statements = []
 
     for grant in grants:
-        def add_grant(grant_value):
-            if grant[1] == True:
+        def add_grant(grant_value, pos):
+            if grant[pos] == True:
                 grant_statements.append("grant %s on %s.%s to %s;" % (grant_value, schema_name, table_name, grant[0]))
 
-        add_grant('select')
-        add_grant('insert')
-        add_grant('update')
-        add_grant('delete')
-        add_grant('references')
+        add_grant('select', 1)
+        add_grant('insert', 2)
+        add_grant('update', 3)
+        add_grant('delete', 4)
+        add_grant('references', 5)
 
     if len(grant_statements) > 0:
         return grant_statements
