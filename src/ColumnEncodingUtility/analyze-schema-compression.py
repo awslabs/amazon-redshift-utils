@@ -63,7 +63,7 @@ import config_constants
 
 thismodule = sys.modules[__name__]
 
-__version__ = ".9.3.3"
+__version__ = ".9.3.4"
 
 OK = 0
 ERROR = 1
@@ -74,6 +74,12 @@ NO_CONNECTION = 5
 
 # timeout for retries - 100ms
 RETRY_TIMEOUT = 100. / 1000
+
+# buffer size to add to columns whose length is reduced
+COL_LENGTH_EXPANSION_BUFFER = .2
+
+# maximum length above which varchar columns should be reduced if analyze_col_width is true
+STRING_REDUCTION_MAX_LENGTH_THRESHOLD = 255
 
 # compiled regular expressions
 IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \(?\'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
@@ -264,7 +270,8 @@ def get_grants(schema_name, table_name, current_user):
 
     for grant in grants:
         if grant[3] == True:
-            grant_statements.append("grant %s on %s.%s to group %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
+            grant_statements.append(
+                "grant %s on %s.%s to group %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
         else:
             grant_statements.append("grant %s on %s.%s to %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
 
@@ -414,6 +421,83 @@ def run_commands(conn, commands):
     return True
 
 
+def reduce_column_length(col_type, column_name):
+    set_col_type = col_type
+
+    # analyze the current size length for varchar columns and return early if they are below the threshold
+    if "varchar" in col_type:
+        curr_col_length = int(re.search(r'\d+', col_type).group())
+        if curr_col_length < STRING_REDUCTION_MAX_LENGTH_THRESHOLD:
+            return col_type
+        else:
+            col_len_statement = 'select /* computing max column length */ max(octet_length("%s")) from %s."%s"' % (
+                column_name, schema_name, table_name)
+    else:
+        col_len_statement = 'select /* computing max column length */ max("%s") from %s."%s"' % (
+            column_name, schema_name, table_name)
+
+    if debug:
+        comment(col_len_statement)
+
+    comment("Analyzing max length of column '%s' for table '%s.%s' " % (
+        column_name, schema_name, table_name))
+
+    # run the analyze in a loop, because it could be locked by another process modifying rows
+    # and get a timeout
+    col_len_result = None
+    col_len_retry = 10
+    col_len_attempt_count = 0
+    col_len_last_exception = None
+
+    while col_len_attempt_count < col_len_retry and col_len_result is None:
+        try:
+            col_len_result = execute_query(col_len_statement)
+            col_max_len = col_len_result[0][0]
+        except KeyboardInterrupt:
+            # To handle Ctrl-C from user
+            cleanup(get_pg_conn())
+            return TERMINATED_BY_USER
+        except Exception as e:
+            print(e)
+            col_len_attempt_count += 1
+            col_len_last_exception = e
+
+            # Exponential Backoff
+            time.sleep(2 ** col_len_attempt_count * RETRY_TIMEOUT)
+
+    if col_len_result is None:
+        if col_len_last_exception is not None:
+            print("Unable to determine length of %s for table %s due to Exception %s" % (
+                column_name, table_name, col_len_last_exception.message))
+            raise col_len_last_exception
+        else:
+            print(
+                "Unable to determine length of %s for table %s due to Null response to query. No changes will be made" % (
+                    column_name, table_name))
+
+    if "varchar" in col_type:
+        new_column_len = int(col_max_len * (1 + COL_LENGTH_EXPANSION_BUFFER))
+
+        if debug:
+            comment(
+                "Max width of character column '%s' for table '%s.%s' is %d. Current width is %d. Setting new size to %s" % (
+                    column_name, schema_name, table_name, col_max_len,
+                    curr_col_length, new_column_len))
+
+        if new_column_len < curr_col_length:
+            set_col_type = re.sub(str(curr_col_length), str(new_column_len), col_type)
+    else:
+        # Test to see if largest value is smaller than largest value of smallint (2 bytes)
+        if col_max_len * (1 + COL_LENGTH_EXPANSION_BUFFER) <= int(math.pow(2, 15) - 1) and col_type != "smallint":
+
+            set_col_type = re.sub(col_type, "smallint", col_type)
+        # Test to see if largest value is smaller than largest value of smallint (4 bytes)
+        elif col_max_len * (1 + COL_LENGTH_EXPANSION_BUFFER) <= int(math.pow(2, 31) - 1) and col_type != "integer":
+            set_col_type = re.sub(col_type, "integer", col_type)
+
+    return set_col_type
+
+
 def analyze(table_info):
     schema_name = table_info[0]
     table_name = table_info[1]
@@ -531,127 +615,16 @@ def analyze(table_info):
                             col, old_encoding, new_encoding))
 
                 # fix datatypes from the description type to the create type
-                col_type = descr[col][1]
+                col_type = descr[col][1].replace('character varying', 'varchar').replace('without time zone', '')
 
-                # check whether varchars columns are too wide
-                if analyze_col_width and "character varying" in col_type:
-                    curr_col_length = int(re.search(r'\d+', col_type).group())
+                # check whether columns are too wide
+                if analyze_col_width and ("varchar" in col_type or "int" in col_type):
+                    new_col_type = reduce_column_length(col_type, descr[col][0])
+                    if new_col_type != col_type:
+                        col_type = new_col_type
+                        encodings_modified = True
 
-                    if curr_col_length > 255:
-                        col_len_statement = 'select /* computing max column length */ max(octet_length("%s")) from %s."%s"' % (
-                            descr[col][0], schema_name, table_name)
-                        try:
-                            if debug:
-                                comment(col_len_statement)
-
-                            comment("Analyzing max length of character column '%s' for table '%s.%s' " % (
-                                col, schema_name, table_name))
-
-                            # run the analyze in a loop, because it could be locked by another process modifying rows
-                            # and get a timeout
-                            col_len_result = None
-                            col_len_retry = 10
-                            col_len_attempt_count = 0
-                            col_len_last_exception = None
-                            while col_len_attempt_count < col_len_retry and col_len_result is None:
-                                try:
-                                    col_len_result = execute_query(col_len_statement)
-                                except KeyboardInterrupt:
-                                    # To handle Ctrl-C from user
-                                    cleanup(get_pg_conn())
-                                    return TERMINATED_BY_USER
-                                except Exception as e:
-                                    print(e)
-                                    col_len_attempt_count += 1
-                                    col_len_last_exception = e
-
-                                    # Exponential Backoff
-                                    time.sleep(2 ** col_len_attempt_count * RETRY_TIMEOUT)
-
-                            if col_len_result is None:
-                                if col_len_last_exception is not None:
-                                    print("Unable to determine length of %s for table %s due to Exception %s" % (
-                                        col, table_name, last_exception.message))
-                                else:
-                                    print("Unknown Error")
-                                return ERROR
-
-                            if debug:
-                                comment(
-                                    "Max width of character column '%s' for table '%s.%s' is %d. Current width is %d." % (
-                                        descr[col][0], schema_name, table_name, col_len_result[0][0],
-                                        curr_col_length))
-
-                            if col_len_result[0][0] < curr_col_length:
-                                col_type = re.sub(str(curr_col_length), str(col_len_result[0][0]), col_type)
-                                encodings_modified = True
-
-                        except Exception as e:
-                            print('Exception %s during analysis of %s' % (e.message, table_name))
-                            print(traceback.format_exc())
-                            return ERROR
-
-                col_type = col_type.replace('character varying', 'varchar').replace('without time zone', '')
-
-                # check whether number columns are too wide
-                if analyze_col_width and "int" in col_type:
-                    col_len_statement = 'select max("%s") from %s."%s"' % (descr[col][0], schema_name, table_name)
-                    try:
-                        if debug:
-                            comment(col_len_statement)
-
-                        comment("Analyzing max column '%s' for table '%s.%s' " % (col, schema_name, table_name))
-
-                        # run the analyze in a loop, because it could be locked by another process modifying rows and
-                        # get a timeout
-                        col_len_result = None
-                        col_len_retry = 10
-                        col_len_attempt_count = 0
-                        col_len_last_exception = None
-                        while col_len_attempt_count < col_len_retry and col_len_result is None:
-                            try:
-                                col_len_result = execute_query(col_len_statement)
-                            except KeyboardInterrupt:
-                                # To handle Ctrl-C from user
-                                cleanup(get_pg_conn())
-                                return TERMINATED_BY_USER
-                            except Exception as e:
-                                print(e)
-                                col_len_attempt_count += 1
-                                col_len_last_exception = e
-
-                                # Exponential Backoff
-                                time.sleep(2 ** col_len_attempt_count * RETRY_TIMEOUT)
-
-                        if col_len_result is None:
-                            if col_len_last_exception is not None:
-                                print("Unable to determine length of %s for table %s due to Exception %s" % (
-                                    col, table_name, last_exception.message))
-                            else:
-                                print("Unknown Error")
-                            return ERROR
-
-                        if debug:
-                            maxlen = col_len_result[0][0] if col_len_result else 'not defined'
-                            comment("Max of column '%s' for table '%s.%s' is %s. Current column type is %s." % (
-                                descr[col][0], schema_name, table_name, maxlen, col_type))
-
-                        # Test to see if largest value is smaller than largest value of smallint (2 bytes)
-                        if col_len_result[0][0] <= int(math.pow(2, 15) - 1) and col_type != "smallint":
-                            col_type = re.sub(col_type, "smallint", col_type)
-                            encodings_modified = True
-
-                            # Test to see if largest value is smaller than largest value of smallint (4 bytes)
-                        elif col_len_result[0][0] <= int(math.pow(2, 31) - 1) and col_type != "integer":
-                            col_type = re.sub(col_type, "integer", col_type)
-                            encodings_modified = True
-
-                    except Exception as e:
-                        print('Exception %s during analysis of %s' % (e.message, table_name))
-                        print(traceback.format_exc())
-                        return ERROR
-
-                        # link in the existing distribution key, or set the new one
+                # link in the existing distribution key, or set the new one
                 row_distkey = descr[col][3]
                 if table_name is not None and new_dist_key is not None:
                     if col == new_dist_key:
@@ -724,7 +697,7 @@ def analyze(table_info):
             # abort if new sortkeys were set but we couldn't find them in the set of all columns
             if new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
                 if debug:
-                    comment("Reqested Sort Keys: %s" % new_sort_keys)
+                    comment("Requested Sort Keys: %s" % new_sort_keys)
                     comment("Resolved Sort Keys: %s" % table_sortkeys)
                 msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sort_keys
                 comment(msg)
