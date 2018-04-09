@@ -982,7 +982,7 @@ def run():
         statement = '''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
-left outer join pg_description pgd ON pgd.objoid = pgc.oid
+left outer join pg_description pgd ON pgd.objoid = pgc.oid and pgd.objsubid = 0
 join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
@@ -996,7 +996,7 @@ and pgn.nspname::text ~ '%s' and pgc.relname in (%s)
         statement = '''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
-left outer join pg_description pgd ON pgd.objoid = pgc.oid
+left outer join pg_description pgd ON pgd.objoid = pgc.oid and pgd.objsubid = 0
 join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner 
 join (select tbl, count(*) as mbytes
