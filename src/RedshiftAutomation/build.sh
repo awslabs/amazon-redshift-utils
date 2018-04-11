@@ -59,4 +59,4 @@ echo "Imported Redshift Advance Monitoring"
 cd -
 
 # build the combined lambda package
-zip -r $ARCHIVE *.py config.json .pgpass ../aws_utils.py ../config_constants.py lib/AnalyzeVacuumUtility lib/ColumnEncodingUtility lib/SystemTablePersistence lib/pg8000* lib/shortuuid* lib/pgpasslib* lib/amazon-redshift-monitoring/redshift_monitoring.py lib/amazon-redshift-monitoring/sql/ lib/amazon-redshift-monitoring/monitoring-queries.json
+zip -r $ARCHIVE *.py config.json .pgpass ../aws_utils.py ../config_constants.py lib/AnalyzeVacuumUtility lib/ColumnEncodingUtility lib/WorkloadManagementScheduler lib/SystemTablePersistence lib/pg8000* lib/shortuuid* lib/pgpasslib* lib/amazon-redshift-monitoring/redshift_monitoring.py lib/amazon-redshift-monitoring/sql/ lib/amazon-redshift-monitoring/monitoring-queries.json
