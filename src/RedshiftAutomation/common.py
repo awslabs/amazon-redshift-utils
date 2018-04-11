@@ -21,21 +21,24 @@ def get_password(kms_connection, config_detail, debug):
             print(auth_context)
 
     # resolve password
-    encrypted_password = base64.b64decode(config_detail[config_constants.ENCRYPTED_PASSWORD])
+    if config_constants.ENCRYPTED_PASSWORD in config_detail:
+        encrypted_password = base64.b64decode(config_detail[config_constants.ENCRYPTED_PASSWORD])
 
-    if encrypted_password != "" and encrypted_password is not None:
-        if auth_context is not None:
-            # decrypt the password using KMS
-            use_password = kms_connection.decrypt(CiphertextBlob=encrypted_password, EncryptionContext=auth_context)[
-                'Plaintext']
+        if encrypted_password != "" and encrypted_password is not None:
+            if auth_context is not None:
+                # decrypt the password using KMS
+                use_password = kms_connection.decrypt(CiphertextBlob=encrypted_password, EncryptionContext=auth_context)[
+                    'Plaintext']
+            else:
+                # decrypt the password using KMS
+                use_password = kms_connection.decrypt(CiphertextBlob=encrypted_password)[
+                    'Plaintext']
         else:
-            # decrypt the password using KMS
-            use_password = kms_connection.decrypt(CiphertextBlob=encrypted_password)[
-                'Plaintext']
-    else:
-        raise Exception("Unable to run Utilities without a configured Password")
+            raise Exception("Unable to run Utilities without a configured Password")
 
-    return use_password
+        return use_password
+    else:
+        return None
 
 def get_config(config_location, current_region):
     if config_location.startswith("s3://"):
