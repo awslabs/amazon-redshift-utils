@@ -660,6 +660,9 @@ def run_analyze_vacuum(**kwargs):
     if db_pwd is None:
         db_pwd = kwargs[config_constants.DB_PASSWORD]
 
+    if config_constants.SCHEMA_NAME not in kwargs:
+        kwargs[config_constants.SCHEMA_NAME] = 'public'
+
     # get a connection for the controlling processes
     master_conn = get_pg_conn(kwargs[config_constants.DB_HOST],
                               kwargs[config_constants.DB_NAME],
