@@ -1,0 +1,22 @@
+Launch a Amazon linux EC2 Instance and attach a role to it with admin access.
+
+Copy the script to one of your s3 buckets .(migration.py)
+
+1] Download the script:
+
+# wget https://s3.<region>.amazonaws.com/<bucket-name>/<path>/migrate-production.py
+
+alternatively you can use scp linux  utility .
+
+scp : https://www.computerhope.com/unix/scp.htm
+
+2] Install python 3 and dependencies for running the script:
+
+# sudo yum install python36 postgresql postgresql-devel gcc python36-devel libffi-devel
+# curl -O https://bootstrap.pypa.io/get-pip.py
+# python3 get-pip.py --user
+# pip3.6 install PyGreSQL boto3 pytz --user
+
+3] Run the script
+# python3 migrate-production.py
+
