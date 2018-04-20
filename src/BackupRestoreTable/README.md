@@ -11,7 +11,7 @@ A simple table-only backup and restore utility.
 
 1. S3 Bucket should be in the same region as Redshift cluster
 
-## DEPENDENCIES:
+## Running the script:
 	    
 1. Please run the following command to install the necessary python modules in order to run the script:
 
