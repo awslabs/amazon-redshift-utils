@@ -6,7 +6,7 @@ An automated script which takes care of Redshift migraiton from unencrypted to e
 
 You can follow the below instructions on you local linux machine but we recommend launching a Amazon linux EC2 Instance and attach a role to it with admin access in order to simplify the process of installing dependencies for the script. For instructions on how to do this, please refer below links:
 
-https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/launching-instance.html
+https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/launching-instance.html<br>
 https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html
 
 Also, copy the script (migrate-production.py) to one of your S3 buckets.
@@ -56,7 +56,7 @@ Please follow the instructions in the script to complete the migration.
 
 1. Use new cluster as a destination cluster is recommended to avoid namespace clashes which may result in migration failure.
 
-2. Duplicate users and groups are not supported by the script on the new cluster. So, if for some reason the script failed after creating users and groups on the new cluster and the second time you run the script throws the below error:
+2. Duplicate users and groups are not supported by the script on the new cluster. So, if for some reason the script failed after creating users and groups on the new cluster and the second time you run the script it throws the below error:
 
 ```bash
 'USER EXISTS OR GROUP EXISTS WITH THE SAME NAME'
