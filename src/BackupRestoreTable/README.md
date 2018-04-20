@@ -35,7 +35,7 @@ Please follow the instructions in the script.
 
 ## Input Parameters:
 
-The script takes the below parameters
+The script takes the below parameters:
 
 | Input Name              | Examples       | Description                                              |
 | -------------------     | ---------      | -------------------------------------------------------- |
