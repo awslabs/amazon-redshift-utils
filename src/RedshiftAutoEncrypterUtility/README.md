@@ -1,6 +1,6 @@
 # Redshift Auto Encrypter Utility
 
-An automated script which takes care of Redshift migraiton from unencrypted to encrypted cluster.
+An automated script which takes care of Redshift migration from unencrypted to encrypted cluster.
 
 ## Running the Script
 
