@@ -21,10 +21,12 @@ wget https://raw.githubusercontent.com/suvenduk/amazon-redshift-utils/master/src
 wget https://raw.githubusercontent.com/suvenduk/amazon-redshift-utils/master/src/OnDemandRedshift/template.json
 ```
 
-3] Run the script ondemand.py. This is a one time activity, as the pipeline will be created and will run on schedule based on the  input entered.
+3] Run the script "ondemand.py":
 
 ```bash
 python ondemand.py
 ```
 
-Please follow the instructions in the script to process further.
+This is a one time activity, as the pipeline will be created and will run on schedule based on the input entered.
+
+Please follow the instructions in the script to proceed further.
