@@ -1,7 +1,9 @@
 from __future__ import print_function
 
+import datetime
 import os
 import re
+import socket
 import sys
 import traceback
 import socket
@@ -152,7 +154,7 @@ def run_commands(conn, commands, cw=None, cluster_name=None, suppress_errors=Fal
                 cursor = conn.cursor()
                 cursor.execute(c)
                 comment('Success.')
-            except Exception:
+            except:
                 # cowardly bail on errors
                 conn.rollback()
                 if not suppress_errors:
@@ -379,7 +381,7 @@ def run_vacuum(conn,
             statements.append(vs[0])
             statements.append("analyze %s.\"%s\"" % (vs[2], vs[1]))
 
-        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -560,7 +562,7 @@ def run_analyze(conn,
 
     comment("Found %s Tables requiring Analysis" % len(statements))
 
-    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
         if not ignore_errors:
             if debug:
                 print("Error running statements: %s" % (str(statements),))
@@ -601,7 +603,7 @@ def run_analyze(conn,
         for vs in analyze_statements:
             statements.append(vs[0])
 
-        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -653,7 +655,8 @@ def run_analyze_vacuum(**kwargs):
     # get the password using .pgpass, environment variables, and then fall back to config
     db_pwd = None
     try:
-        db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST],kwargs[config_constants.DB_PORT], kwargs[config_constants.DB_NAME],kwargs[config_constants.DB_USER])
+        db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST], kwargs[config_constants.DB_PORT],
+                                   kwargs[config_constants.DB_NAME], kwargs[config_constants.DB_USER])
     except pgpasslib.FileNotFound as e:
         pass
 
@@ -670,8 +673,10 @@ def run_analyze_vacuum(**kwargs):
                               db_pwd,
                               kwargs[config_constants.SCHEMA_NAME],
                               kwargs[config_constants.DB_PORT],
-                              None if config_constants.QUERY_GROUP not in kwargs else kwargs[config_constants.QUERY_GROUP],
-                              None if config_constants.QUERY_SLOT_COUNT not in kwargs else kwargs[config_constants.QUERY_SLOT_COUNT],
+                              None if config_constants.QUERY_GROUP not in kwargs else kwargs[
+                                  config_constants.QUERY_GROUP],
+                              None if config_constants.QUERY_SLOT_COUNT not in kwargs else kwargs[
+                                  config_constants.QUERY_SLOT_COUNT],
                               None if config_constants.SSL not in kwargs else kwargs[config_constants.SSL])
 
     if master_conn is None:
