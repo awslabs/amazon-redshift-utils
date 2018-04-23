@@ -1,6 +1,6 @@
 # Redshift Auto Encrypter Utility
 
-An automated script which takes care of Redshift migration from unencrypted to encrypted cluster.
+As you might be aware, in place or direct conversion from an unencrypted to encrypted cluster is not possible in Redshift. To migrate from an unencrypted Redshift cluster to an encrypted Redshift cluster, you first need to unload your data from the existing source cluster. Then you reload the data in a new target cluster with the chosen encryption setting. Post migration, you also need to [rename](https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-clusters.html#rs-mgmt-rename-cluster) the cluster. For more information about launching an encrypted cluster, see [Amazon Redshift Database Encryption](https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-db-encryption.html). As we can see, there are a couple of intermediate steps involved in the whole migration process. This is an utility which tries to automate this intermediate steps and thus help for seamless Redshift migration from unencrypted to encrypted cluster.
 
 ## Running the Script
 
@@ -9,17 +9,14 @@ You can follow the below instructions on you local linux machine but we recommen
 https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/launching-instance.html<br>
 https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html
 
-Also, copy the script (migrate-production.py) to one of your S3 buckets.
+1. Download the 'migrate-production.py' script from the GitHub repository to S3 or to an EC2 instance from where you can access the cluster.
 
-1. Download the script:
+For example, you can download the script by using 'wget' command as given below:
 
 ```bash
-wget https://s3.<region>.amazonaws.com/<bucket-name>/<path>/migrate-production.py
+wget https://raw.githubusercontent.com/suvenduk/amazon-redshift-utils/master/src/RedshiftAutoEncrypterUtility/migrate-production.py
 ```
 
-Alternatively you can use scp linux utility to download it to the EC2 instance from your local machine.
-
-scp : https://www.computerhope.com/unix/scp.htm
 
 2. Install python 3 and dependencies for running the script:
 
