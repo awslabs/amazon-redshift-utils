@@ -157,9 +157,9 @@ def run_commands(conn, commands, cw=None, cluster_name=None, suppress_errors=Fal
             except:
                 # cowardly bail on errors
                 conn.rollback()
+                print(traceback.format_exc())
                 if not suppress_errors:
-                    print(traceback.format_exc())
-                raise
+                    raise
 
             # emit a cloudwatch metric for the statement
             if cw is not None and cluster_name is not None:
