@@ -27,6 +27,7 @@ History:
 2018-03-04      adedotua added column grantseq to help return the DDLs in the order they need to be granted or revoked
 2018-03-04      adedotua renamed column sequence to objseq and username to grantee
 2018-03-09      adedotua added logic to handle function name generation when there are non-alphabets in the function schemaname
+2018-04-26	adedotua added missing filter for handling empty default acls
 
 
 
@@ -190,5 +191,8 @@ SELECT null::text AS objowner, trim(c.nspname)::text AS schemaname, decode(b.def
 ||'GRANT ALL on '||decode(b.defaclobjtype,'r','tables','f','functions')||' TO '||QUOTE_IDENT(pg_get_userbyid(b.defacluser))||
 CASE WHEN b.defaclobjtype = 'f' then ', PUBLIC;' ELSE ';' END::text AS ddl 
 		FROM pg_default_acl b 
-		LEFT JOIN  pg_namespace c on b.defaclnamespace = c.oid;
+		LEFT JOIN  pg_namespace c on b.defaclnamespace = c.oid
+		where EXISTS (select 1 where b.defaclacl='{}'::aclitem[]
+		UNION ALL
+		select 1 WHERE array_to_string(b.defaclacl,'')=('=X/'||QUOTE_IDENT(pg_get_userbyid(b.defacluser))));
 
