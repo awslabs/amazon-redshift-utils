@@ -118,7 +118,7 @@ WITH objprivs AS (
 		inner join pg_language B ON b.oid = ns.oid and NS.n <= array_upper(b.lanacl,1)
 		UNION ALL
 		-- DEFAULT ACL privileges
-		SELECT null::text AS objowner,
+		SELECT pg_get_userbyid(b.defacluser)::text AS objowner,
 		trim(c.nspname)::text AS schemaname,
 		decode(b.defaclobjtype,'r','tables','f','functions')::text AS objname,
 		'default acl'::text AS objtype,
@@ -182,7 +182,7 @@ CASE WHEN (grantor <> current_user AND grantor <> 'rdsdb' AND objtype <> 'defaul
 ELSE 'REVOKE ALL on '||(CASE WHEN objtype = 'table' OR objtype = 'view' THEN '' ELSE objtype||' ' END::text)||fullobjname||' FROM '||splitgrantee||';' END::text)||
 CASE WHEN (grantor <> current_user AND grantor <> 'rdsdb' AND objtype <> 'default acl' AND grantor <> objowner) THEN 'RESET SESSION AUTHORIZATION;' ELSE '' END::text AS ddl
 FROM objprivs
-WHERE NOT (objtype = 'default acl' AND grantee = 'PUBLIC')
+WHERE NOT (objtype = 'default acl' AND grantee = 'PUBLIC' and objname='functions') and objowner<>grantee
 UNION ALL
 -- Eliminate empty default ACLs
 SELECT null::text AS objowner, trim(c.nspname)::text AS schemaname, decode(b.defaclobjtype,'r','tables','f','functions')::text AS objname,
