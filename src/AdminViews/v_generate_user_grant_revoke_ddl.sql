@@ -28,6 +28,7 @@ History:
 2018-03-04      adedotua renamed column sequence to objseq and username to grantee
 2018-03-09      adedotua added logic to handle function name generation when there are non-alphabets in the function schemaname
 2018-04-26	adedotua added missing filter for handling empty default acls
+2018-04-26	adedotua fixed one more edge case where default privilege is granted on schema to user other than schema owner
 
 
 
