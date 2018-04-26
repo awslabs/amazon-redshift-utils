@@ -27,6 +27,7 @@ History:
 2018-03-04      adedotua added column grantseq to help return the DDLs in the order they need to be granted or revoked
 2018-03-04      adedotua renamed column sequence to objseq and username to grantee
 2018-03-09      adedotua added logic to handle function name generation when there are non-alphabets in the function schemaname
+2018-04-26	adedotua added missing filter for handling empty default acls
 
 
 
@@ -117,7 +118,7 @@ WITH objprivs AS (
 		inner join pg_language B ON b.oid = ns.oid and NS.n <= array_upper(b.lanacl,1)
 		UNION ALL
 		-- DEFAULT ACL privileges
-		SELECT null::text AS objowner,
+		SELECT pg_get_userbyid(b.defacluser)::text AS objowner,
 		trim(c.nspname)::text AS schemaname,
 		decode(b.defaclobjtype,'r','tables','f','functions')::text AS objname,
 		'default acl'::text AS objtype,
@@ -181,7 +182,7 @@ CASE WHEN (grantor <> current_user AND grantor <> 'rdsdb' AND objtype <> 'defaul
 ELSE 'REVOKE ALL on '||(CASE WHEN objtype = 'table' OR objtype = 'view' THEN '' ELSE objtype||' ' END::text)||fullobjname||' FROM '||splitgrantee||';' END::text)||
 CASE WHEN (grantor <> current_user AND grantor <> 'rdsdb' AND objtype <> 'default acl' AND grantor <> objowner) THEN 'RESET SESSION AUTHORIZATION;' ELSE '' END::text AS ddl
 FROM objprivs
-WHERE NOT (objtype = 'default acl' AND grantee = 'PUBLIC')
+WHERE NOT (objtype = 'default acl' AND grantee = 'PUBLIC' and objname='functions') and objowner<>grantee
 UNION ALL
 -- Eliminate empty default ACLs
 SELECT null::text AS objowner, trim(c.nspname)::text AS schemaname, decode(b.defaclobjtype,'r','tables','f','functions')::text AS objname,
@@ -190,5 +191,8 @@ SELECT null::text AS objowner, trim(c.nspname)::text AS schemaname, decode(b.def
 ||'GRANT ALL on '||decode(b.defaclobjtype,'r','tables','f','functions')||' TO '||QUOTE_IDENT(pg_get_userbyid(b.defacluser))||
 CASE WHEN b.defaclobjtype = 'f' then ', PUBLIC;' ELSE ';' END::text AS ddl 
 		FROM pg_default_acl b 
-		LEFT JOIN  pg_namespace c on b.defaclnamespace = c.oid;
+		LEFT JOIN  pg_namespace c on b.defaclnamespace = c.oid
+		where EXISTS (select 1 where b.defaclacl='{}'::aclitem[]
+		UNION ALL
+		select 1 WHERE array_to_string(b.defaclacl,'')=('=X/'||QUOTE_IDENT(pg_get_userbyid(b.defacluser))));
 
