@@ -2,9 +2,8 @@
 Purpose:        View to generate grant or revoke ddl for users and groups. This is useful for 
                 recreating users or group privileges or for revoking privileges before dropping 
                 a user or group. For the older version of this view see 
-                https://github.com/adedotua/amazon-redshift-utils/blob/master/src/AdminViews/v_generate_user_grant_revoke_ddl_v101.sql
-
-Version:        1.02
+                 
+Version:        1.03
 
 Columns -
 objowner:       Object owner 
