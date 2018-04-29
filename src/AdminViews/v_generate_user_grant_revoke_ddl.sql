@@ -1,8 +1,8 @@
 /*************************************************************************************************************************
 Purpose:        View to generate grant or revoke ddl for users and groups. This is useful for 
                 recreating users or group privileges or for revoking privileges before dropping 
-                a user or group. For the older version of this view see 
-                 
+                a user or group. 
+		
 Version:        1.03
 
 Columns -
