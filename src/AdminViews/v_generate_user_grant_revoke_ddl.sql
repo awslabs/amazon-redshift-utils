@@ -1,10 +1,9 @@
 /*************************************************************************************************************************
 Purpose:        View to generate grant or revoke ddl for users and groups. This is useful for 
                 recreating users or group privileges or for revoking privileges before dropping 
-                a user or group. For the older version of this view see 
-                https://github.com/adedotua/amazon-redshift-utils/blob/master/src/AdminViews/v_generate_user_grant_revoke_ddl_v101.sql
-
-Version:        1.02
+                a user or group. 
+		
+Current Version:        1.04
 
 Columns -
 objowner:       Object owner 
@@ -21,15 +20,23 @@ ddl:            DDL text
 Notes:           
                 
 History:
-2017-03-01      adedotua created
-2018-03-04      adedotua completely refactored the view to minimize nested loop joins. View is now significantly faster on clusters
-                with a large number of users and privileges
-2018-03-04      adedotua added column grantseq to help return the DDLs in the order they need to be granted or revoked
-2018-03-04      adedotua renamed column sequence to objseq and username to grantee
-2018-03-09      adedotua added logic to handle function name generation when there are non-alphabets in the function schemaname
-2018-04-26	adedotua added missing filter for handling empty default acls
-2018-04-26	adedotua fixed one more edge case where default privilege is granted on schema to user other than schema owner
 
+Version 1.01
+	2017-03-01      adedotua created
+	2018-03-04      adedotua completely refactored the view to minimize nested loop joins. View is now significantly faster on clusters
+			with a large number of users and privileges
+	2018-03-04      adedotua added column grantseq to help return the DDLs in the order they need to be granted or revoked
+	2018-03-04      adedotua renamed column sequence to objseq and username to grantee
+
+Version 1.02
+	2018-03-09      adedotua added logic to handle function name generation when there are non-alphabets in the function schemaname
+
+Version 1.03
+	2018-04-26	adedotua added missing filter for handling empty default acls
+	2018-04-26	adedotua fixed one more edge case where default privilege is granted on schema to user other than schema owner
+
+Version 1.04
+	2018-05-02	adedotua added support for privileges granted on pg_catalog tables and other system owned objects
 
 
 
@@ -69,7 +76,7 @@ WITH objprivs AS (
 		(SELECT oid,generate_series(1,array_upper(relacl,1))  AS n FROM pg_class) NS
 		inner join pg_class B ON b.oid = ns.oid AND  NS.n <= array_upper(b.relacl,1)
 		join pg_namespace c on b.relnamespace = c.oid
-		where relowner>1 AND relkind in ('r','v')
+		where relkind in ('r','v')
 		UNION ALL
 		-- SCHEMA privileges
 		SELECT pg_get_userbyid(b.nspowner)::text AS objowner,
@@ -81,7 +88,6 @@ WITH objprivs AS (
 		FROM 
 		(SELECT oid,generate_series(1,array_upper(nspacl,1)) AS n FROM pg_namespace) NS
 		inner join pg_namespace B ON b.oid = ns.oid AND NS.n <= array_upper(b.nspacl,1)
-		where nspowner>1 
 		UNION ALL
 		-- DATABASE privileges
 		SELECT pg_get_userbyid(b.datdba)::text AS objowner,
@@ -92,8 +98,7 @@ WITH objprivs AS (
 		NS.n as grantseq
 		FROM 
 		(SELECT oid,generate_series(1,array_upper(datacl,1)) AS n FROM pg_database) NS
-		inner join pg_database B ON b.oid = ns.oid AND NS.n <= array_upper(b.datacl,1)
-		where datdba>1 OR datname = 'dev'
+		inner join pg_database B ON b.oid = ns.oid AND NS.n <= array_upper(b.datacl,1) 
 		UNION ALL
 		-- FUNCTION privileges 
 		SELECT pg_get_userbyid(b.proowner)::text AS objowner,
