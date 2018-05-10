@@ -16,7 +16,7 @@ trim(a.dbname) as dbname,
 trim(c.application_name) as app_name,
 trim(b.authmethod) as authmethod,
 case when d.duration > 0 then (d.duration/1000000)/86400||' days '||((d.duration/1000000)%86400)/3600||'hrs '
-||((d.duration/1000000)%3600)/60||'mins '||(d.duration/1000000%60)||'secs' else datediff(s,a.recordtime,getdate())/86400||' days '||(datediff(s,a.recordtime,getdate())%86400)/3600||'hrs '
+||((d.duration/1000000)%3600)/60||'mins '||(d.duration/1000000%60)||'secs' when f.process is null then null else datediff(s,a.recordtime,getdate())/86400||' days '||(datediff(s,a.recordtime,getdate())%86400)/3600||'hrs '
 ||(datediff(s,a.recordtime,getdate())%3600)/60||'mins '||(datediff(s,a.recordtime,getdate())%60)||'secs' end as duration,
 b.mtu,
 trim(b.sslversion) as sslversion,
