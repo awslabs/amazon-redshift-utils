@@ -291,7 +291,7 @@ def run_vacuum(conn,
         statements.append(vs[0])
         statements.append("analyze %s.\"%s\"" % (schema_name, vs[1]))
 
-    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
         if not ignore_errors:
             if debug:
                 print("Error running statements: %s" % (str(statements),))
@@ -339,7 +339,7 @@ def run_vacuum(conn,
             statements.append(vs[0])
             statements.append("analyze %s.\"%s\"" % (vs[2], vs[1]))
 
-        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
