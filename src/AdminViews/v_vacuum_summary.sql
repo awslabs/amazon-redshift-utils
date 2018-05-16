@@ -20,8 +20,14 @@ CREATE OR REPLACE VIEW admin.v_vacuum_summary as SELECT a.userid,
        END AS vac_end_status,
        a.eventtime AS vac_start_time,
        b.eventtime AS vac_end_time,
+       CASE 
+       WHEN f.xid IS NOT NULL THEN datediff(s,a.eventtime,getdate())
+       WHEN b.eventtime IS NOT NULL THEN datediff(s,a.eventtime,b.eventtime)
+       ELSE NULL
+       END AS vac_duration_secs,
        a."rows" AS vac_start_rows,
        b."rows" AS vac_end_rows,
+       a."rows" - b."rows" AS vac_deleted_rows,
        a.sortedrows AS vac_start_sorted_rows,
        b.sortedrows AS vac_end_sorted_rows,
        a."blocks" AS vac_start_blocks,
