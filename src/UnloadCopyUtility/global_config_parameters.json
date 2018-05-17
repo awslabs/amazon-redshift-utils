@@ -70,7 +70,7 @@
     "possibleValues": "/any/valid/system/path|s3://any/valid/s3/path"
   },
   "tableName": {
-    "description": "The table that is being copied from source to destination. Should be same name.",
+    "description": "Provide the table name of the table that you want to copy from source to destination.  The name from source and destination table needs to be the same.",
     "value": "None",
     "possibleValues": "table_name"
   }
