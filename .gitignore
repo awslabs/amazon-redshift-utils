@@ -59,7 +59,12 @@ target/
 # Virtual environments
 venv/
 .venv/
+src/AdminViews/.DS_Store
+src/.DS_Store
+src/metadatatransfer/.DS_Store
+src/metadatatransfer/.idea/metadatatransfer.iml
+src/metadatatransfer/.idea/misc.xml
+*.xml
+.DS_Store
 
-# IDE's
-.project
-.idea
+*.iml

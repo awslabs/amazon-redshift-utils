@@ -1,3 +1,12 @@
+COLUMN_ENCODING = "ColumnEncodingUtility"
+ANALYZE_VACUUM = "AnalyzeVacuumUtility"
+ANALYZE = "Analyze"
+VACUUM = "Vacuum"
+MONITORING = "Monitoring"
+TABLE_PERSISTENCE = "SystemTablePersistence"
+WLM_SCHEDULER = "WlmScheduler"
+LOCAL_CONFIG = "config.json"
+
 DB_NAME = "db"
 DB_HOST = "db_host"
 DB_PORT = "db_port"
@@ -23,12 +32,11 @@ ANALYZE_COL_WIDTH = "analyze_col_width"
 THREADS = "threads"
 OUTPUT_FILE = "output_file"
 SSL = "ssl"
-TABLE_BLACKLIST = "table_blacklist"
+BLACKLISTED_TABLES = "blacklisted_tables"
 AGG_INTERVAL = "agg_interval"
 VACUUM_PARAMETER = "vacuum_parameter"
 MIN_UNSORTED_PCT = "min_unsorted_pct"
 MAX_UNSORTED_PCT = "max_unsorted_pct"
-DELETED_PCT = "deleted_pct"
 STATS_OFF_PCT = "stats_off_pct"
 PREDICATE_COLS = "predicate_cols"
 SUPPRESS_CLOUDWATCH = "suppress_cw"
@@ -36,6 +44,8 @@ MAX_TBL_SIZE_MB = "max_table_size_mb"
 MIN_INTERLEAVED_SKEW = "min_interleaved_skew"
 MIN_INTERLEAVED_COUNT = "min_interleaved_count"
 KMS_AUTH_CONTEXT = "kms_auth_context"
+SYSTABLE_CLEANUP_AFTER_DAYS = "systable_cleanup_after_days"
+STATEMENT_TIMEOUT = "statement_timeout"
 
 config_aliases = {
     "db": ["db", "DatabaseName"],
@@ -47,7 +57,7 @@ config_aliases = {
     "table_name": ["analyzeTable"],
     "schema_name": ["analyzeSchema"],
     "target_schema": ["targetSchema"],
-    "cluster_name": ["ClusterName, clusterName"],
+    "cluster_name": ["ClusterName", "clusterName"],
     "do_analyze": ["doAnalyze", "analyze_flag", "analyze-flag"],
     "do_vacuum": ["doVacuum", "vacuum_flag", 'vacuum-flag'],
     "do_execute": ["do-execute"],
@@ -57,7 +67,7 @@ config_aliases = {
     "ignore_errors": ["ignoreErrors"],
     "output_file": ["outputFile"],
     "ssl": ["ssl-option", 'require-ssl'],
-    "table_blacklist": ["tableBlacklist"],
+    "blacklisted_tables": ["blacklistedTables"],
     "agg_interval": ["aggregationInterval"],
 }
 
@@ -94,12 +104,11 @@ def normalise_config(config):
     add_to_config(THREADS)
     add_to_config(OUTPUT_FILE)
     add_to_config(SSL)
-    add_to_config(TABLE_BLACKLIST)
+    add_to_config(BLACKLISTED_TABLES)
     add_to_config(AGG_INTERVAL)
     add_to_config(VACUUM_PARAMETER)
     add_to_config(MIN_UNSORTED_PCT)
     add_to_config(MAX_UNSORTED_PCT)
-    add_to_config(DELETED_PCT)
     add_to_config(STATS_OFF_PCT)
     add_to_config(PREDICATE_COLS)
     add_to_config(SUPPRESS_CLOUDWATCH)
@@ -107,6 +116,7 @@ def normalise_config(config):
     add_to_config(MIN_INTERLEAVED_SKEW)
     add_to_config(MIN_INTERLEAVED_COUNT)
     add_to_config(KMS_AUTH_CONTEXT)
+    add_to_config(SYSTABLE_CLEANUP_AFTER_DAYS)
 
     return config_out
 

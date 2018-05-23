@@ -1,6 +1,6 @@
 # !/usr/bin/python
 
-'''
+"""
 multitablerestore.py
 * Copyright 2016, Amazon.com, Inc. or its affiliates. All Rights Reserved.
 *
@@ -14,17 +14,25 @@ multitablerestore.py
 * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
 * express or implied. See the License for the specific language governing
 * permissions and limitations under the License.
-'''
+
+Managed by adedotua
+
+2017-12-23: PEP8 compliance
+2017-12-23: Added cosmetic changes. Logs will now record timestamp for each step. 
+            Number of successful, canceled or Failed restores will now be recorded once script completes
+2017-12-23: Fixed issue where script would get stuck if table restore status is in state CANCELED.
+"""
 
 import json
 import getopt
+import datetime
 from time import sleep
 from boto3 import client
 from botocore.exceptions import ClientError
-from sys import exit, stdout, argv
+from sys import exit, argv
 
 
-class rsrestore:
+class RsRestore:
     # Create restore table object
     def __init__(self, clusterIdentifier, snapshotIdentifier,
                  sourceDatabaseName, sourceSchemaName,
@@ -63,36 +71,36 @@ class rsrestore:
         except:
             return rstatus['TableRestoreStatusDetails'][0]['Message']
 
-    # In place printing of the restore status
-    def monitorRestore(self):
-        print "\rSTATUS: %s " % self.restorestatus('Status'),
-        stdout.flush()
-
-    # Print the final status of the table restore
-    def printMessage(self):
-        if self.restorestatus('Status') == 'SUCCEEDED':
-            print "\nDETAIL: Table %s.%s restored to database %s. Total size restored is %sMB." % (self.restorestatus('TargetSchemaName'),
-                                                                                                   self.restorestatus('NewTableName'),
-                                                                                                   self.restorestatus('TargetDatabaseName'),
-                                                                                                   self.restorestatus('TotalDataInMegaBytes'))
+    def printmessage(self, status):
+        datetime_str = str(datetime.datetime.now())
+        if status == 'FAILED':
+            print "[%s] %s " % (datetime_str, self.restorestatus('Message'))
+        elif status != 'SUCCEEDED':
+            print "[%s] STATUS: %s " % (datetime_str, self.restorestatus('Status'))
         else:
-            print "\n%s " % (self.restorestatus('Message'))
+            print "[%s] DETAIL: Table %s.%s restored to database %s. Total size restored is %sMB." \
+                  % (datetime_str, self.restorestatus('TargetSchemaName'), self.restorestatus('NewTableName'),
+                     self.restorestatus('TargetDatabaseName'), self.restorestatus('TotalDataInMegaBytes'))
 
 
 #  Usage of script
 def errormsg(script_name):
-    print('Usage: %s --target-database-name <target database> --source-database-name <source database> --snapshot-identifier <snapshot name> --cluster-identifier <cluster> --listfile <filename>') % script_name
+    print("Usage: %s --target-database-name <target database> "
+          "--source-database-name <source database> "
+          "--snapshot-identifier <snapshot name> "
+          "--cluster-identifier <cluster> --listfile <filename>") % script_name
 
 
 #  Table restore function that can be called from within another module
 def tablerestore(tgtdbname, srcdbname, snapshotid, clusterid, filename):
+    previous_status = None
     try:
         with open(filename) as data_file:
             datac = json.load(data_file)
             #  Check json for valid key
             if 'TableRestoreList' not in datac:
-                print 'ERROR: \'%s\' key in %s list is an invalid key. Valid key is \'TableRestoreList\'.' % (datac.keys()[0],
-                                                                                                              filename)
+                print 'ERROR: \'%s\' key in %s list is an invalid key. Valid key is \'TableRestoreList\'.' \
+                      % (datac.keys()[0], filename)
                 exit()
     #  Check restore list file exists
     except IOError:
@@ -101,6 +109,12 @@ def tablerestore(tgtdbname, srcdbname, snapshotid, clusterid, filename):
     except Exception as e:
         print e
         exit()
+
+    count_succeeded = 0
+    count_failed = 0
+    count_canceled = 0
+    count_unknown = 0
+    total_restore_size = 0
 
     for i in datac['TableRestoreList']:
         try:
@@ -112,17 +126,35 @@ def tablerestore(tgtdbname, srcdbname, snapshotid, clusterid, filename):
             exit()
         tgtschema = srcschema
         trgttable = srctable
-        tlr = rsrestore(clusterid, snapshotid, srcdbname, srcschema, tgtdbname, tgtschema)
-
+        tlr = RsRestore(clusterid, snapshotid, srcdbname, srcschema, tgtdbname, tgtschema)
         tlr.restoretable(srctable, trgttable)
-        print "INFO: Starting restore of %s to schema %s in database %s. Requestid: %s " % (trgttable, tgtschema, tgtdbname,
-                                                                                            tlr.restorestatus(
-                                                                                                'TableRestoreRequestId'))
-        while tlr.restorestatus('Status') != 'SUCCEEDED' and tlr.restorestatus('Status') != 'FAILED':
-            tlr.monitorRestore()
+        print "%s Starting Table Restores %s" % ('-' * 50, '-' * 50)
+        print "[%s] Requestid: %s " % (str(datetime.datetime.now()), tlr.restorestatus('TableRestoreRequestId'))
+        print "[%s] INFO: Starting restore of %s to schema %s in database %s" % (str(datetime.datetime.now()),
+                                                                                 trgttable, tgtschema, tgtdbname)
+        current_status = tlr.restorestatus('Status')
+        while current_status != 'SUCCEEDED' and current_status != 'FAILED' and current_status != 'CANCELED':
+            if current_status != previous_status:
+                previous_status = current_status
+                tlr.printmessage(current_status)
             sleep(2)
-        tlr.monitorRestore()
-        tlr.printMessage()
+            current_status = tlr.restorestatus('Status')
+
+        if current_status == 'SUCCEEDED':
+            count_succeeded += 1
+            total_restore_size += tlr.restorestatus('TotalDataInMegaBytes')
+        elif current_status == 'FAILED':
+            count_failed += 1
+        elif current_status == 'CANCELED':
+            count_canceled += 1
+        else:
+            count_unknown += 1
+        tlr.printmessage(current_status)
+    print "%s Table Restore Summary %s" % ('-' * 51, '-' * 51)
+    print "[%s] Succeeded: %d Failed: %d Canceled: %d Unknown: %d Total Size: %dMB" \
+          % (str(datetime.datetime.now()), count_succeeded, count_failed, count_canceled,
+             count_unknown, total_restore_size)
+    print "%s" % ('-' * 125)
 
 
 def main(input_args):
@@ -134,28 +166,30 @@ def main(input_args):
 
     try:
         optlist,  remaining = getopt.getopt(input_args[1:], "", ['target-database-name=', 'source-database-name=',
-                                                                 'snapshot-identifier=', 'cluster-identifier=', 'listfile='])
+                                                                 'snapshot-identifier=', 'cluster-identifier=',
+                                                                 'listfile='])
     except getopt.GetoptError as err:
         print str(err)
         exit()
 
     for arg,  value in optlist:
-        if arg in ("--target-database-name"):
+        if arg == "--target-database-name":
             tgtdbname = value
-        elif arg in ("--source-database-name"):
+        elif arg == "--source-database-name":
             srcdbname = value
-        elif arg in ("--snapshot-identifier"):
+        elif arg == "--snapshot-identifier":
             snapshotid = value
-        elif arg in ("--cluster-identifier"):
+        elif arg == "--cluster-identifier":
             clusterid = value
-        elif arg in ("--listfile"):
+        elif arg == "--listfile":
             filename = value
         else:
-            print "Unknown argument %s" % (arg)
+            print "Unknown argument %s" % arg
     if (tgtdbname is None) or (srcdbname is None) or (snapshotid is None) or (clusterid is None) or (filename is None):
         errormsg(input_args[0])
         exit()
     tablerestore(tgtdbname, srcdbname, snapshotid, clusterid, filename)
+
 
 if __name__ == "__main__":
     main(argv)

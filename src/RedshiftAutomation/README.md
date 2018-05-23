@@ -6,7 +6,7 @@ This project includes code that is able to run several of the Amazon Redshift Ut
 
 This utility creates a Lambda function which imports other Redshift Utils modules, and then invokes them against a cluster. It runs within your VPC, and should be configured to connect via a Subnet which is either the same, or can route to the subnet where your Redshift cluster is running. It should also be configured with a Security Group which is trusted by your [Redshift Cluster Security Configuration](http://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html).
 
-Currently the [Column Encoding Utility](src/ColumnEncodingUtility), [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility), and [Redshift Advanced Monitoring](https://github.com/awslabs/amazon-redshift-monitoring) are supported for automated invocation:
+Currently the [Column Encoding Utility](src/ColumnEncodingUtility), [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility), [Redshift Advanced Monitoring](https://github.com/awslabs/amazon-redshift-monitoring), and [System Table Persistence](src/SystemTablePersistence) are supported for automated invocation:
 
 ![what it does](WhatItDoes.png)
 
@@ -57,12 +57,12 @@ The required configuration items are placed into the ```configuration``` part of
   "output_file":"/tmp/analyze-schema-compression.sql",
   "debug": "Should the utilities run in debug mode? (boolean - true | false | default false)",
   "do_execute": "Should changes be made automatically, or just for reporting purposes (boolean - true |  false | default true)",
-  "analyze_col_width": "Analyze columns wider than this value (int)",
+  "analyze_col_width": "Analyze varchar columns wider that 255 characters and reduce size based on determined data length (boolean - default false)",
   "threads": "How many threads should the column encoding utility use (can run in parallel - default 1 for Lambda)",
   "ssl":"Should you connect to the cluster with SSL? (boolean true | false | default true)",
   "do_vacuum": "Should the Analyze Vacuum utility run Vacuum? (boolean true | false | default true)",
   "do_analyze":"Should the Analyze Vacuum utility run Analyze? (boolean true | false | default true)",
-  "table_blacklist":"comma separated list of tables to suppress running the analyze vacuum utility against",
+  "blacklisted_tables":"comma separated list of tables to suppress running the analyze vacuum utility against",
   "agg_interval":"Interval on which to summarise database statistics (redshift interval literal: http://docs.aws.amazon.com/redshift/latest/dg/r_interval_literals.html | default '1 hour'",
   "cluster_name":"The cluster name that is the first part of the DNS name"
   }
@@ -82,7 +82,6 @@ You can also add the following configuration options to finely tune the operatio
 "vacuum_parameter": "Vacuum type to be run, including FULL, SORT ONLY, DELETE ONLY, REINDEX (default FULL)",
 "min_unsorted_pct": "Minimum unsorted percentage(%) to consider a table for vacuum (default 5%)",
 "max_unsorted_pct": "Maximum unsorted percentage(%) to consider a table for vacuum (default 50%)",
-"deleted_pct": "Minimum deleted percentage (%) to consider a table for vacuum (default 5%)",
 "stats_off_pct": "Minimum stats off percentage(%) to consider a table for analyze (default 10%)",
 "predicate_cols": "Flag to enforce only analyzing predicate columns (see http://bit.ly/2o163tC)",
 "suppress_cw": "Set to true to suppress utilities exporting CloudWatch metrics",
@@ -128,7 +127,7 @@ When completed, it will deploy the following objects:
 * `InvokeLambdaRedshiftRunner-MonitoringUtility`: The CloudWatch Scheduled Event which runs the [Redshift Advanced Monitoring Utility](https://github.com/awslabs/amazon-redshift-monitoring/)
 * _3 AWS Lambda Permissions are also created so that CloudWatch Events can call the Lambda function_
 
-## Running the Modules
+## Manually executing the Lambda Function
 
 These utilites are configured to run via CloudWatch Scheduled Events. You will see that each of the scheduled events includes a payload of input which enables the function to download the configuration and run the correct utility per-instance:
 
@@ -150,7 +149,29 @@ __To run the Monitoring Utility__
 {"ExecuteUtility":"Monitoring","ConfigLocation":"s3//mybucket/myprefix/config.json"}
 ```
 
+__To run the System Table Persistence Utility__
+
+```javascript
+{"ExecuteUtility":"SystemTablePersistence","ConfigLocation":"s3//mybucket/myprefix/config.json"}
+```
+
 You can change the CRON schedule for each event so they don't run at the same time, if you prefer.
+
+## But I don't want to use Lambda!
+
+If you don't want to deploy this module using AWS Lambda, then we've also provided a command line based mechanism that will allow you to run all utilities using a host command or through a Cron job. You still need to go through the configuration step to create a config file and place this on S3, then you need to build the RedshiftAutomation project, so that it downloads all its dependencies:
+
+```./build.sh```
+
+You can then invoke the automation unified client `ra`:
+
+```./ra <utility> <config>
+
+Redshift Automation CLI - Automation Utilities for Amazon Redshift
+ra <utility> <config>
+<utility>: Available Utilities: (ColumnEncodingUtility, AnalyzeVacuumUtility, Analyze, Vacuum, Monitoring, SystemTablePersistence)
+<config>: Path to configuration file on Amazon S3, for example 's3://my-bucket/my-prefix/config.json'
+```
 
 ## Rebuilding the Project 
 

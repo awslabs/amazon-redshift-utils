@@ -81,11 +81,15 @@ Run ANALYZE based the `stats_off` metric in `svv_table_info`. If table has a `st
 |--max-table-size-mb | No | 700*1024 |
 |--predicate-cols | No | False |
 
-The above parameter values depend on the cluster type, table size, available system resources and available ‘Time window’ etc. The default values provided here are based on ds2.8xlarge, 8 node cluster. It may take some trial and error to come up with correct parameter values to vacuum and analyze your table(s). If table size is greater than certain size (`max_table_size_mb`) and has a large unsorted region (`deleted_pct` or `max_unsorted_pct`), consider performing a deep copy, which will be much faster than a vacuum.
+The above parameter values depend on the cluster type, table size, available system resources and available ‘Time window’ etc. The default values provided here are based on ds2.8xlarge, 8 node cluster. It may take some trial and error to come up with correct parameter values to vacuum and analyze your table(s). If table size is greater than certain size (`max_table_size_mb`) and has a large unsorted region (`max_unsorted_pct`), consider performing a deep copy, which will be much faster than a vacuum.
 
 As VACUUM & ANALYZE operations are resource intensive, you should ensure that this will not adversely impact other database operations running on your cluster. AWS has thoroughly tested this software on a variety of systems, but cannot be responsible for the impact of running the utility against your database.
 
 ### Parameter Guidance
+
+### Schema Name
+
+The utility will accept a valid schema name, or alternative a regular expression pattern which will be used to match to all schemas in the database. This uses Posix regular expression syntax.
 
 #### Slot Count
 

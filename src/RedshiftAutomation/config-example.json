@@ -22,7 +22,7 @@
   "ssl-option":"Should you connect to the cluster with SSL? (boolean true | false | default true)",
   "doVacuum": "Should the Analyze Vacuum utility run Vacuum? (boolean true | false | default true)",
   "doAnalyze":"Should the Analyze Vacuum utility run Analyze? (boolean true | false | default true)",
-  "tableBlacklist":"comma separated list of tables to suppress running the analyze vacuum utility against",
+  "blacklistedTables":"comma separated list of tables to suppress running the analyze vacuum utility against",
   "aggregationInterval":"Interval on which to summarise database statistics (redshift interval literal: http://docs.aws.amazon.com/redshift/latest/dg/r_interval_literals.html | default '1 hour'",
   "clusterName":"The cluster name that is the first part of the DNS name"
   }

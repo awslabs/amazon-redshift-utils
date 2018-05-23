@@ -1,0 +1,4 @@
+boto3
+botocore
+PyGreSQL==5.0.4
+pytz==2017.3
