@@ -999,7 +999,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-and pgn.nspname::text ~ '%s' and pgc.relname in (%s)        
+and pgn.nspname::text = '%s' and pgc.relname in (%s)
         ''' % (schema_name, tables)
     else:
         # query for all tables in the schema ordered by size descending
@@ -1013,7 +1013,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner 
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-where pgn.nspname::text ~ '%s'
+where pgn.nspname::text = '%s'
   and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
 order by 2;
         ''' % (schema_name,)
