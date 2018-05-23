@@ -440,7 +440,7 @@ def reduce_column_length(col_type, column_name, table_name):
             col_len_statement = 'select /* computing max column length */ max(octet_length("%s")) from %s."%s"' % (
                 column_name, schema_name, table_name)
     else:
-        col_len_statement = 'select /* computing max column length */ abs(max("%s")) from %s."%s"' % (
+        col_len_statement = 'select /* computing max column length */ max(abs("%s")) from %s."%s"' % (
             column_name, schema_name, table_name)
 
     if debug:
