@@ -838,7 +838,7 @@ def analyze(table_info):
                 else:
                     comment("No encoding modifications run for %s.%s" % (schema_name, table_name))
         except Exception as e:
-            print('Exception %s during analysis of %s' % (e.message, table_name))
+            print('Exception %s during analysis of %s' % (e, table_name))
             print(traceback.format_exc())
             return ERROR
 
