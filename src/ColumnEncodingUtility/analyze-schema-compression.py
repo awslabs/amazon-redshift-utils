@@ -230,6 +230,13 @@ def get_pg_conn():
 
         run_commands(conn, [set_name])
 
+        # Set search_path
+        set_searchpath = "set search_path to '$user', public, %s;" % schema_name
+        if debug:
+            comment(set_searchpath)
+
+        run_commands(conn, [set_searchpath])
+
         # turn off autocommit for the rest of the executions
         conn.autocommit = False
 
