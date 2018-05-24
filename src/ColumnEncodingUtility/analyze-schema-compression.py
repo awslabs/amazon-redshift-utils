@@ -230,6 +230,13 @@ def get_pg_conn():
 
         run_commands(conn, [set_name])
 
+        # Set search_path
+        set_searchpath = "set search_path to '$user', public, %s;" % schema_name
+        if debug:
+            comment(set_searchpath)
+
+        run_commands(conn, [set_searchpath])
+
         # turn off autocommit for the rest of the executions
         conn.autocommit = False
 
@@ -421,7 +428,7 @@ def run_commands(conn, commands):
     return True
 
 
-def reduce_column_length(col_type, column_name):
+def reduce_column_length(col_type, column_name, table_name):
     set_col_type = col_type
 
     # analyze the current size length for varchar columns and return early if they are below the threshold
@@ -433,7 +440,7 @@ def reduce_column_length(col_type, column_name):
             col_len_statement = 'select /* computing max column length */ max(octet_length("%s")) from %s."%s"' % (
                 column_name, schema_name, table_name)
     else:
-        col_len_statement = 'select /* computing max column length */ max("%s") from %s."%s"' % (
+        col_len_statement = 'select /* computing max column length */ max(abs("%s")) from %s."%s"' % (
             column_name, schema_name, table_name)
 
     if debug:
@@ -453,6 +460,8 @@ def reduce_column_length(col_type, column_name):
         try:
             col_len_result = execute_query(col_len_statement)
             col_max_len = col_len_result[0][0]
+            if col_max_len is None:
+                col_max_len = 0
         except KeyboardInterrupt:
             # To handle Ctrl-C from user
             cleanup(get_pg_conn())
@@ -480,6 +489,9 @@ def reduce_column_length(col_type, column_name):
 
         # if the new length would be greater than varchar(max) then return the current value - no changes
         if new_column_len > 65535:
+            return col_type
+        # if the new length would be 0 then return the current value - no changes
+        if new column_len == 0:
             return col_type
 
         if debug:
@@ -623,7 +635,7 @@ def analyze(table_info):
 
                 # check whether columns are too wide
                 if analyze_col_width and ("varchar" in col_type or "int" in col_type):
-                    new_col_type = reduce_column_length(col_type, descr[col][0])
+                    new_col_type = reduce_column_length(col_type, descr[col][0], table_name)
                     if new_col_type != col_type:
                         col_type = new_col_type
                         encodings_modified = True
@@ -826,7 +838,7 @@ def analyze(table_info):
                 else:
                     comment("No encoding modifications run for %s.%s" % (schema_name, table_name))
         except Exception as e:
-            print('Exception %s during analysis of %s' % (e.message, table_name))
+            print('Exception %s during analysis of %s' % (e, table_name))
             print(traceback.format_exc())
             return ERROR
 
@@ -987,7 +999,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-and pgn.nspname::text ~ '%s' and pgc.relname in (%s)        
+and pgn.nspname::text = '%s' and pgc.relname in (%s)
         ''' % (schema_name, tables)
     else:
         # query for all tables in the schema ordered by size descending
@@ -1001,7 +1013,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner 
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-where pgn.nspname::text ~ '%s'
+where pgn.nspname::text = '%s'
   and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
 order by 2;
         ''' % (schema_name,)
