@@ -54,7 +54,7 @@ You only need to deploy the function once to support a virtually unlimited numbe
 
 * Max Runtime: 60 Seconds (each function only runs for 1 cluster, so this is plenty long enough - you can even reduce it)
 * Memory Size: 128 MB (the minimum)
-* Runtime: Node.js 4.3
+* Runtime: Node.js 8.10
 
 Please note that the current account limit for Redshift manual snapshots is 20 per region. This module will create `24/snapshotIntervalHours * snapshotRetentionDays` snapshots, and so if this number is greater than 20 please open an AWS support case to have the limit increased. For example, an RPO of 2 hours with 7 days retention (as shown above) will create `24/2 * 7 = 84` snapshots.
 
