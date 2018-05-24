@@ -24,7 +24,7 @@ import sys
 import logging
 from global_config import GlobalConfigParametersReader, config_parameters
 from util.s3_utils import S3Helper, S3Details
-from util.resources import ResourceFactory
+from util.resources import ResourceFactory, TableResource
 from util.tasks import TaskManager, FailIfResourceDoesNotExistsTask, CreateIfTargetDoesNotExistTask, \
     FailIfResourceClusterDoesNotExistsTask, UnloadDataToS3Task, CopyDataFromS3Task, CleanupS3StagingAreaTask, \
     NoOperationTask
@@ -78,6 +78,10 @@ class UnloadCopyTool:
         source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
 
         destination = ResourceFactory.get_target_resource_from_config_helper(self.config_helper, self.region)
+
+        if global_config_values['tableName']:
+            source = TableResource(source.get_cluster(), source.get_schema(), global_config_values['tableName'])
+            destination = TableResource(destination.get_cluster(), destination.get_schema(), global_config_values['tableName'])
 
         self.task_manager = TaskManager()
         self.barrier_after_all_cluster_pre_tests = NoOperationTask()
