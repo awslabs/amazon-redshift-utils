@@ -371,6 +371,10 @@ class ResourceFactory:
         cluster.set_user(cluster_dict['connectUser'])
         cluster.set_host(cluster_dict['clusterEndpoint'])
         cluster.set_db(cluster_dict['db'])
+        if 'queryGroup' in cluster_dict:
+            cluster.set_query_group(cluster_dict['queryGroup'])
+        if 'wlmQuerySlotCount' in cluster_dict:
+            cluster.set_wlm_query_slot_count(cluster_dict['wlmQuerySlotCount'])
         if 'connectPwd' in cluster_dict:
             if kms_region is None:
                 kms_region = cluster.get_region_name()
