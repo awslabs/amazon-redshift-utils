@@ -10,9 +10,9 @@ import pytz
 import boto3
 from pg import connect
 
-options = "keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=6 connect_timeout=10"
+options = "keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=54 connect_timeout=10"
 
-set_timeout_stmt = "set statement_timeout = 1200000"
+set_timeout_stmt = "set statement_timeout = 0"
 
 
 class RedshiftClusterFactory:
@@ -52,6 +52,8 @@ class RedshiftCluster:
         self._user_db_groups = []
         self._configured_timeout = None
         self.has_temporary_password = False
+        self._query_group = None
+        self._wlm_query_slot_count = 1
 
     def __eq__(self, other):
         return type(self) == type(other) and \
@@ -114,6 +116,18 @@ class RedshiftCluster:
 
     def set_user_creds_expiration(self, user_creds_expiration):
         self._user_creds_expiration = user_creds_expiration
+
+    def get_query_group(self):
+        return self._query_group
+
+    def set_query_group(self, query_group):
+        self._query_group = query_group
+
+    def get_wlm_query_slot_count(self):
+        return self._wlm_query_slot_count
+
+    def set_wlm_query_slot_count(self, wlm_query_slot_count):
+        self._wlm_query_slot_count = wlm_query_slot_count
 
     def is_temporary_credential_expired(self):
         if not self.has_temporary_password:
@@ -232,6 +246,12 @@ class RedshiftCluster:
         if self._configured_timeout is not None and not self._configured_timeout == timeout:
             rs_conn.query(timeout)
             self.database_timeouts[database][opt] = timeout
+
+        if self._query_group is not None:
+            rs_conn.query("set query_group to '%s'" % self.get_query_group())
+
+        rs_conn.query('set wlm_query_slot_count to %d' % self.get_wlm_query_slot_count())
+
         return rs_conn
 
     def get_conn_to_rs(self, opt=options, timeout=set_timeout_stmt, database=None):
