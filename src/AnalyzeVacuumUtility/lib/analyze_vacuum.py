@@ -1,7 +1,9 @@
 from __future__ import print_function
 
+import datetime
 import os
 import re
+import socket
 import sys
 import traceback
 import socket
@@ -152,12 +154,12 @@ def run_commands(conn, commands, cw=None, cluster_name=None, suppress_errors=Fal
                 cursor = conn.cursor()
                 cursor.execute(c)
                 comment('Success.')
-            except Exception:
+            except:
                 # cowardly bail on errors
                 conn.rollback()
+                print(traceback.format_exc())
                 if not suppress_errors:
-                    print(traceback.format_exc())
-                raise
+                    raise
 
             # emit a cloudwatch metric for the statement
             if cw is not None and cluster_name is not None:
@@ -212,7 +214,7 @@ def run_vacuum(conn,
             vacuum_parameter, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
 
     elif blacklisted_tables is not None:
-        comment("Extracting Candidate Tables for vacuum based on stl_alert_event_log...")
+        comment("Extracting Candidate Tables for Vacuum...")
         blacklisted_tables_array = blacklisted_tables.split(',')
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
                                          + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
@@ -231,7 +233,7 @@ def run_vacuum(conn,
 
     else:
         # query for all tables in the schema ordered by size descending
-        comment("Extracting Candidate Tables for vacuum based on stl_alert_event_log...")
+        comment("Extracting Candidate Tables for Vacuum...")
 
         get_vacuum_statement = '''
                 SELECT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" ; ' 
@@ -289,7 +291,7 @@ def run_vacuum(conn,
         statements.append(vs[0])
         statements.append("analyze %s.\"%s\"" % (schema_name, vs[1]))
 
-    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
         if not ignore_errors:
             if debug:
                 print("Error running statements: %s" % (str(statements),))
@@ -298,7 +300,7 @@ def run_vacuum(conn,
     statements = []
     if table_name is None and blacklisted_tables is None:
         # query for all tables in the schema ordered by size descending
-        comment("Extracting Candidate Tables for vacuum ...")
+        comment("Extracting Candidate Tables for Vacuum ...")
         get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
                                                    + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                                    + ',  Unsorted_pct : ' + coalesce(info_tbl.unsorted :: varchar(10),'N/A')
@@ -337,7 +339,7 @@ def run_vacuum(conn,
             statements.append(vs[0])
             statements.append("analyze %s.\"%s\"" % (vs[2], vs[1]))
 
-        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -346,7 +348,7 @@ def run_vacuum(conn,
     statements = []
     if table_name is None and blacklisted_tables is None:
         # query for all tables in the schema for vacuum reindex
-        comment("Extracting Candidate Tables for vacuum reindex ...")
+        comment("Extracting Candidate Tables for Vacuum reindex of Interleaved Sort Keys...")
         get_vacuum_statement = ''' SELECT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" ; ' + '/* Rows : ' + CAST("rows" AS VARCHAR(10))
                                     + ', Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10))
                                     + ', Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;' AS statement, table_name, schema_name
@@ -379,7 +381,7 @@ def run_vacuum(conn,
             statements.append(vs[0])
             statements.append("analyze %s.\"%s\"" % (vs[2], vs[1]))
 
-        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -560,7 +562,7 @@ def run_analyze(conn,
 
     comment("Found %s Tables requiring Analysis" % len(statements))
 
-    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
         if not ignore_errors:
             if debug:
                 print("Error running statements: %s" % (str(statements),))
@@ -601,7 +603,7 @@ def run_analyze(conn,
         for vs in analyze_statements:
             statements.append(vs[0])
 
-        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -653,12 +655,16 @@ def run_analyze_vacuum(**kwargs):
     # get the password using .pgpass, environment variables, and then fall back to config
     db_pwd = None
     try:
-        db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST],kwargs[config_constants.DB_PORT], kwargs[config_constants.DB_NAME],kwargs[config_constants.DB_USER])
+        db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST], kwargs[config_constants.DB_PORT],
+                                   kwargs[config_constants.DB_NAME], kwargs[config_constants.DB_USER])
     except pgpasslib.FileNotFound as e:
         pass
 
     if db_pwd is None:
         db_pwd = kwargs[config_constants.DB_PASSWORD]
+
+    if config_constants.SCHEMA_NAME not in kwargs:
+        kwargs[config_constants.SCHEMA_NAME] = 'public'
 
     # get a connection for the controlling processes
     master_conn = get_pg_conn(kwargs[config_constants.DB_HOST],
@@ -667,8 +673,10 @@ def run_analyze_vacuum(**kwargs):
                               db_pwd,
                               kwargs[config_constants.SCHEMA_NAME],
                               kwargs[config_constants.DB_PORT],
-                              None if config_constants.QUERY_GROUP not in kwargs else kwargs[config_constants.QUERY_GROUP],
-                              None if config_constants.QUERY_SLOT_COUNT not in kwargs else kwargs[config_constants.QUERY_SLOT_COUNT],
+                              None if config_constants.QUERY_GROUP not in kwargs else kwargs[
+                                  config_constants.QUERY_GROUP],
+                              None if config_constants.QUERY_SLOT_COUNT not in kwargs else kwargs[
+                                  config_constants.QUERY_SLOT_COUNT],
                               None if config_constants.SSL not in kwargs else kwargs[config_constants.SSL])
 
     if master_conn is None:

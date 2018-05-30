@@ -86,7 +86,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: index.handler
-      Runtime: nodejs4.3
+      Runtime: nodejs8.10
       CodeUri:
         Bucket: !Sub awslabs-code-${AWS::Region}
         Key: RedshiftSnapshotManager/RedshiftSnapshotManager-1.1.1.zip

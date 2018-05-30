@@ -44,7 +44,6 @@ Arguments: --db                  - The database to use
            --target-schema       - Name of a single schema into which the newly optimised tables and data should be created, rather than in place
            --threads             - The number of concurrent connections to use during analysis (default 2)
            --output-file         - The full path to the output file to be generated
-           --report-file         - The full path to the report file to be generated
            --debug               - Generate debug output including SQL Statements being run
            --do-execute          - Run the compression encoding optimisation
            --slot-count          - Modify the wlm_query_slot_count from the default of 1

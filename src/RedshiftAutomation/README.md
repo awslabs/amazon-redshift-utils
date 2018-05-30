@@ -57,7 +57,7 @@ The required configuration items are placed into the ```configuration``` part of
   "output_file":"/tmp/analyze-schema-compression.sql",
   "debug": "Should the utilities run in debug mode? (boolean - true | false | default false)",
   "do_execute": "Should changes be made automatically, or just for reporting purposes (boolean - true |  false | default true)",
-  "analyze_col_width": "Analyze columns wider than this value (int)",
+  "analyze_col_width": "Analyze varchar columns wider that 255 characters and reduce size based on determined data length (boolean - default false)",
   "threads": "How many threads should the column encoding utility use (can run in parallel - default 1 for Lambda)",
   "ssl":"Should you connect to the cluster with SSL? (boolean true | false | default true)",
   "do_vacuum": "Should the Analyze Vacuum utility run Vacuum? (boolean true | false | default true)",

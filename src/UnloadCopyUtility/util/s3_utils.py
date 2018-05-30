@@ -124,9 +124,10 @@ class S3Details:
             if 'path' in s3_staging_conf:
                 # datetime alias for operations
                 self.nowString = "{:%Y-%m-%d_%H:%M:%S}".format(datetime.datetime.now())
-                self.dataStagingRoot = "{s3_stage_path}/{timestamp}/".format(
+                self.dataStagingRoot = "{s3_stage_path}/{timestamp}-{table_name}/".format(
                     s3_stage_path=s3_staging_conf['path'].rstrip("/"),
-                    timestamp=self.nowString
+                    timestamp=self.nowString,
+                    table_name=source_table.get_table()
                 )
                 self.dataStagingPath = "{root}{db_name}.{schema_name}.{table_name}".format(
                     root=self.dataStagingRoot,
@@ -141,7 +142,7 @@ class S3Details:
                 role = s3_staging_conf['aws_iam_role']
                 self.access_credentials = S3AccessCredentialsRole(role)
             elif 'aws_access_key_id' in s3_staging_conf and 'aws_secret_access_key' in s3_staging_conf:
-                kms_helper = KMSHelper(config_helper.region_name)
+                kms_helper = KMSHelper(config_helper.s3_helper.region_name)
                 key_id = kms_helper.decrypt(s3_staging_conf['aws_access_key_id'])
                 secret_key = kms_helper.decrypt(s3_staging_conf['aws_secret_access_key'])
                 self.access_credentials = S3AccessCredentialsKey(key_id, secret_key)

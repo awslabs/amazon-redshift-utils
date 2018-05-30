@@ -4,6 +4,7 @@ ANALYZE = "Analyze"
 VACUUM = "Vacuum"
 MONITORING = "Monitoring"
 TABLE_PERSISTENCE = "SystemTablePersistence"
+WLM_SCHEDULER = "WlmScheduler"
 LOCAL_CONFIG = "config.json"
 
 DB_NAME = "db"
@@ -44,6 +45,7 @@ MIN_INTERLEAVED_SKEW = "min_interleaved_skew"
 MIN_INTERLEAVED_COUNT = "min_interleaved_count"
 KMS_AUTH_CONTEXT = "kms_auth_context"
 SYSTABLE_CLEANUP_AFTER_DAYS = "systable_cleanup_after_days"
+STATEMENT_TIMEOUT = "statement_timeout"
 
 config_aliases = {
     "db": ["db", "DatabaseName"],

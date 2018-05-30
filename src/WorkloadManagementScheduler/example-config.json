@@ -1,0 +1,55 @@
+{
+  "parameter-group-name": "my-parameter-group",
+  "apply-region":"eu-west-1",
+  "rulesets": [
+    {
+      "name": "My Daytime Ruleset",
+      "active-interval": "03:00-20:00",
+      "configuration": "s3://meyersi-ire/redshift/my-daily-schedule.json"
+    },
+    {
+      "name": "My Loading Ruleset",
+      "active-interval": "20:00-03:00",
+      "configuration": [
+        {
+          "query_concurrency": 10,
+          "max_execution_time": 0,
+          "memory_percent_to_use": 15,
+          "query_group": [
+            "adhoc"
+          ],
+          "query_group_wild_card": 0,
+          "user_group": [
+            "business_users"
+          ],
+          "user_group_wild_card": 0
+        },
+        {
+          "query_concurrency": 4,
+          "max_execution_time": 0,
+          "memory_percent_to_use": 80,
+          "query_group": [
+            "loader"
+          ],
+          "query_group_wild_card": 0,
+          "user_group": [
+            "database_loader"
+          ],
+          "user_group_wild_card": 0
+        },
+        {
+          "query_concurrency": 1,
+          "max_execution_time": 0,
+          "memory_percent_to_use": 5,
+          "query_group": [],
+          "query_group_wild_card": 0,
+          "user_group": [],
+          "user_group_wild_card": 0
+        },
+        {
+          "short_query_queue": false
+        }
+      ]
+    }
+  ]
+}

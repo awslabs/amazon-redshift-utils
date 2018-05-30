@@ -36,21 +36,22 @@ Amazon Web Services (2014)
 
 from __future__ import print_function
 
+import datetime
 import getopt
 import getpass
+import math
 import os
 import re
-import sys
-import traceback
 import socket
-from multiprocessing import Pool
-import pgpasslib
-import boto3
-import datetime
-import math
-import pg8000
-import shortuuid
+import sys
 import time
+import traceback
+from multiprocessing import Pool
+
+import boto3
+import pg8000
+import pgpasslib
+import shortuuid
 
 try:
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -62,7 +63,7 @@ import config_constants
 
 thismodule = sys.modules[__name__]
 
-__version__ = ".9.3.2"
+__version__ = ".9.3.4"
 
 OK = 0
 ERROR = 1
@@ -73,6 +74,12 @@ NO_CONNECTION = 5
 
 # timeout for retries - 100ms
 RETRY_TIMEOUT = 100. / 1000
+
+# buffer size to add to columns whose length is reduced
+COL_LENGTH_EXPANSION_BUFFER = .2
+
+# maximum length above which varchar columns should be reduced if analyze_col_width is true
+STRING_REDUCTION_MAX_LENGTH_THRESHOLD = 255
 
 # compiled regular expressions
 IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \(?\'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
@@ -106,6 +113,7 @@ query_group = None
 ssl = False
 suppress_cw = None
 cw = None
+statement_timeout = '1200000'
 
 
 def execute_query(string):
@@ -205,10 +213,10 @@ def get_pg_conn():
             if debug:
                 comment(set_slot_count)
 
-            run_commands(conn,[set_slot_count])
+            run_commands(conn, [set_slot_count])
 
         # set a long statement timeout
-        set_timeout = "set statement_timeout = '1200000'"
+        set_timeout = "set statement_timeout = '%s'" % statement_timeout
         if debug:
             comment(set_timeout)
 
@@ -221,6 +229,13 @@ def get_pg_conn():
             comment(set_name)
 
         run_commands(conn, [set_name])
+
+        # Set search_path
+        set_searchpath = "set search_path to '$user', public, %s;" % schema_name
+        if debug:
+            comment(set_searchpath)
+
+        run_commands(conn, [set_searchpath])
 
         # turn off autocommit for the rest of the executions
         conn.autocommit = False
@@ -240,6 +255,38 @@ def get_identity(adsrc):
     if m:
         return m.group('seed'), m.group('step')
     else:
+        return None
+
+
+def get_grants(schema_name, table_name, current_user):
+    sql = '''
+        SELECT table_schema, table_name, privilege_type, g.groname is not null as is_group, grantee 
+        FROM information_schema.table_privileges tp 
+        LEFT OUTER JOIN pg_group g ON g.groname = tp.grantee
+        where table_schema = '%s'
+          and table_name = '%s'
+        and grantee not in ('%s','rdsdb')
+    ''' % (schema_name, table_name, current_user)
+
+    if debug:
+        comment(sql)
+
+    grants = execute_query(sql)
+
+    grant_statements = []
+
+    for grant in grants:
+        if grant[3] == True:
+            grant_statements.append(
+                "grant %s on %s.%s to group %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
+        else:
+            grant_statements.append("grant %s on %s.%s to %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
+
+    if len(grant_statements) > 0:
+        return grant_statements
+    else:
+        if debug:
+            comment('Found no table grants to extend to the new table')
         return None
 
 
@@ -381,6 +428,92 @@ def run_commands(conn, commands):
     return True
 
 
+def reduce_column_length(col_type, column_name, table_name):
+    set_col_type = col_type
+
+    # analyze the current size length for varchar columns and return early if they are below the threshold
+    if "varchar" in col_type:
+        curr_col_length = int(re.search(r'\d+', col_type).group())
+        if curr_col_length < STRING_REDUCTION_MAX_LENGTH_THRESHOLD:
+            return col_type
+        else:
+            col_len_statement = 'select /* computing max column length */ max(octet_length("%s")) from %s."%s"' % (
+                column_name, schema_name, table_name)
+    else:
+        col_len_statement = 'select /* computing max column length */ max(abs("%s")) from %s."%s"' % (
+            column_name, schema_name, table_name)
+
+    if debug:
+        comment(col_len_statement)
+
+    comment("Analyzing max length of column '%s' for table '%s.%s' " % (
+        column_name, schema_name, table_name))
+
+    # run the analyze in a loop, because it could be locked by another process modifying rows
+    # and get a timeout
+    col_len_result = None
+    col_len_retry = 10
+    col_len_attempt_count = 0
+    col_len_last_exception = None
+
+    while col_len_attempt_count < col_len_retry and col_len_result is None:
+        try:
+            col_len_result = execute_query(col_len_statement)
+            col_max_len = col_len_result[0][0]
+            if col_max_len is None:
+                col_max_len = 0
+        except KeyboardInterrupt:
+            # To handle Ctrl-C from user
+            cleanup(get_pg_conn())
+            return TERMINATED_BY_USER
+        except Exception as e:
+            print(e)
+            col_len_attempt_count += 1
+            col_len_last_exception = e
+
+            # Exponential Backoff
+            time.sleep(2 ** col_len_attempt_count * RETRY_TIMEOUT)
+
+    if col_len_result is None:
+        if col_len_last_exception is not None:
+            print("Unable to determine length of %s for table %s due to Exception %s" % (
+                column_name, table_name, col_len_last_exception.message))
+            raise col_len_last_exception
+        else:
+            print(
+                "Unable to determine length of %s for table %s due to Null response to query. No changes will be made" % (
+                    column_name, table_name))
+
+    if "varchar" in col_type:
+        new_column_len = int(col_max_len * (1 + COL_LENGTH_EXPANSION_BUFFER))
+
+        # if the new length would be greater than varchar(max) then return the current value - no changes
+        if new_column_len > 65535:
+            return col_type
+        # if the new length would be 0 then return the current value - no changes
+        if new column_len == 0:
+            return col_type
+
+        if debug:
+            comment(
+                "Max width of character column '%s' for table '%s.%s' is %d. Current width is %d. Setting new size to %s" % (
+                    column_name, schema_name, table_name, col_max_len,
+                    curr_col_length, new_column_len))
+
+        if new_column_len < curr_col_length:
+            set_col_type = re.sub(str(curr_col_length), str(new_column_len), col_type)
+    else:
+        # Test to see if largest value is smaller than largest value of smallint (2 bytes)
+        if col_max_len * (1 + COL_LENGTH_EXPANSION_BUFFER) <= int(math.pow(2, 15) - 1) and col_type != "smallint":
+
+            set_col_type = re.sub(col_type, "smallint", col_type)
+        # Test to see if largest value is smaller than largest value of smallint (4 bytes)
+        elif col_max_len * (1 + COL_LENGTH_EXPANSION_BUFFER) <= int(math.pow(2, 31) - 1) and col_type != "integer":
+            set_col_type = re.sub(col_type, "integer", col_type)
+
+    return set_col_type
+
+
 def analyze(table_info):
     schema_name = table_info[0]
     table_name = table_info[1]
@@ -405,10 +538,10 @@ def analyze(table_info):
                 count_unoptimised += row[0]
 
     if not table_unoptimised and not force:
-        comment("Table %s.%s does not require encoding optimisation" % (schema_name,table_name))
+        comment("Table %s.%s does not require encoding optimisation" % (schema_name, table_name))
         return OK
     else:
-        comment("Table %s.%s contains %s unoptimised columns" % (schema_name,table_name, count_unoptimised))
+        comment("Table %s.%s contains %s unoptimised columns" % (schema_name, table_name, count_unoptimised))
         if force:
             comment("Using Force Override Option")
 
@@ -421,7 +554,7 @@ def analyze(table_info):
             if debug:
                 comment(statement)
 
-            comment("Analyzing Table '%s.%s'" % (schema_name,table_name,))
+            comment("Analyzing Table '%s.%s'" % (schema_name, table_name,))
 
             # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
             analyze_compression_result = None
@@ -498,126 +631,16 @@ def analyze(table_info):
                             col, old_encoding, new_encoding))
 
                 # fix datatypes from the description type to the create type
-                col_type = descr[col][1]
+                col_type = descr[col][1].replace('character varying', 'varchar').replace('without time zone', '')
 
-                # check whether varchars columns are too wide
-                if analyze_col_width and "character varying" in col_type:
-                    curr_col_length = int(re.search(r'\d+', col_type).group())
-                    if curr_col_length > 255:
-                        col_len_statement = 'select /* computing max column length */ max(len("%s")) from %s."%s"' % (
-                            descr[col][0], schema_name, table_name)
-                        try:
-                            if debug:
-                                comment(col_len_statement)
+                # check whether columns are too wide
+                if analyze_col_width and ("varchar" in col_type or "int" in col_type):
+                    new_col_type = reduce_column_length(col_type, descr[col][0], table_name)
+                    if new_col_type != col_type:
+                        col_type = new_col_type
+                        encodings_modified = True
 
-                            comment("Analyzing max length of character column '%s' for table '%s.%s' " % (
-                                col, schema_name, table_name))
-
-                            # run the analyze in a loop, because it could be locked by another process modifying rows
-                            # and get a timeout
-                            col_len_result = None
-                            col_len_retry = 10
-                            col_len_attempt_count = 0
-                            col_len_last_exception = None
-                            while col_len_attempt_count < col_len_retry and col_len_result is None:
-                                try:
-                                    col_len_result = execute_query(col_len_statement)
-                                except KeyboardInterrupt:
-                                    # To handle Ctrl-C from user
-                                    cleanup(get_pg_conn())
-                                    return TERMINATED_BY_USER
-                                except Exception as e:
-                                    print(e)
-                                    col_len_attempt_count += 1
-                                    col_len_last_exception = e
-
-                                    # Exponential Backoff
-                                    time.sleep(2 ** col_len_attempt_count * RETRY_TIMEOUT)
-
-                            if col_len_result is None:
-                                if col_len_last_exception is not None:
-                                    print("Unable to determine length of %s for table %s due to Exception %s" % (
-                                        col, table_name, last_exception.message))
-                                else:
-                                    print("Unknown Error")
-                                return ERROR
-
-                            if debug:
-                                comment(
-                                    "Max width of character column '%s' for table '%s.%s' is %d. Current width is %d." % (
-                                        descr[col][0], schema_name, table_name, col_len_result[0][0],
-                                        curr_col_length))
-
-                            if col_len_result[0][0] < curr_col_length:
-                                col_type = re.sub(str(curr_col_length), str(col_len_result[0][0]), col_type)
-                                encodings_modified = True
-
-                        except Exception as e:
-                            print('Exception %s during analysis of %s' % (e.message, table_name))
-                            print(traceback.format_exc())
-                            return ERROR
-
-                col_type = col_type.replace('character varying', 'varchar').replace('without time zone', '')
-
-                # check whether number columns are too wide
-                if analyze_col_width and "int" in col_type:
-                    col_len_statement = 'select max("%s") from %s."%s"' % (descr[col][0], schema_name, table_name)
-                    try:
-                        if debug:
-                            comment(col_len_statement)
-
-                        comment("Analyzing max column '%s' for table '%s.%s' " % (col, schema_name, table_name))
-
-                        # run the analyze in a loop, because it could be locked by another process modifying rows and
-                        # get a timeout
-                        col_len_result = None
-                        col_len_retry = 10
-                        col_len_attempt_count = 0
-                        col_len_last_exception = None
-                        while col_len_attempt_count < col_len_retry and col_len_result is None:
-                            try:
-                                col_len_result = execute_query(col_len_statement)
-                            except KeyboardInterrupt:
-                                # To handle Ctrl-C from user
-                                cleanup(get_pg_conn())
-                                return TERMINATED_BY_USER
-                            except Exception as e:
-                                print(e)
-                                col_len_attempt_count += 1
-                                col_len_last_exception = e
-
-                                # Exponential Backoff
-                                time.sleep(2 ** col_len_attempt_count * RETRY_TIMEOUT)
-
-                        if col_len_result is None:
-                            if col_len_last_exception is not None:
-                                print("Unable to determine length of %s for table %s due to Exception %s" % (
-                                    col, table_name, last_exception.message))
-                            else:
-                                print("Unknown Error")
-                            return ERROR
-
-                        if debug:
-                            maxlen = col_len_result[0][0] if col_len_result else 'not defined'
-                            comment("Max of column '%s' for table '%s.%s' is %s. Current column type is %s." % (
-                                descr[col][0], schema_name, table_name, maxlen, col_type))
-
-                        # Test to see if largest value is smaller than largest value of smallint (2 bytes)
-                        if col_len_result[0][0] <= int(math.pow(2, 15) - 1) and col_type != "smallint":
-                            col_type = re.sub(col_type, "smallint", col_type)
-                            encodings_modified = True
-
-                            # Test to see if largest value is smaller than largest value of smallint (4 bytes)
-                        elif col_len_result[0][0] <= int(math.pow(2, 31) - 1) and col_type != "integer":
-                            col_type = re.sub(col_type, "integer", col_type)
-                            encodings_modified = True
-
-                    except Exception as e:
-                        print('Exception %s during analysis of %s' % (e.message, table_name))
-                        print(traceback.format_exc())
-                        return ERROR
-
-                        # link in the existing distribution key, or set the new one
+                # link in the existing distribution key, or set the new one
                 row_distkey = descr[col][3]
                 if table_name is not None and new_dist_key is not None:
                     if col == new_dist_key:
@@ -690,7 +713,7 @@ def analyze(table_info):
             # abort if new sortkeys were set but we couldn't find them in the set of all columns
             if new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
                 if debug:
-                    comment("Reqested Sort Keys: %s" % new_sort_keys)
+                    comment("Requested Sort Keys: %s" % new_sort_keys)
                     comment("Resolved Sort Keys: %s" % table_sortkeys)
                 msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sort_keys
                 comment(msg)
@@ -789,6 +812,11 @@ def analyze(table_info):
                 # add foreign keys
                 fks = get_foreign_keys(schema_name, set_target_schema, table_name)
 
+                # add grants back
+                grants = get_grants(schema_name, table_name, db_user)
+                if grants is not None:
+                    statements.extend(grants)
+
                 statements.extend(['commit;'])
 
                 if do_execute:
@@ -810,7 +838,7 @@ def analyze(table_info):
                 else:
                     comment("No encoding modifications run for %s.%s" % (schema_name, table_name))
         except Exception as e:
-            print('Exception %s during analysis of %s' % (e.message, table_name))
+            print('Exception %s during analysis of %s' % (e, table_name))
             print(traceback.format_exc())
             return ERROR
 
@@ -851,6 +879,7 @@ def usage(with_message):
     print('           --comprows            - Set the number of rows to use for Compression Encoding Analysis')
     print('           --query_group         - Set the query_group for all queries')
     print('           --ssl-option          - Set SSL to True or False (default False)')
+    print('           --statement_timeout   - Set the runtime statement timeout in milliseconds (default 1200000)')
     print(
         '           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True')
     sys.exit(INVALID_ARGS)
@@ -882,6 +911,7 @@ def configure(**kwargs):
     global ssl
     global suppress_cw
     global cw
+    global statement_timeout
 
     # set variables
     for key, value in kwargs.items():
@@ -893,7 +923,8 @@ def configure(**kwargs):
     # override the password with the contents of .pgpass or environment variables
     pwd = None
     try:
-        pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST],kwargs[config_constants.DB_PORT], kwargs[config_constants.DB_NAME],kwargs[config_constants.DB_USER])
+        pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST], kwargs[config_constants.DB_PORT],
+                                kwargs[config_constants.DB_NAME], kwargs[config_constants.DB_USER])
     except pgpasslib.FileNotFound as e:
         pass
 
@@ -959,17 +990,16 @@ def run():
         else:
             tables = "'" + table_name + "'"
 
-
     if table_name is not None:
         statement = '''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
-left outer join pg_description pgd ON pgd.objoid = pgc.oid
+left outer join pg_description pgd ON pgd.objoid = pgc.oid and pgd.objsubid = 0
 join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-and pgn.nspname::text ~ '%s' and pgc.relname in (%s)        
+and pgn.nspname::text = '%s' and pgc.relname in (%s)
         ''' % (schema_name, tables)
     else:
         # query for all tables in the schema ordered by size descending
@@ -978,12 +1008,12 @@ and pgn.nspname::text ~ '%s' and pgc.relname in (%s)
         statement = '''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
 from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
 join pg_class as pgc on pgc.oid = a.id
-left outer join pg_description pgd ON pgd.objoid = pgc.oid
+left outer join pg_description pgd ON pgd.objoid = pgc.oid and pgd.objsubid = 0
 join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner 
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-where pgn.nspname::text ~ '%s'
+where pgn.nspname::text = '%s'
   and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
 order by 2;
         ''' % (schema_name,)
@@ -1074,7 +1104,7 @@ order by 2;
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch= statement-timeout="""
 
     # extract the command line arguments
     try:
@@ -1172,6 +1202,12 @@ def main(argv):
                 args[config_constants.SUPPRESS_CLOUDWATCH] = True
             else:
                 args[config_constants.SUPPRESS_CLOUDWATCH] = False
+        elif arg == "--statement-timeout":
+            if value != '' and value is not None:
+                try:
+                    args[config_constants.STATEMENT_TIMEOUT] = str(int(value))
+                except ValueError:
+                    pass
         else:
             print("Unsupported Argument " + arg)
             usage()
@@ -1184,7 +1220,7 @@ def main(argv):
     if config_constants.DB_HOST not in args:
         usage("Missing Parameter 'db-host'")
     if config_constants.DB_PORT not in args:
-        usage("Missing Parameter 'db-port'")
+        args[config_constants.DB_PORT] = 5439
     if config_constants.SCHEMA_NAME not in args:
         args[config_constants.SCHEMA_NAME] = 'public'
 

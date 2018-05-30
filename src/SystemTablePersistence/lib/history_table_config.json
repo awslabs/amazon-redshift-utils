@@ -23,5 +23,15 @@
     "table": "hist_stl_query",
     "insert": "INSERT INTO history.hist_stl_query (SELECT q.* FROM stl_query q, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_query) h WHERE q.starttime > h.max_starttime)",
     "archiveColumn": "starttime"
+  },
+  {
+    "table": "hist_svl_s3query_summary",
+    "insert": "insert into history.hist_svl_s3query_summary (select * from svl_s3query_summary where starttime > (select nvl(max(starttime), '01/01/1970'::timestamp) from history.hist_svl_s3query_summary))",
+    "archiveColumn": "starttime"
+  },
+  {
+    "table": "hist_svl_s3query",
+    "insert": "insert into history.hist_svl_s3query (select * from svl_s3query where starttime > (select nvl(max(starttime), '01/01/1970'::timestamp) from history.hist_svl_s3query))",
+    "archiveColumn": "starttime"
   }
 ]
