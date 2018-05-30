@@ -491,7 +491,7 @@ def reduce_column_length(col_type, column_name, table_name):
         if new_column_len > 65535:
             return col_type
         # if the new length would be 0 then return the current value - no changes
-        if new column_len == 0:
+        if new_column_len == 0:
             return col_type
 
         if debug:
