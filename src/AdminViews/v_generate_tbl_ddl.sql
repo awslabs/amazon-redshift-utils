@@ -43,6 +43,7 @@ History:
 2017-05-03 pvbouwel Change table & schemaname of Foreign key constraints to allow for filters
 2018-01-15 pvbouwel Add QUOTE_IDENT for identifiers (schema,table and column names)
 2018-05-30 adedotua Add table_id column
+2018-05-30 adedotua Added ENCODE RAW keyword for non compressed columns (Issue #308)
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
@@ -110,7 +111,7 @@ FROM
      ELSE UPPER(format_type(a.atttypid, a.atttypmod))
      END AS col_datatype
     ,CASE WHEN format_encoding((a.attencodingtype)::integer) = 'none'
-     THEN ''
+     THEN 'ENCODE RAW'
      ELSE 'ENCODE ' + format_encoding((a.attencodingtype)::integer)
      END AS col_encoding
     ,CASE WHEN a.atthasdef IS TRUE THEN 'DEFAULT ' + adef.adsrc ELSE '' END AS col_default
