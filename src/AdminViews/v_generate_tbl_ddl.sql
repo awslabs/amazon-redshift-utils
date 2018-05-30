@@ -42,6 +42,7 @@ History:
 2016-05-24 chriz-bigdata Added support for BACKUP NO tables
 2017-05-03 pvbouwel Change table & schemaname of Foreign key constraints to allow for filters
 2018-01-15 pvbouwel Add QUOTE_IDENT for identifiers (schema,table and column names)
+2018-05-30 adedotua Add table_id column
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
