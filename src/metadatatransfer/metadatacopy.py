@@ -187,9 +187,7 @@ def main():
         executeddls(srccur, tgtcur, queries.schemaprivs, tgtuser)
         executeddls(srccur, tgtcur, queries.tableprivs, tgtuser)
         executeddls(srccur, tgtcur, queries.functionprivs, tgtuser)
-        executeddls(srccur, tgtcur, queries.defaclprivs, tgtuser, 'defacl')
-
-        tgtcon.rollback()
+        executeddls(srccur, tgtcur, queries.defaclprivs, tgtuser, 'defacl') 
 
         cleanup(tgtcur, tgtcon, 'target')
         cleanup(srccur, srccon, 'source')
