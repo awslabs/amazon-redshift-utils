@@ -181,7 +181,6 @@ def main():
     executeddls(srccur, tgtcur, queries.functionprivs, tgtuser)
     executeddls(srccur, tgtcur, queries.defaclprivs, tgtuser, 'defacl')
 
-    tgtcon.rollback()
     # Commit all transactions and cleaup cursor and connection objects
 
     cleanup(tgtcur, tgtcon, 'target')
