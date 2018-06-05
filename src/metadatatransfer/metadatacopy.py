@@ -175,13 +175,6 @@ def main():
         else:
             print "[%s] ERROR: Error while creating users or groups. Please fix and retry" % (str(datetime.now()))
 
-        # transferprivs(srccur, tgtcur, queries.sourcetables, queries.usrgrants, tgtdbname)
-
-        # copyprivs(queries.lanprivs, srccur, tgtcur, tgtuser)
-        # copyprivs(queries.dbprivs, srccur, tgtcur, tgtuser)
-        # copyprivs(queries.schemaprivs, srccur, tgtcur, tgtuser)
-        # copyprivs(queries.tabprivs, srccur, tgtcur, tgtuser)
-
         executeddls(srccur, tgtcur, queries.languageprivs, tgtuser)
         executeddls(srccur, tgtcur, queries.databaseprivs, tgtuser)
         executeddls(srccur, tgtcur, queries.schemaprivs, tgtuser)
