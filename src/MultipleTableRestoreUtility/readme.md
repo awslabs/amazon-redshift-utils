@@ -23,7 +23,7 @@ This utility enables the end user to automate the restore of multiple tables usi
 The keys 'TableRestoreList' , 'Schemaname' and 'Tablename' must be used in order for the utility to work. The utility is compatible with python 2.7. 
 
 ## Usage
-python multitablerestore.py --target-database-name <target database> --source-database-name <source database> --snapshot-identifier <snapshot name> --cluster-identifier <cluster name> --listfile <filename>
+```python multitablerestore.py --target-database-name <target database> --source-database-name <source database> --snapshot-identifier <snapshot name> --cluster-identifier <cluster name> --listfile <filename>```
 
 The source and target databases can be the same however, the table must not exist in the target 
 

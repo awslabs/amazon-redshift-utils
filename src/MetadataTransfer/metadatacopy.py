@@ -1,27 +1,10 @@
 #!/usr/bin/python
 import psycopg2
-from dbconstring import connstring
 from datetime import datetime
 import queries
 import argparse
-
-
-def executequery(cursor, query, inlist=None):
-    cursor.execute(query, inlist)
-    return cursor.fetchall()
-
-
-def cleanup(cursor, conn, cluster):
-    if not conn.closed:
-        conn.commit()
-    if not cursor.closed:
-        cursor.close()
-    if not conn.closed:
-        conn.close()
-    if conn.closed:
-        print "[%s] INFO: %s cluster connection closed" % (str(datetime.now()), cluster.title())
-    else:
-        print "[%s] ERROR: Failed to close %s cluster connection" % (str(datetime.now()), cluster)
+from dbconstring import executequery, cleanup, connstring
+from userprivs import executeddls
 
 
 def createobjs(objtype, query, objcon, srccursor, tgtcursor, tgtcluster):
@@ -30,8 +13,8 @@ def createobjs(objtype, query, objcon, srccursor, tgtcursor, tgtcluster):
     objlist = list(set(srcobjlist) - set(tgtobjlist))
     objcnt = 0
     objerr = False
-    print "[%s] INFO: Starting %s creation in target cluster '%s'..." \
-          % (str(datetime.now()), objtype + 's', tgtcluster)
+    print "[%s] INFO: Starting creation of %s in target cluster" \
+          % (str(datetime.now()), objtype + 's')
     if objlist:
         if objtype == 'database':
             objcon.commit()
@@ -80,7 +63,7 @@ def objconfig(srccursor, tgtcursor, query, objtype, tgtdb, tgtconn):
 
     # Add users to their respective groups
     if objtype == 'usrtogrp':
-        print "[%s] INFO: Adding users to groups in database '%s' on target..." % (str(datetime.now()), tgtdb)
+        print "[%s] INFO: Adding users to groups in database '%s' on target" % (str(datetime.now()), tgtdb)
         if usrobjconfig:
             for i in usrobjconfig:
                 tgtcursor.execute(i[2])
@@ -91,7 +74,7 @@ def objconfig(srccursor, tgtcursor, query, objtype, tgtdb, tgtconn):
 
     # Add user settings usecreatedb,valuntil and useconnlimit from source to target cluster
     elif objtype == 'usrprofile':
-        print "[%s] INFO: Copying user profiles to database '%s' on target..." % (str(datetime.now()), tgtdb)
+        print "[%s] INFO: Copying user profiles to database '%s' on target" % (str(datetime.now()), tgtdb)
         if usrobjconfig:
             for i in usrobjconfig:
                 tgtcursor.execute(i[1])
@@ -102,7 +85,7 @@ def objconfig(srccursor, tgtcursor, query, objtype, tgtdb, tgtconn):
 
     # Add useconfig settings from source to target cluster
     elif objtype == 'usrconfig':
-        print "[%s] INFO: Copying user configs to database '%s' on target..." % (str(datetime.now()), tgtdb)
+        print "[%s] INFO: Copying user configs to database '%s' on target" % (str(datetime.now()), tgtdb)
         if usrobjconfig:
             for i in usrobjconfig:
                 tgtcursor.execute(i[2])
@@ -116,16 +99,21 @@ def objconfig(srccursor, tgtcursor, query, objtype, tgtdb, tgtconn):
 
 
 def transferprivs(srccursor, tgtcursor, gettablequery, usrgrntquery, tgtdb):
-    print "[%s] INFO: Starting transfer of user object privileges to database '%s' on target..." \
+    print "[%s] INFO: Starting transfer of user object privileges to database '%s' on target" \
           % (str(datetime.now()), tgtdb)
     # Get tables from target cluster to be used in extracting user privileges from source cluster
     tgttables = executequery(tgtcursor, gettablequery)
+    # print tgttables
     tablelist = tuple([i for sub in tgttables for i in sub])
+    # print tablelist
     if tablelist:
         tgtddl = executequery(tgtcursor, usrgrntquery, (tablelist,))
+        # print tgtddl
         srcddl = executequery(srccursor, usrgrntquery, (tablelist,))
+        # print srcddl
         # Find difference between privileges on source and target clusters
         ddl = list(set(srcddl) - set(tgtddl))
+        print ddl
         if ddl:
             for i in ddl:
                 # Copy user privileges from source cluster to target cluster
@@ -173,6 +161,8 @@ def main():
         tgtcon = psycopg2.connect(tgtconstring)
         tgtcur = tgtcon.cursor()
 
+        print "[%s] INFO: Starting transfer of metadata from source cluster %s to target cluster %s" % \
+              (str(datetime.now()), srclusterid.title(), tgtclusterid.title())
         createobjs('database', queries.dblist, tgtcon, srccur, tgtcur, tgtclusterid)
         createobjs('schema', queries.schemalist, tgtcon, srccur, tgtcur, tgtclusterid)
         grperr = createobjs('group', queries.grouplist, tgtcon, srccur, tgtcur, tgtclusterid)
@@ -185,7 +175,12 @@ def main():
         else:
             print "[%s] ERROR: Error while creating users or groups. Please fix and retry" % (str(datetime.now()))
 
-        transferprivs(srccur, tgtcur, queries.sourcetables, queries.usrgrants, tgtdbname)
+        executeddls(srccur, tgtcur, queries.languageprivs, tgtuser)
+        executeddls(srccur, tgtcur, queries.databaseprivs, tgtuser)
+        executeddls(srccur, tgtcur, queries.schemaprivs, tgtuser)
+        executeddls(srccur, tgtcur, queries.tableprivs, tgtuser)
+        executeddls(srccur, tgtcur, queries.functionprivs, tgtuser)
+        executeddls(srccur, tgtcur, queries.defaclprivs, tgtuser, 'defacl') 
 
         cleanup(tgtcur, tgtcon, 'target')
         cleanup(srccur, srccon, 'source')
