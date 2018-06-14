@@ -360,6 +360,23 @@ class ResourceFactory:
         return ResourceFactory.get_resource_from_dict(cluster_dict, kms_region)
 
     @staticmethod
+    def get_table_resource_from_merging_2_resources(resource1, resource2):
+        cluster = resource1.get_cluster()
+        try:
+            schema = resource1.get_schema()
+        except AttributeError:
+            logging.info('Destination did not have a schema declared fetching from resource2.')
+            schema = resource2.get_schema()
+            logging.info('Using resource2 schema {s}'.format(s=schema))
+        try:
+            table = resource1.get_table()
+        except AttributeError:
+            logging.info('Destination did not have a table declared fetching from resource2.')
+            table = resource2.get_table()
+            logging.info('Using resource2 table {t}'.format(t=table))
+        return TableResource(cluster, schema, table)
+
+    @staticmethod
     def get_target_resource_from_config_helper(config_helper, kms_region=None):
         cluster_dict = config_helper.config['copyTarget']
         return ResourceFactory.get_resource_from_dict(cluster_dict, kms_region)
