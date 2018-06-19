@@ -40,7 +40,10 @@
     "schemaName": "public",
     "tableName": "import_table",
     //Optional List of columns. Probably best used in conjunction with unloadSource.columns, unless the schemas are different and you know what you are doing
-    "columns" : "column1,column2"
+    "columns" : "column1,column2",
+    //Optinak Boolean indicating whether COPY command should use exlicit_ids:
+    // https://docs.aws.amazon.com/redshift/latest/dg/copy-parameters-data-conversion.html#copy-explicit-ids
+    "exlicit_ids": true
   }
 }
         
