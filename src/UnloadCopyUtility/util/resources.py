@@ -331,7 +331,7 @@ class TableResource(SchemaResource):
                            'dataStagingPath': s3_details.dataStagingPath,
                            'region': s3_details.dataStagingRegion,
                            'columns': self.columns or '',
-                           'explicit_ids': 'explicit_ids' if self.explcit_ids else ''}
+                           'explicit_ids': 'explicit_ids' if self.explicit_ids else ''}
 
         self.run_command_against_resource('copy_table', copy_parameters)
 
