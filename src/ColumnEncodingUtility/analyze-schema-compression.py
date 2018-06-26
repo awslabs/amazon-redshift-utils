@@ -784,7 +784,7 @@ def analyze(table_info):
                 if len(table_sortkeys) > 0:
                     insert = "order by \"%s\";" % (",".join(table_sortkeys).replace(',','\",\"'))
                 else:
-                    insert = "%s;" % (insert)
+                    insert = "\"%s\";" % (insert)
 
                 statements.extend([insert])
 
