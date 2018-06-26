@@ -42,7 +42,7 @@ select regexp_replace(ddl,grantor,'<superuser>') from v_generate_user_grant_revo
 select ddl from v_generate_user_grant_revoke_ddl where ddltype='revoke' and (grantee='<username>' or grantor='<username>') order by objseq, grantseq desc;              
 ************************************************************************************************************************/
 
-CREATE OR REPLACE VIEW admin.v_generate_user_grant_revoke_ddl_v105 AS 
+CREATE OR REPLACE VIEW admin.v_generate_user_grant_revoke_ddl AS 
 WITH objprivs AS ( 
 	SELECT objowner, 
 	schemaname, 
