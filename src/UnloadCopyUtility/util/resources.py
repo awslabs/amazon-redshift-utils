@@ -271,6 +271,7 @@ class TableResource(SchemaResource):
                      manifest
                      encrypted
                      gzip
+                     null as 'NULL_STRING__'
                      delimiter '^' addquotes escape allowoverwrite"""
 
     copy_table_stmt = """copy {schema_name}.{table_name} {columns}
@@ -279,6 +280,7 @@ class TableResource(SchemaResource):
                    manifest 
                    encrypted
                    gzip 
+                   null as 'NULL_STRING__'
                    {explicit_ids}
                    delimiter '^' removequotes escape compupdate off """
 
