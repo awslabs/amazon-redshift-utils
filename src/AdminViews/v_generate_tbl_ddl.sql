@@ -206,7 +206,7 @@ FROM pg_namespace AS n
     AND a.attnum > 0
   --SORTKEY COLUMNS
   UNION select table_id,schemaname, tablename, seq,
-       case when min_sort <0 then 'INTERLEAVED SORTKEY (' else 'SORTKEY (' end as ddl
+       case when min_sort <0 then 'INTERLEAVED SORTKEY (' else ' SORTKEY (' end as ddl
 from (SELECT
    c.oid::bigint as table_id
    ,n.nspname AS schemaname
