@@ -782,7 +782,7 @@ def analyze(table_info):
                                                                             schema_name,
                                                                             table_name)
                 if len(table_sortkeys) > 0:
-                    insert = "%s order by %s;" % (insert, ",".join(table_sortkeys))
+                    insert = "%s order by \"%s\";" % (insert, ",".join(table_sortkeys).replace(',','\",\"'))
                 else:
                     insert = "%s;" % (insert)
 
