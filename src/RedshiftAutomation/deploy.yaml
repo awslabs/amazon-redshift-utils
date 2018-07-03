@@ -60,32 +60,26 @@ Parameters:
     Default: 0 0 * * ? *
     Description: Cron expression for when to run the Column Encoding Utility (default midnight daily)
     Type: String
-    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
   AnalyzeCronExpression:
     Default: 0 1 * * ? *
     Description: Cron expression for when to run the Analyze  Utility (default 1 am daily)
     Type: String
-    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
   VacuumCronExpression:
     Default: 0 2 * * ? *
     Description: Cron expression for when to run the Vacuum Utility (default 2 am daily)
     Type: String
-    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
   MonitorCronExpression:
     Default: 5 * * * ? *
     Description: Cron expression for when to run Monitoring (default 5 minutes past every hour)
     Type: String
-    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
   SysTablesCronExpression:
     Default: 0 0 * * ? *
     Description: Cron expression for when to run System Table Persistence (nightly at midnight)
     Type: String
-    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
   WlmSchedulerCronExpression:
     Default: 2 * * * ? *
     Description: Cron expression for when to run the WLM Scheduler Daemon (2 minutes past every hour)
     Type: String
-    AllowedPattern: ^([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|W) ([0-59]|\*|\,|\-|\/) ([0-59]|\*|\,|\-|\/|\?|L|\#) ([0-59]|\*|\,|\-|\/)$
   WlmSchedulerConfigLocation:
     Default: s3://mybucket/prefix/config.json
     Description: Configuration File Location for the WLM Scheduler
