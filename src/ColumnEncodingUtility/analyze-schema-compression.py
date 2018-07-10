@@ -278,9 +278,9 @@ def get_grants(schema_name, table_name, current_user):
     for grant in grants:
         if grant[3] == True:
             grant_statements.append(
-                "grant %s on %s.%s to group %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
+                "grant %s on %s.%s to group \"%s\";" % (grant[2].lower(), schema_name, table_name, grant[4]))
         else:
-            grant_statements.append("grant %s on %s.%s to %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
+            grant_statements.append("grant %s on %s.%s to \"%s\";" % (grant[2].lower(), schema_name, table_name, grant[4]))
 
     if len(grant_statements) > 0:
         return grant_statements
