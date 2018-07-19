@@ -87,7 +87,7 @@ class UnloadCopyTool:
             src_tables = src_config['tableNames']
             dest_tables = dest_config['tableNames']
             logging.info("Migrating multiple tables")
-            if(!dest_tables or len(src_tables) != len(dest_tables) ):
+            if( not dest_tables or len(src_tables) != len(dest_tables) ):
                 logging.fatal("When migrating multiple tables 'tableNames' property must be configured in unloadSource and copyTarget, and be the same length")
                 raise NotImplementedError
             for(idx in range(0,len(src_tables))):
