@@ -95,16 +95,16 @@ class UnloadCopyTool:
                 dest_config['tableName'] = dest_tables[idx]
                 source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
                 destination = ResourceFactory.get_target_resource_from_config_helper(self.config_helper, self.region)
-                self.add_src_dest_tasks(source,destination)
+                self.add_src_dest_tasks(source,destination,global_config_values)
         else:
             # Migrating a single table
             source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
             destination = ResourceFactory.get_target_resource_from_config_helper(self.config_helper, self.region)
-            self.add_src_dest_tasks(source,destination)
+            self.add_src_dest_tasks(source,destination,global_config_values)
 
         self.task_manager.run()
 
-    def add_src_dest_tasks(self,source,destination):
+    def add_src_dest_tasks(self,source,destination,global_config_values):
         # TODO: Check whether both resources are of type table if that is not the case then perform other scenario's
         if isinstance(source, TableResource):
             if isinstance(destination, DBResource):
