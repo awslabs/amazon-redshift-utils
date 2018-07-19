@@ -90,7 +90,7 @@ class UnloadCopyTool:
             if( not dest_tables or len(src_tables) != len(dest_tables) ):
                 logging.fatal("When migrating multiple tables 'tableNames' property must be configured in unloadSource and copyTarget, and be the same length")
                 raise NotImplementedError
-            for(idx in range(0,len(src_tables))):
+            for idx in range(0,len(src_tables)):
                 src_config['tableName'] = src_tables[idx]
                 dest_config['tableName'] = dest_tables[idx]
                 source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
