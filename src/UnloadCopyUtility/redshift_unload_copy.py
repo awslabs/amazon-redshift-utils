@@ -81,8 +81,8 @@ class UnloadCopyTool:
         self.barrier_after_all_resource_pre_tests = NoOperationTask()
         self.task_manager.add_task(self.barrier_after_all_resource_pre_tests)
 
-        src_config = config_helper.config['unloadSource']
-        dest_config = config_helper.config['copyTarget']
+        src_config = self.config_helper.config['unloadSource']
+        dest_config = self.config_helper.config['copyTarget']
         if(src_config['tableNames']):
             src_tables = src_config['tableNames']
             dest_tables = dest_config['tableNames']
