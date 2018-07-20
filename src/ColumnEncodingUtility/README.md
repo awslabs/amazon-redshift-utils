@@ -1,21 +1,21 @@
 # Amazon Redshift Column Encoding Utility
 
-In order to get the best performance from your Redshift Database, you must ensure 
-that database tables have the correct Column Encoding applied (see [http://docs.aws.amazon.com/redshift/latest/dg/t\_Compressing\_data\_on\_disk.html](http://docs.aws.amazon.com/redshift/latest/dg/t_Compressing_data_on_disk.html)). 
-Column Encoding specifies which algorithm is used to compress data within a column, 
-and is chosen on the basis of the datatype, the unique number of discrete values 
+In order to get the best performance from your Redshift Database, you must ensure
+that database tables have the correct Column Encoding applied (see [http://docs.aws.amazon.com/redshift/latest/dg/t\_Compressing\_data\_on\_disk.html](http://docs.aws.amazon.com/redshift/latest/dg/t_Compressing_data_on_disk.html)).
+Column Encoding specifies which algorithm is used to compress data within a column,
+and is chosen on the basis of the datatype, the unique number of discrete values
 in the column, and so on. When the [COPY command](http://docs.aws.amazon.com/redshift/latest/dg/r_COPY.html)
-is used to load data into a table, column encoding will be analyzed and applied by default. 
-Other tables may be loaded via Extract/Load/Transform/Load (ELT) processes, and 
+is used to load data into a table, column encoding will be analyzed and applied by default.
+Other tables may be loaded via Extract/Load/Transform/Load (ELT) processes, and
 these tables may require having the column encoding updated at some point.
 
-The Redshift Column Encoding Utility gives you the ability to apply optimal Column 
-Encoding to an established Schema with data already loaded. When run, it will analyze 
-an entire schema or individual tables. The [ANALYZE COMPRESSION](http://docs.aws.amazon.com/redshift/latest/dg/r_ANALYZE_COMPRESSION.html) 
-command is used to determine if any of the columns in the table require updating, 
+The Redshift Column Encoding Utility gives you the ability to apply optimal Column
+Encoding to an established Schema with data already loaded. When run, it will analyze
+an entire schema or individual tables. The [ANALYZE COMPRESSION](http://docs.aws.amazon.com/redshift/latest/dg/r_ANALYZE_COMPRESSION.html)
+command is used to determine if any of the columns in the table require updating,
 and if so a script is generated to convert to the optimal structure.
 
-Because this utility can make changes to your database live (using the ```--do-execute true``` option), it is highly recommended that you thoroughly test the utility against a dev/test system, and ensure that you take a manual snapshot of Production systems prior to running the generated script. Also, as a large amount of data will be migrated, you should ensure that the migration will not adversely impact Cluster customers. AWS has thoroughly tested this software on a variety of systems, but cannot be responsible for the impact of running the utility against your database. 
+Because this utility can make changes to your database live (using the ```--do-execute true``` option), it is highly recommended that you thoroughly test the utility against a dev/test system, and ensure that you take a manual snapshot of Production systems prior to running the generated script. Also, as a large amount of data will be migrated, you should ensure that the migration will not adversely impact Cluster customers. AWS has thoroughly tested this software on a variety of systems, but cannot be responsible for the impact of running the utility against your database.
 
 ## Data Migration
 
@@ -23,8 +23,8 @@ The script generated will take advantage of one of two data migration options. T
 
 ## Running the Column Encoding Utility
 
-This utility was built and tested on Python 2.7x, but may work with other versions of Python. After cloning this Github project, you must ensure that you have installed the dependencies from [requirements.txt](src/requirements.txt).
- 
+This utility was built and tested on Python 2.7x, but may work with other versions of Python. After cloning this Github project, you must ensure that you have installed the dependencies from [requirements.txt](../requirements.txt).
+
  You can then run the column encoding utility by typing ```python analyze-schema-compression.py``` or ```./analyze-schema-compression.py```. This will generate the following Usage instructions:
 
 ```
@@ -44,7 +44,6 @@ Arguments: --db                  - The database to use
            --target-schema       - Name of a single schema into which the newly optimised tables and data should be created, rather than in place
            --threads             - The number of concurrent connections to use during analysis (default 2)
            --output-file         - The full path to the output file to be generated
-           --report-file         - The full path to the report file to be generated
            --debug               - Generate debug output including SQL Statements being run
            --do-execute          - Run the compression encoding optimisation
            --slot-count          - Modify the wlm_query_slot_count from the default of 1

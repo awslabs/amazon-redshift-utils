@@ -124,9 +124,10 @@ class S3Details:
             if 'path' in s3_staging_conf:
                 # datetime alias for operations
                 self.nowString = "{:%Y-%m-%d_%H:%M:%S}".format(datetime.datetime.now())
-                self.dataStagingRoot = "{s3_stage_path}/{timestamp}/".format(
+                self.dataStagingRoot = "{s3_stage_path}/{timestamp}-{table_name}/".format(
                     s3_stage_path=s3_staging_conf['path'].rstrip("/"),
-                    timestamp=self.nowString
+                    timestamp=self.nowString,
+                    table_name=source_table.get_table()
                 )
                 self.dataStagingPath = "{root}{db_name}.{schema_name}.{table_name}".format(
                     root=self.dataStagingRoot,

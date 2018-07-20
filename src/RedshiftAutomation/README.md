@@ -2,13 +2,12 @@
 
 This project includes code that is able to run several of the Amazon Redshift Utilities in AWS Lambda to automate the most common administrative tasks on a Redshift database. By using a Lambda function scheduled via a [CloudWatch Event](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html), you can ensure that these valuable utilities run automatically and keep your Redshift cluster running well.
 
-![Architecture](Architecture.png)
-
-This utility creates a Lambda function which imports other Redshift Utils modules, and then invokes them against a cluster. It runs within your VPC, and should be configured to connect via a Subnet which is either the same, or can route to the subnet where your Redshift cluster is running. It should also be configured with a Security Group which is trusted by your [Redshift Cluster Security Configuration](http://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html).
 
 Currently the [Column Encoding Utility](src/ColumnEncodingUtility), [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility), [Redshift Advanced Monitoring](https://github.com/awslabs/amazon-redshift-monitoring), and [System Table Persistence](src/SystemTablePersistence) are supported for automated invocation:
 
-![what it does](WhatItDoes.png)
+![Architecture](Architecture.png)
+
+This utility creates a Lambda function which imports other Redshift Utils modules, and then invokes them against a cluster. It runs within your VPC, and should be configured to connect via a Subnet which is either the same, or can route to the subnet where your Redshift cluster is running. It should also be configured with a Security Group which is trusted by your [Redshift Cluster Security Configuration](http://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html).
 
 ## Setup Pre-Tasks
 

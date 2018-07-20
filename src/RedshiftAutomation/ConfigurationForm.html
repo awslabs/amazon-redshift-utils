@@ -130,6 +130,12 @@ $('#config-form').parsley().on('field:validated', function() {
   <label for="sourceSchema">Source Schema * :</label>
   <input type="text" class="form-control" name="configuration[schema_name]" required="true" data-parsley-trigger="change" value="public">
 
+  <label for="systableUnloadLoc">System Tables S3 Unload Location :</label>
+  <input type="text" class="form-control" name="configuration[s3_unload_location]" required="false" data-parsley-trigger="change" value="">
+
+  <label for="systableUnloadRoleArn">System Tables Unload Role ARN :</label>
+  <input type="text" class="form-control" name="configuration[s3_unload_role_arn]" required="false" data-parsley-trigger="change" value="arn:aws:iam::<your account number>:role/<role name>">
+
   <hr/>
   <label>Table Analyze Options</label>
   <br>

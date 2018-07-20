@@ -40,8 +40,9 @@ def get_password(kms_connection, config_detail, debug):
     else:
         return None
 
-def get_config(config_location, current_region):
+def get_config(config_location, current_region, debug):
     if config_location.startswith("s3://"):
+        print("Downloading configuration from %s" % config_location)
         # load the configuration file from S3
         s3_client = boto3.client('s3', region_name=current_region)
 
@@ -51,7 +52,12 @@ def get_config(config_location, current_region):
         obj = s3_client.get_object(Bucket=bucket, Key=key)
         config_body = obj['Body'].read()
         config = json.loads(config_body)
+
+        if debug:
+            print("Raw Configuration downloaded from S3")
+            print(config)
     elif config_location == config_constants.LOCAL_CONFIG:
+        print("Using local configuration")
         # load from the local configuration
         if not os.path.isfile(config_constants.LOCAL_CONFIG):
             raise Exception("Unable to resolve local %s file" % config_constants.LOCAL_CONFIG)
