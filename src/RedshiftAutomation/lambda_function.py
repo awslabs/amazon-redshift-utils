@@ -51,15 +51,14 @@ def event_handler(event, context):
     if event is not None and 'ConfigLocation' in event:
         config_location = event['ConfigLocation']
 
-    config = common.get_config(config_location, current_region)
+    global debug
+    config = common.get_config(config_location, current_region, debug)
 
-    debug = False
-    
     if config_constants.DEBUG in config and config[config_constants.DEBUG]:
         debug = True
 
     if debug:
-        print("Using Provided Configuration:")
+        print("Configuration File Contents:")
         print(config)
 
     # extract the password

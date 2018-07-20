@@ -23,7 +23,7 @@ import common
 import boto3
 
 REGION_KEY = 'AWS_REGION'
-
+debug = False
 
 def usage():
     print("Redshift Automation CLI - Automation Utilities for Amazon Redshift")
@@ -39,10 +39,12 @@ def usage():
 def cli(utility, config_loc, use_region):
     kms_connection = boto3.client('kms', region_name=use_region)
 
-    # extract the configuration
-    config = common.get_config(config_loc, use_region)
+    global debug
+    if 'DEBUG' in os.environ and os.environ['DEBUG'] == True:
+        debug = True
 
-    debug = False
+    # extract the configuration
+    config = common.get_config(config_loc, use_region, debug)
 
     if config_constants.DEBUG in config and config[config_constants.DEBUG]:
         debug = True
