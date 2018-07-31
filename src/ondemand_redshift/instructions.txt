@@ -29,12 +29,6 @@ Download the Ondemand_Redshift_Final.zip file. (from redshift utilities)
 Note:
 1. The code will not work if there are already more than 20 manual snapshots present in that region.
 2. Do not delete the following resources created by the code, they are required to create and delete cluster everyday at the time provided by you:
-<<<<<<< HEAD
 	a. Lambda function: Redshift-ondemand-function
 	b. Cloudwatch rules: Ondemand-createCluster-rule   AND  Ondemand-deleteCluster-rule
 	c. Policy: Ondemand_CW_log_policy 
-=======
-    a. Lambda function: Redshift-ondemand-function
-    b. Cloudwatch rules: Ondemand-createCluster-rule   AND  Ondemand-deleteCluster-rule
-    c. Policy: Ondemand_CW_log_policy 
->>>>>>> 92698a53262d2305bd66dc7ea2f5e0d80933b82c
