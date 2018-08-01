@@ -30,7 +30,7 @@ pip3 install requests
 
 2. Clone the repository using the following command:
 ```bash
-   git clone https://github.com/suvenduk/amazon-redshift-utils.git
+git clone https://github.com/suvenduk/amazon-redshift-utils.git
 ```
 
 3. Change directory to amazon-redshift-utils/src/ondemand_redshift/ and run the script “Ondemand_Lamb.py” using python3.
