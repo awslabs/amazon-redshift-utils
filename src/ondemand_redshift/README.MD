@@ -48,7 +48,7 @@ The script takes the below parameters:
 | Input Name              | Examples       | Description                                              |
 | -------------------     | ---------      | -------------------------------------------------------- |
 | cluster_region          | ap-south-1     | Region where redshift cluster is located                 	    |
-| clusterName		  | my-redshfit-cluster     | Name of your Amazon Redshift cluster                  |
+| clusterName		  | my-redshift-cluster     | Name of your Amazon Redshift cluster                  |
 | deleteTime(hour)          	  | 09		   | Enter the hour in UTC when you want to delete the cluster(0-23)      |
 | deleteMin	          | 05             | Enter the minute in UTC when you want to delete the cluster(0-59)    |
 | createTime(hour)              | 14		   | Enter the hour in UTC when you want to restore the cluster(0-23)    |
