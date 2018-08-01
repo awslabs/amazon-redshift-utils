@@ -22,10 +22,10 @@ As resources of these services will be spun there will be some additional charge
 
 1. Please run the following commands in terminal to install the necessary python modules in order to run the script:
 ```bash
-# pip3 install boto3
-# pip3 install botocore
-# pip3 install awscli
-# pip3 install requests
+pip3 install boto3
+pip3 install botocore
+pip3 install awscli
+pip3 install requests
 ```
 
 2. Clone the repository using the following command:
@@ -35,7 +35,7 @@ As resources of these services will be spun there will be some additional charge
 
 3. Change directory to amazon-redshift-utils/src/ondemand_redshift/ and run the script “Ondemand_Lamb.py” using python3.
 ```bash
-# python3 Ondemand_Lamb.py
+python3 Ondemand_Lamb.py
 ```
 
 Please follow the instructions in the script.
