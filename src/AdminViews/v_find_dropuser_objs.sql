@@ -1,16 +1,13 @@
 /**********************************************************************************************
 Purpose:        View to help find all objects owned by the user to be dropped
 Columns -
-
-
 objtype:        Type of object user has privilege on. Object types are Function,Schema,
                 Table or View, Database, Language or Default ACL
 objowner:       Object owner 
-userid:			    Owner user id
+userid:         Owner user id
 schemaname:     Schema for the object
 objname:        Name of the object
 ddl:            Generate DDL string to transfer object ownership to new user
-
 Notes:           
                 
 History:
@@ -19,8 +16,10 @@ History:
 2018-01-06 adedotua added ddl column to generate ddl for transferring object ownership
 2018-01-15 pvbouwel Add QUOTE_IDENT for identifiers
 2018-05-29 adedotua added filter to skip temp tables
+2018-08-03 alexlsts added filter to skip temp tables
 
 **********************************************************************************************/
+
 
 CREATE OR REPLACE VIEW admin.v_find_dropuser_objs as 
 SELECT owner.objtype,
@@ -76,5 +75,16 @@ WHERE pgc.relnamespace = nc.oid
 AND   pgc.relkind IN ('r','v')
 AND   pgu.usesysid = pgc.relowner
 AND   nc.nspname NOT ILIKE 'pg\_temp\_%') OWNER ("objtype","objowner","userid","schemaname","objname","ddl") 
-WHERE owner.userid > 1;
+WHERE owner.userid > 1
+UNION ALL
+-- Python libraries owned by the user
+SELECT 
+      'Library',
+  pgu.usename,
+  pgu.usesysid,
+  '',
+    pgl.name,
+  'No DDL avaible for Python Library. You should DROP OR REPLACE the Python Library'
+FROM pg_library pgl
+INNER JOIN pg_user pgu ON pgl.owner = pgu.usesysid;
 
