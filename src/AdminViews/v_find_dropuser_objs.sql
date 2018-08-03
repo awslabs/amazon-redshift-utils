@@ -78,13 +78,13 @@ AND   nc.nspname NOT ILIKE 'pg\_temp\_%') OWNER ("objtype","objowner","userid","
 WHERE owner.userid > 1
 UNION ALL
 -- Python libraries owned by the user
-SELECT 
-      'Library',
-  pgu.usename,
-  pgu.usesysid,
-  '',
-    pgl.name,
-  'No DDL avaible for Python Library. You should DROP OR REPLACE the Python Library'
-FROM pg_library pgl
-INNER JOIN pg_user pgu ON pgl.owner = pgu.usesysid;
+SELECT 'Library',
+       pgu.usename,
+       pgu.usesysid,
+       '',
+       pgl.name,
+       'No DDL avaible for Python Library. You should DROP OR REPLACE the Python Library'
+FROM  pg_library pgl,
+      pg_user pgu
+WHERE pgl.owner = pgu.usesysid;
 
