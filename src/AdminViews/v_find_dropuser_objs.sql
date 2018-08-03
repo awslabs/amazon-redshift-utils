@@ -74,8 +74,7 @@ FROM pg_class pgc,
 WHERE pgc.relnamespace = nc.oid
 AND   pgc.relkind IN ('r','v')
 AND   pgu.usesysid = pgc.relowner
-AND   nc.nspname NOT ILIKE 'pg\_temp\_%') OWNER ("objtype","objowner","userid","schemaname","objname","ddl") 
-WHERE owner.userid > 1
+AND   nc.nspname NOT ILIKE 'pg\_temp\_%'
 UNION ALL
 -- Python libraries owned by the user
 SELECT 'Library',
@@ -86,5 +85,6 @@ SELECT 'Library',
        'No DDL avaible for Python Library. You should DROP OR REPLACE the Python Library'
 FROM  pg_library pgl,
       pg_user pgu
-WHERE pgl.owner = pgu.usesysid;
+WHERE pgl.owner = pgu.usesysid) OWNER ("objtype","objowner","userid","schemaname","objname","ddl") 
+WHERE owner.userid > 1;
 
