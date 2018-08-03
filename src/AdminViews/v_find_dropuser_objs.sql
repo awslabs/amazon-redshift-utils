@@ -16,7 +16,7 @@ History:
 2018-01-06 adedotua added ddl column to generate ddl for transferring object ownership
 2018-01-15 pvbouwel Add QUOTE_IDENT for identifiers
 2018-05-29 adedotua added filter to skip temp tables
-2018-08-03 alexlsts added filter to skip temp tables
+2018-08-03 alexlsts added pg_library
 
 **********************************************************************************************/
 
