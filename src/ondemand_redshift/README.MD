@@ -15,7 +15,7 @@ This script will help you to run your Redshift cluster in specific hours of the 
 4. AWS Cloudwatch Events
 5. AWS Lambda
 
-As resources of these services will be spun there will be some additional charges for using these services. Please refer the documentation[1] for the charges.
+As resources of these services will be spun there will be some additional charges for using these services. Please refer the documentation [1] for details about the charges.
 
 
 ## Running the script
