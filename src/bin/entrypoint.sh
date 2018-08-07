@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 PROJECT=${1:-}
 
 if [ "${PROJECT}" == "analyze-vacuum" ]; then bin/run-analyze-vacuum-utility.sh
