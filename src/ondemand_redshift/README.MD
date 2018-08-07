@@ -3,7 +3,7 @@
 This script will help you to run your Redshift cluster in specific hours of the day based on your requirement. As part of the script, at the end of your scheduled window, this script will take a backup of the cluster before deleting the cluster and will restore it from the latest backup based on your requirement. It is automated using Amazon Lambda and Amazon Cloudwatch rules. This is a one time schedule operation.
 
 ## Setting the environment
-1. Make sure the user running the script has full admin access.
+1. Make sure the user running the script has required service access. For easy setup, you can use a user with full admin access.
 2. Configure aws credentials using "aws configure" in terminal. Enter the default region same as where your Amazon Redshift cluster is.
 
 
@@ -15,7 +15,7 @@ This script will help you to run your Redshift cluster in specific hours of the 
 4. AWS Cloudwatch Events
 5. AWS Lambda
 
-As resources of these services will be spun there will be some additional charges for using these services. Please refer the documentation [1] for details about the charges.
+As resources of these services will be spun, there might be some additional charges for using these services. Please refer the documentation [1] for details about the charges.
 
 
 ## Running the script
@@ -57,9 +57,9 @@ The script takes the below parameters:
 
 
 ## Notes:
-1. The code will not work if the number of snapshots exceed the limit allotted to your account. Please refer the documentation [2][3] for more information on snapshot limits.
+1. The code will not work if the number of snapshots exceed the snapshot limit allotted to your account. Please refer the documentation [2][3] for more information on snapshot limits. You can reach [AWS Premium support](https://aws.amazon.com/premiumsupport/) to increase the snapshot limits.
 
-2. Do not delete the following resources created by the code, they are required to create and delete cluster everyday at the time provided by you. <br>
+2. Do not delete the following resources created by the code, they are required to manage the cluster availability schedule. <br>
 	a. Lambda function: Redshift-ondemand-function <br>
 	b. Cloudwatch rules: Ondemand-createCluster-rule   AND  Ondemand-deleteCluster-rule <br>
 	c. Policy: Ondemand_CW_log_policy  <br>
