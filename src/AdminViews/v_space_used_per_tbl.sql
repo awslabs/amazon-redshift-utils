@@ -5,12 +5,13 @@ History:
 2014-01-30 jjschmit Created
 2014-02-18 jjschmit Removed hardcoded where clause against 'public' schema
 2014-02-21 jjschmit Added pct_unsorted and recommendation fields
-2015-03-31 tinkerbotfoo Handled a special case to avoid divide by zero for pct_unsorted 
+2015-03-31 tinkerbotfoo Handled a special case to avoid divide by zero for pct_unsorted
+2018-08-10 alexlsts Changed column "tablename" to use "relname" column from pg_class  
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_space_used_per_tbl
 AS with info_table as ( SELECT TRIM(pgdb.datname) AS dbase_name
         ,TRIM(pgn.nspname) as schemaname
-        ,TRIM(a.name) AS tablename
+        ,TRIM(pgc.relname) AS tablename
         ,id AS tbl_oid
         ,b.mbytes AS megabytes
        ,CASE WHEN pgc.reldiststyle = 8
