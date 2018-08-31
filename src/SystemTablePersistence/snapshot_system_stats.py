@@ -186,7 +186,9 @@ def snapshot(config_sources):
 
     # override the password with the contents of .pgpass or environment variables
     try:
-        pwd = pgpasslib.getpass(host, port, database, user)
+        pg_pwd = pgpasslib.getpass(host, port, database, user)
+        if pg_pwd:
+            pwd = pg_pwd
     except pgpasslib.FileNotFound as e:
         pass
 
