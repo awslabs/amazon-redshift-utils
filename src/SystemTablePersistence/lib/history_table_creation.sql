@@ -1,4 +1,3 @@
-
 CREATE SCHEMA IF NOT EXISTS history;
 
 CREATE TABLE IF NOT EXISTS history.hist_stl_load_errors (LIKE STL_LOAD_ERRORS);
@@ -61,8 +60,8 @@ CREATE TABLE IF NOT EXISTS history.hist_svl_s3query_summary
     max_request_parallelism  INTEGER,
     avg_request_parallelism  DOUBLE PRECISION
   );
-ALTER TABLE HISTORY.hist_svl_s3query_summary ADD COLUMN is_nested TEXT DEFAULT NULL;
-CREATE TABLE IF NOT EXISTS HISTORY.HIST_SVL_S3QUERY
+ALTER TABLE history.hist_svl_s3query_summary ADD COLUMN is_nested TEXT DEFAULT NULL;
+CREATE TABLE IF NOT EXISTS history.HIST_SVL_S3QUERY
   (
     userid                   INTEGER,
     query                    INTEGER,
@@ -92,4 +91,4 @@ CREATE TABLE IF NOT EXISTS HISTORY.HIST_SVL_S3QUERY
     max_request_parallelism  INTEGER,
     avg_request_parallelism  DOUBLE PRECISION
   );
-ALTER TABLE HISTORY.hist_svl_s3query ADD COLUMN is_nested TEXT DEFAULT NULL;
+ALTER TABLE history.hist_svl_s3query ADD COLUMN is_nested TEXT DEFAULT NULL;
