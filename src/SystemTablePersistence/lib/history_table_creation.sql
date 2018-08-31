@@ -24,7 +24,6 @@ CREATE TABLE IF NOT EXISTS history.hist_svl_query_summary
     is_delayed_scan   CHARACTER(1) ENCODE zstd,
     rows_pre_filter   BIGINT ENCODE zstd
   );
-ALTER TABLE HISTORY.hist_svl_s3query_summary add column is_nested text default null;
 CREATE TABLE IF NOT EXISTS history.hist_svl_s3query_summary
   (
     userid                   integer,
@@ -61,6 +60,7 @@ CREATE TABLE IF NOT EXISTS history.hist_svl_s3query_summary
     max_request_parallelism  integer,
     avg_request_parallelism  double precision
   );
+ALTER TABLE HISTORY.hist_svl_s3query_summary add column is_nested text default null;
 CREATE TABLE IF NOT EXISTS HISTORY.HIST_SVL_S3QUERY
   (
     userid                   integer,
