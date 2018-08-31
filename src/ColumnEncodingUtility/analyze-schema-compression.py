@@ -713,9 +713,9 @@ def analyze(table_info):
             # abort if new sortkeys were set but we couldn't find them in the set of all columns
             if new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
                 if debug:
-                    comment("Requested Sort Keys: %s" % new_sort_keys)
+                    comment("Requested Sort Keys: %s" % new_sortkey_arr)
                     comment("Resolved Sort Keys: %s" % table_sortkeys)
-                msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sort_keys
+                msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sortkey_arr
                 comment(msg)
                 raise Exception(msg)
 
@@ -782,7 +782,7 @@ def analyze(table_info):
                                                                             schema_name,
                                                                             table_name)
                 if len(table_sortkeys) > 0:
-                    insert = "%s order by \"%s\";" % (insert, ",".join(table_sortkeys).replace(',','\",\"'))
+                    insert = "%s order by \"%s\";" % (insert, ",".join(new_sortkey_arr).replace(',','\",\"'))
                 else:
                     insert = "%s;" % (insert)
 
