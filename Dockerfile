@@ -9,6 +9,7 @@ RUN find /usr/src/app -name "*.py"|xargs chmod +x && find /usr/src/app -name "*.
 
 ENV PATH="/usr/src/app/AnalyzeVacuumUtility:/usr/src/app/ColumnEncodingUtility:/usr/src/app/UnloadCopyUtility:${PATH}"
 
-RUN pip install -r /usr/src/app/requirements.txt
+RUN pip install -r /usr/src/app/requirements.txt && \
+    pip install -r /usr/src/app/UnloadCopyUtility/requirements.txt 
 
 ENTRYPOINT ["/usr/src/app/bin/entrypoint.sh"]
