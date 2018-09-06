@@ -8,7 +8,7 @@ History:
 
 **********************************************************************************************/
 
-create view admin.v_my_last_copy_errors as 
+create or replace view admin.v_my_last_copy_errors as 
 select query, 
        starttime,
        filename, 
