@@ -10,7 +10,7 @@ History:
 
 **********************************************************************************************/
 
-create view admin.v_my_last_query_summary as 
+create or replace view admin.v_my_last_query_summary as 
 select query,
        maxtime, 
        avgtime, 

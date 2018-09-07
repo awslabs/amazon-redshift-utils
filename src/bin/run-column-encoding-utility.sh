@@ -65,7 +65,6 @@ else
         --force ${FORCE} \
         --drop-old-data ${DROP_OLD_DATA} \
         --ssl-option ${SSL_OPTION} \
-        --statement-timeout ${STATEMENT_TIMEOUT} \
         ${ANALYZE_TABLE_CMD} ${ANALYZE_COL_WIDTH_CMD} ${OUTPUT_FILE_CMD} ${COMP_ROWS_CMD} ${QUERY_GROUP_CMD} \
         ${NEW_DIST_KEY_CMD} ${NEW_SORT_KEYS_CMD} ${STATEMENT_TIMEOUT_CMD}
 

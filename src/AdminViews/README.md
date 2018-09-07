@@ -1,5 +1,5 @@
 # Redshift Admin Views 
-Views objective is to help on Administration of Redshift
+Views objective is to help with administration of Redshift.
 All views assume you have a schema called admin.
 
 | View | Purpose |
@@ -11,6 +11,7 @@ All views assume you have a schema called admin.
 | v\_check\_wlm\_query\_trend\_hourly.sql | View to get  WLM Query Count, Queue Wait Time , Execution Time and Total Time by Hour |
 | v\_constraint\_dependency.sql |   View to get the the foreign key constraints between tables | 
 | v\_extended\_table\_info.sql| View to get extended table information for permanent database tables.
+| v\_fragmentation\_info.sql| View to list all fragmented tables in the database
 | v\_generate\_cancel\_query.sql | View to get cancel query |
 | v\_generate\_database\_ddl.sql | View to get the DDL for a database |
 | v\_generate\_group\_ddl.sql |   View to get the DDL for a group. | 
