@@ -259,14 +259,42 @@ def get_identity(adsrc):
 
 
 def get_grants(schema_name, table_name, current_user):
+    
     sql = '''
-        SELECT table_schema, table_name, privilege_type, g.groname is not null as is_group, grantee 
-        FROM information_schema.table_privileges tp 
-        LEFT OUTER JOIN pg_group g ON g.groname = tp.grantee
-        where table_schema = '%s'
-          and table_name = '%s'
-        and grantee not in ('%s','rdsdb')
-    ''' % (schema_name, table_name, current_user)
+        WITH priviledge AS
+        (
+            SELECT 'SELECT'::varchar(10) as "grant"
+            UNION ALL
+            SELECT 'DELETE'::varchar(10)
+            UNION ALL
+            SELECT 'INSERT'::varchar(10)
+            UNION ALL
+            SELECT 'UPDATE'::varchar(10)
+            UNION ALL
+            SELECT 'REFERENCES'::varchar(10)
+        ),
+        usr AS
+        (
+            SELECT usesysid, 0 as grosysid, usename, false as is_group
+            FROM pg_user
+            WHERE usename != 'rdsdb'
+            UNION ALL
+            SELECT 0, grosysid, groname, true
+            FROM pg_group
+        )
+        SELECT nc.nspname AS table_schema, c.relname AS table_name, priviledge."grant" AS privilege_type, usr.is_group, usr.usename AS grantee
+        FROM pg_class c
+        JOIN pg_namespace nc ON (c.relnamespace = nc.oid)
+        CROSS JOIN usr
+        CROSS JOIN priviledge
+        JOIN pg_user ON pg_user.usename not in ('rdsdb')
+        WHERE  (c.relkind = 'r'::"char" OR c.relkind = 'v'::"char")
+        AND aclcontains(c.relacl, makeaclitem(usr.usesysid, usr.grosysid, pg_user.usesysid, priviledge."grant", false))
+        AND c.relname = '%s'
+        AND nc.nspname = '%s'
+        and grantee != '%s'
+        ;
+    ''' % (table_name, schema_name, current_user)
 
     if debug:
         comment(sql)
@@ -569,6 +597,7 @@ def analyze(table_info):
                     cleanup(get_pg_conn())
                     return TERMINATED_BY_USER
                 except Exception as e:
+                    execute_query('rollback;')
                     print(e)
                     attempt_count += 1
                     last_exception = e
