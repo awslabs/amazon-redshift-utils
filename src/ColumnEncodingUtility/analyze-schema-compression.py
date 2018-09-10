@@ -569,6 +569,7 @@ def analyze(table_info):
                     cleanup(get_pg_conn())
                     return TERMINATED_BY_USER
                 except Exception as e:
+                    execute_query('rollback;')
                     print(e)
                     attempt_count += 1
                     last_exception = e
