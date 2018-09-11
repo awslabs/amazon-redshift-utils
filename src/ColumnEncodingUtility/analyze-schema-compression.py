@@ -627,6 +627,7 @@ def analyze(table_info):
             table_sortkeys = []
             new_sortkey_arr = [t.strip() for t in new_sort_keys.split(',')] if new_sort_keys is not None else []
 
+
             # count of suggested optimizations
             count_optimized = 0
             # process each item given back by the analyze request
@@ -634,9 +635,11 @@ def analyze(table_info):
                 if debug:
                     comment("Analyzed Compression Row State: %s" % str(row))
                 col = row[1]
+                row_sortkey = descr[col][4]
 
                 # compare the previous encoding to the new encoding
-                new_encoding = row[2]
+                # don't use new encoding for first sortkey
+                new_encoding = row[2] if not abs(row_sortkey) == 1 else 'raw'
                 old_encoding = descr[col][2]
                 old_encoding = 'raw' if old_encoding == 'none' else old_encoding
                 if new_encoding != old_encoding:
@@ -675,7 +678,6 @@ def analyze(table_info):
                         distkey = ''
 
                 # link in the existing sort keys, or set the new ones
-                row_sortkey = descr[col][4]
                 if table_name is not None and len(new_sortkey_arr) > 0:
                     if col in new_sortkey_arr:
                         sortkeys[new_sortkey_arr.index(col) + 1] = col
