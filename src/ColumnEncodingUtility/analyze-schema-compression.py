@@ -580,6 +580,8 @@ def analyze(table_info):
             while attempt_count < analyze_retry and analyze_compression_result is None:
                 try:
                     analyze_compression_result = execute_query(statement)
+                    # Commiting otherwise anaylze keep an exclusive lock until a commit arrive which can be very long
+                    execute_query('commit;')
                 except KeyboardInterrupt:
                     # To handle Ctrl-C from user
                     cleanup(get_pg_conn())
