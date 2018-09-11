@@ -230,13 +230,6 @@ def get_pg_conn():
 
         run_commands(conn, [set_name])
 
-        # Set search_path
-        set_searchpath = "set search_path to '$user', public, %s;" % schema_name
-        if debug:
-            comment(set_searchpath)
-
-        run_commands(conn, [set_searchpath])
-
         # turn off autocommit for the rest of the executions
         conn.autocommit = False
 
@@ -324,12 +317,9 @@ def get_foreign_keys(schema_name, set_target_schema, table_name):
     fk_statement = '''SELECT /* fetching foreign key relations */ conname,
   pg_catalog.pg_get_constraintdef(cons.oid, true) as condef
  FROM pg_catalog.pg_constraint cons,
- pg_namespace pgn,
  pg_class pgc
  WHERE cons.conrelid = pgc.oid
- and pgn.nspname = '%s'
- and pgc.relnamespace = pgn.oid
- and pgc.oid = '%s'::regclass
+ and pgc.oid = '%s."%s"'::regclass
  AND cons.contype = 'f'
  ORDER BY 1
 ''' % (schema_name, table_name)
@@ -359,18 +349,16 @@ def get_primary_key(schema_name, set_target_schema, original_table, new_table):
     # get the primary key columns
     statement = '''SELECT /* fetch primary key information */   
   att.attname
-FROM pg_index ind, pg_class cl, pg_attribute att, pg_namespace pgn
+FROM pg_index ind, pg_class cl, pg_attribute att
 WHERE 
-  cl.oid = '%s'::regclass 
+  cl.oid = '%s."%s"'::regclass 
   AND ind.indrelid = cl.oid 
   AND att.attrelid = cl.oid
-  and cl.relnamespace = pgn.oid
-  and pgn.nspname = '%s'
   and att.attnum = ANY(string_to_array(textin(int2vectorout(ind.indkey)), ' '))
   and attnum > 0
   AND ind.indisprimary
 order by att.attnum;
-''' % (original_table, schema_name)
+''' % (schema_name, original_table)
 
     if debug:
         comment(statement)
@@ -1028,7 +1016,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-and pgn.nspname::text = '%s' and pgc.relname in (%s)
+and pgn.nspname::text ~ '%s' and pgc.relname in (%s)
         ''' % (schema_name, tables)
     else:
         # query for all tables in the schema ordered by size descending
@@ -1042,7 +1030,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner 
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-where pgn.nspname::text = '%s'
+where pgn.nspname::text  ~ '%s'
   and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
 order by 2;
         ''' % (schema_name,)
