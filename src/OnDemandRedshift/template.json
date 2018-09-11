@@ -1,0 +1,77 @@
+{
+  "objects": [
+    {
+      "period": "1 Days",
+      "startDateTime": "2018-01-01T00:00:00",
+      "name": "DefaultSchedule1",
+      "id": "ScheduleId_whI1e",
+      "type": "Schedule"
+    },
+    {
+      "failureAndRerunMode": "CASCADE",
+      "resourceRole": "DataPipelineDefaultResourceRole",
+      "role": "DataPipelineDefaultRole",
+      "scheduleType": "cron",
+      "name": "Default",
+      "id": "Default"
+    },
+    {
+      "schedule": {
+        "ref": "ScheduleId_whI1e"
+      },
+      "resourceRole": "DataPipelineDefaultResourceRole",
+      "role": "DataPipelineDefaultRole",
+      "imageId": "ami-XXXXXXXX",
+      "securityGroupIds": "sg-XXXXXXXX",
+      "name": "DefaultResource1",
+      "id": "ResourceId_wm4Af",
+      "type": "Ec2Resource"
+    },
+    {
+      "period": "1 Days",
+      "startDateTime": "2018-01-01T01:00:00",
+      "name": "DefaultSchedule2",
+      "id": "ScheduleId_t4enx",
+      "type": "Schedule"
+    },
+    {
+      "schedule": {
+        "ref": "ScheduleId_t4enx"
+      },
+      "scriptUri": "s3://xyz/dd.sh",
+      "name": "DefaultShellCommandActivity1",
+      "id": "ShellCommandActivityId_FCPf1",
+      "runsOn": {
+        "ref": "ResourceId_xaylx"
+      },
+      "type": "ShellCommandActivity"
+    },
+    {
+      "schedule": {
+        "ref": "ScheduleId_t4enx"
+      },
+      "resourceRole": "DataPipelineDefaultResourceRole",
+      "role": "DataPipelineDefaultRole",
+      "imageId": "ami-XXXXXXXX",
+      "securityGroupIds": "sg-XXXXXXXX",
+      "name": "DefaultResource2",
+      "id": "ResourceId_xaylx",
+      "type": "Ec2Resource"
+    },
+    {
+      "schedule": {
+        "ref": "ScheduleId_whI1e"
+      },
+      "scriptUri": "s3://xyz/cc.sh",
+      "name": "DefaultShellCommandActivity2",
+      "runsOn": {
+        "ref": "ResourceId_wm4Af"
+      },
+      "id": "ShellCommandActivityId_yzQmD",
+      "type": "ShellCommandActivity"
+    }
+  ],
+  "parameters": [],
+  "values": {
+  }
+}
