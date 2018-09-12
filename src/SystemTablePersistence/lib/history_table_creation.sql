@@ -116,3 +116,5 @@ CREATE TABLE IF NOT EXISTS history.HIST_SVL_S3QUERY
     avg_request_parallelism  DOUBLE PRECISION
   );
 ALTER TABLE history.hist_svl_s3query ADD COLUMN is_nested TEXT DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS history.hist_stl_query_metrics (like stl_query_metrics);
