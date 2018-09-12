@@ -39,5 +39,5 @@
     "snapshotNew": "select * from stl_query_metrics  where starttime > (select nvl(max(starttime), '01/01/1970'::TIMESTAMP) from history.hist_stl_query_metrics)",
     "archiveColumn": "starttime"
   }
-  
 ]
+        
