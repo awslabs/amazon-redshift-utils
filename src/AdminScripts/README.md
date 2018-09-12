@@ -10,7 +10,8 @@ If you are using psql, you can use `psql [option] -f <script.sql>` to run.
 | filter_used.sql              | Return filter applied to tables on scans. To aid on choosing sortkey                      |
 | generate_calendar.sql        | Creates a calendar dimension table useful for star-schema joins                           |
 | missing_table_stats.sql      | Query shows EXPLAIN plans which flagged "missing statistics" on the underlying tables     |
-| perf_alert.sql               | Return top occurrences of alerts, join with table scans                                   |
+| perf_alert.sql               | Return top occurrences of alerts, join with table scans and SQL Text                      |
+| table_alerts.sql             | Return top occurrences of table access related alerts                                     |
 | predicate_columns.sql        | Return Information about Predicate Columns on tables                                      |
 | queuing_queries.sql          | Query showing queries which are waiting on a WLM Query Slot                               |
 | queue_resources_hourly.sql   | Returns hourly resources usage for WLM query queues                                       |
