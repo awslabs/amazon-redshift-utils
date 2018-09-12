@@ -34,5 +34,5 @@
     "snapshotNew": "select userid, query, segment, step, node, slice, starttime, endtime, elapsed, external_table_name, file_format, is_partitioned, is_rrscan, s3_scanned_rows, s3_scanned_bytes, s3query_returned_rows, s3query_returned_bytes, files, splits, total_split_size, max_split_size, total_retries, max_retries, max_request_duration, avg_request_duration, max_request_parallelism, avg_request_parallelism,is_nested from svl_s3query where starttime > (select nvl(max(starttime), '01/01/1970'::timestamp) from history.hist_svl_s3query)",
     "archiveColumn": "starttime"
   }
+  
 ]
-        
