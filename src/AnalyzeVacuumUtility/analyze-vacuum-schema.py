@@ -38,6 +38,7 @@ Srinikri Amazon Web Services (2015)
 '''
 import os
 import sys
+from dotenv import load_dotenv
 
 # add the lib directory to the sys path
 try:
@@ -60,9 +61,11 @@ TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
 
+
+
 def get_env_var(name, default_val):
     return os.environ[name] if name in os.environ else default_val
-
+    # Load environment variables
 
 def usage(with_message=None):
     print('Usage: analyze-vacuum-schema.py')
@@ -104,6 +107,11 @@ def usage(with_message=None):
 def main(argv):
     supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= blacklisted-tables= suppress-cloudwatch= require-ssl= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= stats-off-pct= predicate-cols= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
 
+    """ Load connection environment from bi-etl-python/env/aws.env file
+    """
+    env_dir = "/".join([os.environ['BI_ETL_HOME'], 'env/aws.env', ])
+
+    load_dotenv(env_dir)
     # extract the command line arguments
     try:
         optlist, remaining = getopt.getopt(argv[1:], "", supported_args.split())
@@ -111,11 +119,11 @@ def main(argv):
         print(str(err))
         usage()
 
-    args = {config_constants.DB_NAME: get_env_var('PGDATABASE', None),
-            config_constants.DB_USER: get_env_var('PGUSER', None),
-            config_constants.DB_PASSWORD: get_env_var('PGPASSWORD', None),
-            config_constants.DB_HOST: get_env_var('PGHOST', None),
-            config_constants.DB_PORT: get_env_var('PGPORT', 5439)}
+    args = {config_constants.DB_NAME: os.environ.get('REDSHIFT_DB'),
+            config_constants.DB_USER: os.environ.get('REDSHIFT_USER', None),
+            config_constants.DB_PASSWORD: os.environ.get('REDSHIFT_PASSWORD', None),
+            config_constants.DB_HOST: os.environ.get('REDSHIFT_CLUSTER_PROD', None),
+            config_constants.DB_PORT: os.environ.get('REDSHIFT_PORT', 5439)}
 
     # parse command line arguments
     for arg, value in optlist:
@@ -123,7 +131,7 @@ def main(argv):
             if value == '':
                 usage()
             else:
-                args['db'] = value
+                args[config_constants.DB_NAME] = value
         elif arg == "--db-user":
             if value == '':
                 usage()
