@@ -122,7 +122,7 @@ def main(argv):
     args = {config_constants.DB_NAME: os.environ.get('REDSHIFT_DB'),
             config_constants.DB_USER: os.environ.get('REDSHIFT_USER', None),
             config_constants.DB_PASSWORD: os.environ.get('REDSHIFT_PASSWORD', None),
-            config_constants.DB_HOST: os.environ.get('REDSHIFT_CLUSTER_DEV', None),
+            config_constants.DB_HOST: os.environ.get('REDSHIFT_CLUSTER_PROD', None),
             config_constants.DB_PORT: os.environ.get('REDSHIFT_PORT', 5439)}
 
     # parse command line arguments
