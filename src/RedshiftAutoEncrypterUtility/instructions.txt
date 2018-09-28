@@ -1,0 +1,38 @@
+Launch a Amazon linux EC2 Instance and attach a role to it with admin access for easy setup.
+
+Associating a role with ec2-instance :https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#working-with-iam-roles
+
+Make sure the above attached role has Admin access so that the script does not fail in case of inadequate permissions.
+
+Copy the script to one of your s3 buckets .(migration.py)
+
+1] Download the script: ( from redshift utilities)
+
+# wget <git-hub link> #make sure you pull changes
+
+alternatively you can use scp linux  utility .
+
+scp : https://www.computerhope.com/unix/scp.htm
+
+2] Install python 3 and dependencies for running the script:
+
+# sudo yum install python36 postgresql postgresql-devel gcc python36-devel libffi-devel
+# curl -O https://bootstrap.pypa.io/get-pip.py
+# python3 get-pip.py --user
+# pip3.6 install PyGreSQL boto3 pytz --user
+
+3] Run the script
+# python3 migrate-production.py
+
+
+
+Note
+=====
+
+For larger tables during unloading or copying them, the TCP timeout can occur and can break the replication.
+
+Increase tcp timeout.
+
+
+Change the WLM configuration to give as much as memory you can give to the process.
+
