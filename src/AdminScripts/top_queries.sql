@@ -10,7 +10,7 @@ total:		Total execution time of all occurences
 max_query_id:	Largest query id of the query occurence
 last_run:	Last day the query ran
 aborted:	0 if query ran to completion, 1 if it was canceled.
-alert:      Alert event related to the query
+alerts:		Alert events related to the query
  
 Notes:
 There is a commented filter of the query to filter for only Select statements (otherwise it includes all statements like insert, update, COPY)
@@ -22,7 +22,8 @@ History:
 **********************************************************************************************/
 -- query runtimes
 select trim(database) as DB, count(query) as n_qry, max(substring (qrytext,1,80)) as qrytext, min(run_seconds) as "min" , max(run_seconds) as "max", avg(run_seconds) as "avg", sum(run_seconds) as total,  max(query) as max_query_id, 
-max(starttime)::date as last_run, aborted, event
+max(starttime)::date as last_run, aborted,
+listagg(event, ', ') within group (order by query) as events
 from (
 select userid, label, stl_query.query, trim(database) as database, trim(querytxt) as qrytext, md5(trim(querytxt)) as qry_md5, starttime, endtime, datediff(seconds, starttime,endtime)::numeric(12,2) as run_seconds, 
        aborted, decode(alrt.event,'Very selective query filter','Filter','Scanned a large number of deleted rows','Deleted','Nested Loop Join in the query plan','Nested Loop','Distributed a large number of rows across the network','Distributed','Broadcasted a large number of rows across the network','Broadcast','Missing query planner statistics','Stats',alrt.event) as event
@@ -33,5 +34,5 @@ where userid <> 1
 -- and database = ''
 and starttime >=  dateadd(day, -7, current_Date)
  ) 
-group by database, label, qry_md5, aborted, event
+group by database, label, qry_md5, aborted
 order by total desc limit 50;

@@ -78,7 +78,7 @@ def usage(with_message=None):
     print('           --db-port            - The Cluster endpoint port : Default = 5439')
     print('           --db-conn-opts       - Additional connection options. "name1=opt1[ name2=opt2].."')
     print('           --require-ssl        - Does the connection require SSL? (True | False)')
-    print('           --schema-name        - The Schema to be Analyzed or Vacuumed : Default = public')
+    print('           --schema-name        - The Schema to be Analyzed or Vacuumed (REGEX): Default = public') 
     print('           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
     print('           --blacklisted-tables - The tables we do not want to Vacuum')
     print('           --output-file        - The full path to the output file to be generated')

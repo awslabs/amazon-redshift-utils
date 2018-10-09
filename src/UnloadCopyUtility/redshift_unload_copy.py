@@ -75,16 +75,36 @@ class UnloadCopyTool:
         # load the configuration
         self.config_helper = ConfigHelper(config_file, self.s3_helper)
 
-        source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
-
-        destination = ResourceFactory.get_target_resource_from_config_helper(self.config_helper, self.region)
-
         self.task_manager = TaskManager()
         self.barrier_after_all_cluster_pre_tests = NoOperationTask()
         self.task_manager.add_task(self.barrier_after_all_cluster_pre_tests)
         self.barrier_after_all_resource_pre_tests = NoOperationTask()
         self.task_manager.add_task(self.barrier_after_all_resource_pre_tests)
 
+        src_config = self.config_helper.config['unloadSource']
+        dest_config = self.config_helper.config['copyTarget']
+        if(src_config['tableNames']):
+            src_tables = src_config['tableNames']
+            dest_tables = dest_config['tableNames']
+            logging.info("Migrating multiple tables")
+            if( not dest_tables or len(src_tables) != len(dest_tables) ):
+                logging.fatal("When migrating multiple tables 'tableNames' property must be configured in unloadSource and copyTarget, and be the same length")
+                raise NotImplementedError
+            for idx in range(0,len(src_tables)):
+                src_config['tableName'] = src_tables[idx]
+                dest_config['tableName'] = dest_tables[idx]
+                source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
+                destination = ResourceFactory.get_target_resource_from_config_helper(self.config_helper, self.region)
+                self.add_src_dest_tasks(source,destination,global_config_values)
+        else:
+            # Migrating a single table
+            source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
+            destination = ResourceFactory.get_target_resource_from_config_helper(self.config_helper, self.region)
+            self.add_src_dest_tasks(source,destination,global_config_values)
+
+        self.task_manager.run()
+
+    def add_src_dest_tasks(self,source,destination,global_config_values):
         # TODO: Check whether both resources are of type table if that is not the case then perform other scenario's
         if isinstance(source, TableResource):
             if isinstance(destination, DBResource):
@@ -103,7 +123,6 @@ class UnloadCopyTool:
             logging.fatal('Source is not a Table, this type of unload-copy is currently not supported.')
             raise NotImplementedError
 
-        self.task_manager.run()
 
     def add_table_migration(self, source, destination, global_config_values):
         if global_config_values['connectionPreTest']:

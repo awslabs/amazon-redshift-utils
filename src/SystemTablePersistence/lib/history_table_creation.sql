@@ -1,9 +1,33 @@
 CREATE SCHEMA IF NOT EXISTS history;
 
 CREATE TABLE IF NOT EXISTS history.hist_stl_load_errors (LIKE STL_LOAD_ERRORS);
-CREATE TABLE IF NOT EXISTS history.hist_stl_query (LIKE stl_query);
+
+CREATE TABLE IF NOT EXISTS history.hist_stl_query (
+  "userid" INTEGER NOT NULL  ENCODE lzo,
+  "query" INTEGER NOT NULL  ENCODE lzo,
+  "label" CHAR(30) NOT NULL  ENCODE lzo,
+  "xid" BIGINT NOT NULL  ENCODE lzo,
+  "pid" INTEGER NOT NULL  ENCODE lzo,
+  "database" VARCHAR(32) NOT NULL  ENCODE lzo,
+  "querytxt" VARCHAR(4000) NOT NULL  ENCODE lzo, 
+  "starttime" TIMESTAMP WITHOUT TIME ZONE NOT NULL  ENCODE lzo,
+  "endtime" TIMESTAMP WITHOUT TIME ZONE NOT NULL  ENCODE lzo,
+  "aborted" INTEGER NOT NULL  ENCODE lzo,
+  "insert_pristine" INTEGER NOT NULL  ENCODE lzo
+);
+
 CREATE TABLE IF NOT EXISTS history.hist_stl_wlm_query (LIKE stl_wlm_query);
-CREATE TABLE IF NOT EXISTS history.hist_stl_explain (LIKE stl_explain);
+
+CREATE TABLE IF NOT EXISTS history.hist_stl_explain
+(
+  "userid" INTEGER NOT NULL  ENCODE lzo,
+  "query" INTEGER NOT NULL  ENCODE lzo,
+  "nodeid" INTEGER NOT NULL  ENCODE lzo,
+  "parentid" INTEGER NOT NULL  ENCODE lzo,
+  "plannode" VARCHAR(400) NOT NULL  ENCODE lzo,
+  "info" VARCHAR(400) NOT NULL  ENCODE lzo
+);
+
 CREATE TABLE IF NOT EXISTS history.hist_svl_query_summary
   (
     userid            INTEGER ENCODE zstd,
@@ -92,3 +116,5 @@ CREATE TABLE IF NOT EXISTS history.HIST_SVL_S3QUERY
     avg_request_parallelism  DOUBLE PRECISION
   );
 ALTER TABLE history.hist_svl_s3query ADD COLUMN is_nested TEXT DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS history.hist_stl_query_metrics (like stl_query_metrics);

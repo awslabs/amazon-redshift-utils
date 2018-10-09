@@ -230,13 +230,6 @@ def get_pg_conn():
 
         run_commands(conn, [set_name])
 
-        # Set search_path
-        set_searchpath = "set search_path to '$user', public, %s;" % schema_name
-        if debug:
-            comment(set_searchpath)
-
-        run_commands(conn, [set_searchpath])
-
         # turn off autocommit for the rest of the executions
         conn.autocommit = False
 
@@ -259,14 +252,42 @@ def get_identity(adsrc):
 
 
 def get_grants(schema_name, table_name, current_user):
+    
     sql = '''
-        SELECT table_schema, table_name, privilege_type, g.groname is not null as is_group, grantee 
-        FROM information_schema.table_privileges tp 
-        LEFT OUTER JOIN pg_group g ON g.groname = tp.grantee
-        where table_schema = '%s'
-          and table_name = '%s'
-        and grantee not in ('%s','rdsdb')
-    ''' % (schema_name, table_name, current_user)
+        WITH priviledge AS
+        (
+            SELECT 'SELECT'::varchar(10) as "grant"
+            UNION ALL
+            SELECT 'DELETE'::varchar(10)
+            UNION ALL
+            SELECT 'INSERT'::varchar(10)
+            UNION ALL
+            SELECT 'UPDATE'::varchar(10)
+            UNION ALL
+            SELECT 'REFERENCES'::varchar(10)
+        ),
+        usr AS
+        (
+            SELECT usesysid, 0 as grosysid, usename, false as is_group
+            FROM pg_user
+            WHERE usename != 'rdsdb'
+            UNION ALL
+            SELECT 0, grosysid, groname, true
+            FROM pg_group
+        )
+        SELECT nc.nspname AS table_schema, c.relname AS table_name, priviledge."grant" AS privilege_type, usr.is_group, usr.usename AS grantee
+        FROM pg_class c
+        JOIN pg_namespace nc ON (c.relnamespace = nc.oid)
+        CROSS JOIN usr
+        CROSS JOIN priviledge
+        JOIN pg_user ON pg_user.usename not in ('rdsdb')
+        WHERE  (c.relkind = 'r'::"char" OR c.relkind = 'v'::"char")
+        AND aclcontains(c.relacl, makeaclitem(usr.usesysid, usr.grosysid, pg_user.usesysid, priviledge."grant", false))
+        AND c.relname = '%s'
+        AND nc.nspname = '%s'
+        and grantee != '%s'
+        ;
+    ''' % (table_name, schema_name, current_user)
 
     if debug:
         comment(sql)
@@ -296,12 +317,9 @@ def get_foreign_keys(schema_name, set_target_schema, table_name):
     fk_statement = '''SELECT /* fetching foreign key relations */ conname,
   pg_catalog.pg_get_constraintdef(cons.oid, true) as condef
  FROM pg_catalog.pg_constraint cons,
- pg_namespace pgn,
  pg_class pgc
  WHERE cons.conrelid = pgc.oid
- and pgn.nspname = '%s'
- and pgc.relnamespace = pgn.oid
- and pgc.oid = '%s'::regclass
+ and pgc.oid = '%s."%s"'::regclass
  AND cons.contype = 'f'
  ORDER BY 1
 ''' % (schema_name, table_name)
@@ -331,18 +349,16 @@ def get_primary_key(schema_name, set_target_schema, original_table, new_table):
     # get the primary key columns
     statement = '''SELECT /* fetch primary key information */   
   att.attname
-FROM pg_index ind, pg_class cl, pg_attribute att, pg_namespace pgn
+FROM pg_index ind, pg_class cl, pg_attribute att
 WHERE 
-  cl.oid = '%s'::regclass 
+  cl.oid = '%s."%s"'::regclass 
   AND ind.indrelid = cl.oid 
   AND att.attrelid = cl.oid
-  and cl.relnamespace = pgn.oid
-  and pgn.nspname = '%s'
   and att.attnum = ANY(string_to_array(textin(int2vectorout(ind.indkey)), ' '))
   and attnum > 0
   AND ind.indisprimary
 order by att.attnum;
-''' % (original_table, schema_name)
+''' % (schema_name, original_table)
 
     if debug:
         comment(statement)
@@ -569,6 +585,7 @@ def analyze(table_info):
                     cleanup(get_pg_conn())
                     return TERMINATED_BY_USER
                 except Exception as e:
+                    execute_query('rollback;')
                     print(e)
                     attempt_count += 1
                     last_exception = e
@@ -999,7 +1016,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-and pgn.nspname::text = '%s' and pgc.relname in (%s)
+and pgn.nspname::text ~ '%s' and pgc.relname in (%s)
         ''' % (schema_name, tables)
     else:
         # query for all tables in the schema ordered by size descending
@@ -1013,7 +1030,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner 
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-where pgn.nspname::text = '%s'
+where pgn.nspname::text  ~ '%s'
   and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
 order by 2;
         ''' % (schema_name,)
