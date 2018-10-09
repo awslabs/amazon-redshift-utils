@@ -13,7 +13,36 @@ This is the taxonomy of Redshift system tables and views from [link](https://doc
 
 To persist the tables for a longer amount of time, the material below provides an example implementation to create, populate, and use five of the most common objects that we see being given this treatment: STL_QUERY, STL_WLM_QUERY, STL_EXPLAIN, SVL_QUERY_SUMMARY and STL_LOAD_ERRORS. This mix of tables and views will highlight some of the edge cases users will encounter when applying the techniques to their own list of tables.
 
-## One Time Only Actions: ##
+## Deploying
+
+The [Redshift Automation project](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/RedshiftAutomation) is used to host and run this utility, and this can be setup with a one-click deployment to AWS Lambda. 
+
+We have provided the following AWS SAM templates so that you can deploy this function automatically (please note that we currently only support deploying into VPC):
+
+| Region | Template |
+| ------ | ---------- |
+|ap-northeast-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ap-northeast-1.amazonaws.com/awslabs-code-ap-northeast-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|ap-northeast-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-2#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ap-northeast-2.amazonaws.com/awslabs-code-ap-northeast-2/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|ap-south-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-south-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ap-south-1.amazonaws.com/awslabs-code-ap-south-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|ap-southeast-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ap-southeast-1.amazonaws.com/awslabs-code-ap-southeast-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|ap-southeast-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ap-southeast-2.amazonaws.com/awslabs-code-ap-southeast-2/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|ca-central-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ca-central-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ca-central-1.amazonaws.com/awslabs-code-ca-central-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|eu-central-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-eu-central-1.amazonaws.com/awslabs-code-eu-central-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|eu-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-west-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-eu-west-1.amazonaws.com/awslabs-code-eu-west-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|eu-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-west-2#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-eu-west-2.amazonaws.com/awslabs-code-eu-west-2/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|sa-east-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=sa-east-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-sa-east-1.amazonaws.com/awslabs-code-sa-east-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|us-east-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-us-east-1.amazonaws.com/awslabs-code-us-east-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|us-east-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-2#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-us-east-2.amazonaws.com/awslabs-code-us-east-2/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|us-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-us-west-1.amazonaws.com/awslabs-code-us-west-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|us-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-us-west-2.amazonaws.com/awslabs-code-us-west-2/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+
+We’ve also run across many customers who already have an EC2 host for crontab-related activities. If you wish to use ec2 or other runners with cron, then the Redshift Automation command line provides an option to run this application:
+
+```
+./ra --utility SystemTablePersistence --config s3://mybucket/prefix/config.json
+```
+
+## Manual Setup Actions (optional if you are using the above Lambda function): ##
 
 ### Creating the HISTORY Schema: ###
 
@@ -93,12 +122,6 @@ INSERT INTO history.hist_stl_load_errors (
 ```
 
 You can view the statements that will be run by the utility in [`lib/history_table_config.json`](lib/history_table_config.json);
-
-The [Redshift Automation project](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/RedshiftAutomation) is used to host and run this utility, and this can be setup with a one-click deployment to AWS Lambda. However, we’ve also run across many customers who already have an EC2 host for crontab-related activities. If you wish to use ec2 or other runners with cron, then the Redshift Automation command line provides an option to run this application:
-
-```
-./ra --utility SystemTablePersistence --config s3://mybucket/prefix/config.json
-```
 
 
 ### Querying the Views in the History Schema: ###
