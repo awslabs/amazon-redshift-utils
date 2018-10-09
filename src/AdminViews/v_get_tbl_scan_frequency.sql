@@ -1,10 +1,10 @@
---DROP VIEW admin.v_get_table_scan_frequency;
+--DROP VIEW admin.v_get_tbl_scan_frequency;
 /**********************************************************************************************
 Purpose: View to identify how frequently queries scan database tables.
 History:
 2016-03-14 chriz-bigdata Created
 **********************************************************************************************/
-CREATE OR REPLACE VIEW admin.v_get_table_scan_frequency
+CREATE OR REPLACE VIEW admin.v_get_tbl_scan_frequency
 AS
 SELECT 
 	database, 
