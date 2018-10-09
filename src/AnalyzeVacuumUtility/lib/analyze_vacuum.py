@@ -106,7 +106,7 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
         return None
 
     # set search paths
-    aws_utils.set_search_paths(conn, schema_name)
+    aws_utils.set_search_paths(conn, schema_name, exclude_external_schemas=True)
 
     if query_group is not None and query_group != '':
         set_query_group = 'set query_group to %s' % query_group
