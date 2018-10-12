@@ -256,7 +256,7 @@ from (SELECT
   
   UNION
   --TABLE OWNERSHIP AS AN ALTER TABLE STATMENT
-  SELECT c.oid::bigint as table_id ,n.nspname AS schemaname, c.relname AS tablename, 600000001 AS seq, 
+  SELECT c.oid::bigint as table_id ,n.nspname AS schemaname, c.relname AS tablename, 700000000 AS seq, 
   'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' owner to '+  QUOTE_IDENT(u.usename) +';' AS ddl
   FROM  pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
