@@ -17,13 +17,13 @@ To encrypt your password for use by this function, please run the [encrypt_passw
 
 ```
 > export AWS_REGION=my-aws-region
-> (python) encrypt_password.py MY_SECRET_PASSWORD
+> (python) encrypt_password.py MY_DB_PASSWORD
 ```
 
 This will create the required Customer Master Key in KMS, along with a key alias that makes it easy to work with (called ```alias/RedshiftUtilsLambdaRunner```) and so must be run as a user with rights to do so. It will then encrypt the supplied password and output the encrypted ciphertext as a base64 encoded string:
 
 ```
-$ ./encrypt_password.py MY_SECRET_PASSWORD
+$ ./encrypt_password.py MY_DB_PASSWORD
 Encryption Complete
 Encrypted Password: CiChAYm4goRPj1CuMlY+VbyChti8kHVW4kxInA+keC7gPxKZAQEBAgB4oQGJuIKET49QrjJWPlW8gobYvJB1VuJMSJwPpHgu4D8AAABwMG4GCSqGSIb3DQEHBqBhMF8CAQAwWgYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwdVzuq29SCuPKlh9ACARCALY1H/Tb4Hw73yqLyL+Unjp4NC0F5UjETNUGPtM+DTHG8urILNTKvdv1t9S5zuQ==
 ```
