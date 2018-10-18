@@ -39,7 +39,6 @@ Parameters:
     Description: Interval between Snapshots
     Type: Number
     MinValue: 1
-    MaxValue: 8
   TargetClusterName:
     Default: mycluster
     Description: Target Cluster Name (for example 'mycluster' in 'mycluster.XXXXXX.region.redshift.amazonaws.com')
