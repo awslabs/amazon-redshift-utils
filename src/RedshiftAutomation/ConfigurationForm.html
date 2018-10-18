@@ -107,7 +107,7 @@ $('#config-form').parsley().on('field:validated', function() {
 
 <form id="config-form" data-parsley-validate="">
   <label for="clusterName">Cluster Name * :</label>
-  <input type="text" class="form-control" name="configuration[cluster_name]" required="true" data-parseley-required="true" data-parsley-trigger="change" value="my-cluster">
+  <input type="text" class="form-control" name="configuration[cluster_name]" required="true" data-parsley-required="true" data-parsley-trigger="change" value="my-cluster">
 
   <label for="dnsName">Cluster Endpoint * :</label>
   <input type="text" class="form-control" name="configuration[db_host]" required="true" data-parsley-trigger="change" value="my-cluster.XXXXXX.redshift.amazonaws.com">
@@ -122,7 +122,7 @@ $('#config-form').parsley().on('field:validated', function() {
   <input type="text" class="form-control" name="configuration[encrypted_pwd]" required="true" data-parsley-trigger="change" value="my encrypted password">
   
   <label for="authContext">KMS Authorisation Context JSON:</label>
-  <input type="text" class="form-control" name="configuration[kms_auth_context]" data-parseley-required="false" data-parsley-trigger="change">
+  <input type="text" class="form-control" name="configuration[kms_auth_context]" data-parsley-required="false" data-parsley-trigger="change">
 
   <label for="dbName">Database Name * :</label>
   <input type="text" class="form-control" name="configuration[db]" required="true" data-parsley-trigger="change" value="master">
@@ -141,17 +141,17 @@ $('#config-form').parsley().on('field:validated', function() {
   <br>
   <br>
   <label for="tableWhitelist">Restrict to Table Name:</label>
-  <input type="text" class="form-control" name="configuration[table_name]" data-parseley-required="false" data-parsley-trigger="change">
+  <input type="text" class="form-control" name="configuration[table_name]" data-parsley-required="false" data-parsley-trigger="change">
 
   <label for="blacklistedTables">Blacklisted Tables :</label>
-  <input type="text" class="form-control" name="configuration[blacklisted_tables]" data-parseley-required="false" data-parsley-trigger="change">
+  <input type="text" class="form-control" name="configuration[blacklisted_tables]" data-parsley-required="false" data-parsley-trigger="change">
 
   <hr/>
   <label>Automated Column Encoding Options</label>
   <br>
   <br>
   <label for="targetSchema">Target Schema :</label>
-  <input type="text" class="form-control" name="configuration[target_schema]" data-parseley-required="false" data-parsley-trigger="change">
+  <input type="text" class="form-control" name="configuration[target_schema]" data-parsley-required="false" data-parsley-trigger="change">
 
   <label for="dropOldData">Drop old (unencoded) data tables? * :</label>
   <select name="configuration[drop_old_data]" required="true" data-parsley-trigger="change" value="false">
@@ -161,7 +161,7 @@ $('#config-form').parsley().on('field:validated', function() {
   <hr>
   <br>
   <label for="cleanupAfter">System Table Retention Period (Days - 0 means keep forever) :</label>
-  <input type="number" class="form-control" name="configuration[systable_cleanup_after_days]" data-parseley-required="false" data-parsley-trigger="change" min="0" value="0">
+  <input type="number" class="form-control" name="configuration[systable_cleanup_after_days]" data-parsley-required="false" data-parsley-trigger="change" min="0" value="0">
   <hr>
   <br>
   <input type="submit" class="btn btn-default" value="Validate Configuration">
