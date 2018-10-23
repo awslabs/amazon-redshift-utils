@@ -43,7 +43,7 @@ The required configuration items are placed into the ```configuration``` part of
   "schema_name": "Schema to be analyzed, vacuumed, or encoded (string)",
   "comprows": "Rows to use in the analyze compression request (int | default -1 meaning unspecified)",
   "db": "Database Name to connect to (string)",
-  "db_host": "Your cluster DNS name (string)",
+  "db_host": "Your cluster DNS name (string). If your lambda function is on the same VPC, using private IP address here will be more secure",
   "db_password": "Your base64 encoded encrypted password here (string - generated with encrypt_password.py)",
   "db_port": "The database port number (int)",
   "db_user": "The database User to connect to (string)",
