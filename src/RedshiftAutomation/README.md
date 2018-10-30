@@ -92,7 +92,13 @@ You can also add the following configuration options to finely tune the operatio
 
 ## Deploying
 
-We have provided the following AWS SAM templates so that you can deploy this function automatically (please note that we currently only support deploying into VPC):
+We provide three AWS SAM templates to help you deploy your utilities (please note that we currently only support deploying into VPC): 
+
+1. [`deploy.yaml`](deploy.yaml) to deploy all utilities. 
+1. [`deploy-function-and-schedule.yaml`](deploy-function-and-schedule.yaml) to deploy just a single utility and a scheduled event for it.
+1. [`deploy-schedule.yaml`](deploy-schedule.yaml) to only deploy a scheduled event for an existing function. 
+
+Use one of the following deploy buttons that matches your region to deploy using `deploy.yaml`.
 
 | Region | Template |
 | ------ | ---------- |
@@ -111,7 +117,7 @@ We have provided the following AWS SAM templates so that you can deploy this fun
 |us-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-west-1.amazonaws.com/awslabs-code-us-west-1/LambdaRedshiftRunner/deploy.yaml) |
 |us-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-west-2.amazonaws.com/awslabs-code-us-west-2/LambdaRedshiftRunner/deploy.yaml) |
 
-Alternatively, you can manually upload the template from the `dist` directory. There are also separate templates to [just deploy a single utility](deploy-function-and-schedule.yaml) or just [create a scheduled event for an existing function](deploy-schedule.yaml). You must supply the following parameters
+Alternatively, you can manually upload one of three templates from the `dist` directory. You must supply the following parameters
 
 ![parameters](parameters.png)
 
