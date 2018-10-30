@@ -32,7 +32,7 @@ Copy the value after ```Encrypted Password: ``` and use it for the creation of t
 
 ## Configuration
 
-This lambda function uses a configuration file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. An example `config-example.json` is included to get you started. You configure which utility to run in the ```'utilities'``` array - currently the values ```ColumnEncodingUtility, AnalyzeVacuumUtility``` are supported
+This lambda function uses a configuration file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. An example `config-example.json` is included to get you started. You configure which utility to run in the ```'utilities'``` array - currently the values ```ColumnEncodingUtility, AnalyzeVacuumUtility``` and ```Monitoring``` are supported.
 
 The required configuration items are placed into the ```configuration``` part of the config file, and include:
 
