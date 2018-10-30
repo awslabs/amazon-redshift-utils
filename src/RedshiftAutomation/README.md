@@ -128,7 +128,7 @@ When completed, it will deploy the following objects:
 
 ## Manually executing the Lambda Function
 
-These utilites are configured to run via CloudWatch Scheduled Events. You will see that each of the scheduled events includes a payload of input which enables the function to download the configuration and run the correct utility per-instance:
+These utilities are configured to run via CloudWatch Scheduled Events. You will see that each of the scheduled events includes a payload of input which enables the function to download the configuration and run the correct utility per-instance:
 
 __To run the Column Encoding Utility__
 
