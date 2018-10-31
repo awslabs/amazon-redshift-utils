@@ -32,7 +32,7 @@ Copy the value after ```Encrypted Password: ``` and use it for the creation of t
 
 ## Configuration
 
-This lambda function uses a configuration file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. An example `config-example.json` is included to get you started. You configure which utility to run in the ```'utilities'``` array - currently the values ```ColumnEncodingUtility, AnalyzeVacuumUtility``` are supported
+This lambda function uses a configuration file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. An example `config-example.json` is included to get you started. You configure which utility to run in the ```'utilities'``` array - currently the values ```ColumnEncodingUtility, AnalyzeVacuumUtility``` and ```Monitoring``` are supported.
 
 The required configuration items are placed into the ```configuration``` part of the config file, and include:
 
@@ -43,7 +43,7 @@ The required configuration items are placed into the ```configuration``` part of
   "schema_name": "Schema to be analyzed, vacuumed, or encoded (string)",
   "comprows": "Rows to use in the analyze compression request (int | default -1 meaning unspecified)",
   "db": "Database Name to connect to (string)",
-  "db_host": "Your cluster DNS name (string)",
+  "db_host": "Your cluster DNS name (string). If your lambda function is on the same VPC, using private IP address here will be more secure",
   "db_password": "Your base64 encoded encrypted password here (string - generated with encrypt_password.py)",
   "db_port": "The database port number (int)",
   "db_user": "The database User to connect to (string)",
@@ -92,7 +92,13 @@ You can also add the following configuration options to finely tune the operatio
 
 ## Deploying
 
-We have provided the following AWS SAM templates so that you can deploy this function automatically (please note that we currently only support deploying into VPC):
+We provide three AWS SAM templates to help you deploy your utilities (please note that we currently only support deploying into VPC): 
+
+1. [`deploy.yaml`](deploy.yaml) to deploy all utilities. 
+1. [`deploy-function-and-schedule.yaml`](deploy-function-and-schedule.yaml) to deploy just a single utility and a scheduled event for it.
+1. [`deploy-schedule.yaml`](deploy-schedule.yaml) to only deploy a scheduled event for an existing function. 
+
+Use one of the following deploy buttons that matches your region to deploy using `deploy.yaml`.
 
 | Region | Template |
 | ------ | ---------- |
@@ -111,7 +117,7 @@ We have provided the following AWS SAM templates so that you can deploy this fun
 |us-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-west-1.amazonaws.com/awslabs-code-us-west-1/LambdaRedshiftRunner/deploy.yaml) |
 |us-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-west-2.amazonaws.com/awslabs-code-us-west-2/LambdaRedshiftRunner/deploy.yaml) |
 
-Alternatively, you can manually upload the template from the `dist` directory. There are also separate templates to [just deploy a single utility](deploy-function-and-schedule.yaml) or just [create a scheduled event for an existing function](deploy-schedule.yaml). You must supply the following parameters
+Alternatively, you can manually upload one of three templates from the `dist` directory. You must supply the following parameters
 
 ![parameters](parameters.png)
 
@@ -128,7 +134,7 @@ When completed, it will deploy the following objects:
 
 ## Manually executing the Lambda Function
 
-These utilites are configured to run via CloudWatch Scheduled Events. You will see that each of the scheduled events includes a payload of input which enables the function to download the configuration and run the correct utility per-instance:
+These utilities are configured to run via CloudWatch Scheduled Events. You will see that each of the scheduled events includes a payload of input which enables the function to download the configuration and run the correct utility per-instance:
 
 __To run the Column Encoding Utility__
 
