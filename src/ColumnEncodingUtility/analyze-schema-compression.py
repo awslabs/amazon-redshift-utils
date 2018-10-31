@@ -252,7 +252,6 @@ def get_identity(adsrc):
 
 
 def get_grants(schema_name, table_name, current_user):
-    
     sql = '''
         WITH priviledge AS
         (
@@ -301,7 +300,8 @@ def get_grants(schema_name, table_name, current_user):
             grant_statements.append(
                 "grant %s on %s.%s to group \"%s\";" % (grant[2].lower(), schema_name, table_name, grant[4]))
         else:
-            grant_statements.append("grant %s on %s.%s to \"%s\";" % (grant[2].lower(), schema_name, table_name, grant[4]))
+            grant_statements.append(
+                "grant %s on %s.%s to \"%s\";" % (grant[2].lower(), schema_name, table_name, grant[4]))
 
     if len(grant_statements) > 0:
         return grant_statements
@@ -629,7 +629,6 @@ def analyze(table_info):
             table_sortkeys = []
             new_sortkey_arr = [t.strip() for t in new_sort_keys.split(',')] if new_sort_keys is not None else []
 
-
             # count of suggested optimizations
             count_optimized = 0
             # process each item given back by the analyze request
@@ -693,8 +692,10 @@ def analyze(table_info):
                         if row_sortkey < 0:
                             has_zindex_sortkeys = True
 
-                # don't compress first sort key
-                if abs(row_sortkey) == 1:
+                # don't compress first sort key column. This will be set on the basis of the existing sort key not
+                # being modified, or on the assignment of the new first sortkey
+                if (abs(row_sortkey) == 1 and len(new_sortkey_arr) == 0) or (
+                        col in table_sortkeys and table_sortkeys.index(col) == 0):
                     compression = 'RAW'
                 else:
                     compression = row[2]
@@ -803,7 +804,7 @@ def analyze(table_info):
                                                                             schema_name,
                                                                             table_name)
                 if len(table_sortkeys) > 0:
-                    insert = "%s order by \"%s\";" % (insert, ",".join(table_sortkeys).replace(',','\",\"'))
+                    insert = "%s order by \"%s\";" % (insert, ",".join(table_sortkeys).replace(',', '\",\"'))
                 else:
                     insert = "%s;" % (insert)
 
