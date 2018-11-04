@@ -12,7 +12,7 @@ History:
 2018-02-06    adedotua refactored the script to use rowid column for estimation
 **********************************************************************************************/ 
 
-CREATE OR REPLACE VIEW v_fragmentation_info 
+CREATE OR REPLACE VIEW admin.v_fragmentation_info
 AS 
 select tbl,tablename,dbname,sum(t_excess_blks) est_space_gain 
 from 
