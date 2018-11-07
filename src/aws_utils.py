@@ -47,13 +47,13 @@ def emit_metrics(cw, namespace, put_metrics):
 
 def set_search_paths(conn, schema_name, set_target_schema=None, exclude_external_schemas=False):
     get_schemas_statement = '''
-        select schema_name
-        from information_schema.schemata
-        where schema_name ~ '%s'
+        select nspname
+        from pg_catalog.pg_namespace
+        where nspname ~ '%s'
     ''' % schema_name
 
     if exclude_external_schemas is True:
-        get_schemas_statement += " and schema_name not in (select schemaname from svv_external_schemas)"
+        get_schemas_statement += " and nspname not in (select schemaname from svv_external_schemas)"
 
     # set default search path
     search_path = 'set search_path = \'$user\',public'
