@@ -201,11 +201,7 @@ FROM objprivs
 WHERE NOT (objtype = 'default acl' AND grantee = 'PUBLIC' and objname='functions')
 UNION ALL
 -- Eliminate empty default ACLs
-SELECT null::text AS objowner, trim(c.nspname)::text AS schemaname, decode(b.defaclobjtype,'r','tables','f','functions')::text AS objname,
+SELECT null::text AS objowner, null::text AS schemaname, decode(b.defaclobjtype,'r','tables','f','functions')::text AS objname,
 		'default acl'::text AS objtype,  pg_get_userbyid(b.defacluser)::text AS grantor, null::text AS grantee, 'revoke'::text AS ddltype, 5 as grantseq, 5 AS objseq,
-  'ALTER DEFAULT PRIVILEGES for user '||QUOTE_IDENT(pg_get_userbyid(b.defacluser))||nvl(' in schema '||QUOTE_IDENT(trim(c.nspname))||' ',' ')
-||'GRANT ALL on '||decode(b.defaclobjtype,'r','tables','f','functions')||' TO '||QUOTE_IDENT(pg_get_userbyid(b.defacluser))||
-CASE WHEN b.defaclobjtype = 'f' then ', PUBLIC;' ELSE ';' END::text AS ddl 
-		FROM pg_default_acl b 
-		LEFT JOIN  pg_namespace c on b.defaclnamespace = c.oid
-		where defaclnamespace=0; 
+  'ALTER DEFAULT PRIVILEGES for user '||QUOTE_IDENT(pg_get_userbyid(b.defacluser))||' GRANT ALL on '||decode(b.defaclobjtype,'r','tables','f','functions')||' TO '||QUOTE_IDENT(pg_get_userbyid(b.defacluser))||
+CASE WHEN b.defaclobjtype = 'f' then ', PUBLIC;' ELSE ';' END::text AS ddl FROM pg_default_acl b where b.defaclnamespace=0; 
