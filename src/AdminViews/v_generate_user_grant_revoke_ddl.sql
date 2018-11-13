@@ -3,7 +3,7 @@ Purpose:        View to generate grant or revoke ddl for users and groups. This 
                 recreating users or group privileges or for revoking privileges before dropping 
                 a user or group. 
 		
-Current Version:        1.05
+Current Version:        1.06
 Columns -
 objowner:       Object owner 
 schemaname:     Object schema if applicable
@@ -34,7 +34,9 @@ Version 1.04
 	2018-05-02	adedotua added support for privileges granted on pg_catalog tables and other system owned objects
 Version 1.05
 	2018-06-22	adedotua fixed issue with generation of default privileges grants.
-	
+Version 1.06
+	2018-11-12	adedotua fixed issue with generation of default privileges revokes for user who granted the privileges (defacluser).	
+
 Steps to revoking grants before dropping a user:
 1. Find all grants by granted by user to drop and regrant them as another user (superuser preferably).
 select regexp_replace(ddl,grantor,'<superuser>') from v_generate_user_grant_revoke_ddl where grantor='<username>' and ddltype='grant' and objtype <>'default acl' order by objseq,grantseq;
@@ -132,8 +134,7 @@ WITH objprivs AS (
 	) 
 	where  (split_part(aclstring,'=',1) <> split_part(aclstring,'/',2) 
 	and split_part(aclstring,'=',1) <> 'rdsdb'
-	and NOT (split_part(aclstring,'=',1)='' AND split_part(aclstring,'/',2) = 'rdsdb'))
-	OR (split_part(aclstring,'=',1) = split_part(aclstring,'/',2) AND objtype='default acl')
+	and NOT (split_part(aclstring,'=',1)='' AND split_part(aclstring,'/',2) = 'rdsdb')) 
 )
 -- Extract object GRANTS
 SELECT objowner, schemaname, objname, objtype, grantor, grantee, 'grant' AS ddltype, grantseq,
@@ -207,6 +208,4 @@ SELECT null::text AS objowner, trim(c.nspname)::text AS schemaname, decode(b.def
 CASE WHEN b.defaclobjtype = 'f' then ', PUBLIC;' ELSE ';' END::text AS ddl 
 		FROM pg_default_acl b 
 		LEFT JOIN  pg_namespace c on b.defaclnamespace = c.oid
-		where EXISTS (select 1 where b.defaclacl='{}'::aclitem[]
-		UNION ALL
-		select 1 WHERE array_to_string(b.defaclacl,'')=('=X/'||QUOTE_IDENT(pg_get_userbyid(b.defacluser)))); 
+		where defaclnamespace=0; 
