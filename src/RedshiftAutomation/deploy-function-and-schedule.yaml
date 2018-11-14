@@ -90,4 +90,6 @@ Resources:
                   Action:
                     - "s3:GetObject"
                     - "kms:Decrypt"
+                    - "cloudwatch:PutMetricData"
+                    - "redshift:ModifyClusterParameterGroup"
                   Resource: "*"
