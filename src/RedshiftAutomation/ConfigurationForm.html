@@ -61,6 +61,10 @@ $('#config-form').parsley().on('field:validated', function() {
       if (config['kms_auth_context'] == "") {
         delete config['kms_auth_context'];
       }
+      if (config['s3_unload_location'] == "") {
+        delete config['s3_unload_location'];
+      }
+
 
       config['comprows'] = -1;
       config['ignore_errors'] = true;
@@ -131,7 +135,7 @@ $('#config-form').parsley().on('field:validated', function() {
   <input type="text" class="form-control" name="configuration[schema_name]" required="true" data-parsley-trigger="change" value="public">
 
   <label for="systableUnloadLoc">System Tables S3 Unload Location :</label>
-  <input type="text" class="form-control" name="configuration[s3_unload_location]" required="false" data-parsley-trigger="change" value="">
+  <input type="text" class="form-control" name="configuration[s3_unload_location]" data-parsley-required="false" data-parsley-trigger="change" value="">
 
   <label for="systableUnloadRoleArn">System Tables Unload Role ARN :</label>
   <input type="text" class="form-control" name="configuration[s3_unload_role_arn]" data-parsley-trigger="change" value="arn:aws:iam::<your account number>:role/<role name>">
