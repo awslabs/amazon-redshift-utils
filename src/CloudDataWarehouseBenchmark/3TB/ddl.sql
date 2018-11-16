@@ -2,7 +2,7 @@ create table dbgen_version
 (
     dv_version                varchar(32),
     dv_create_date            date       ,
-    dv_create_time            timestamp                          ,
+    dv_create_time            timestamp,
     dv_cmdline_args           varchar(200)                  
 );
 
@@ -42,7 +42,7 @@ create table date_dim
 (
     d_date_sk                 integer               not null,
     d_date_id                 char(16)              not null,
-    d_date                    date                          ,
+    d_date                    date,
     d_month_seq               integer                       ,
     d_week_seq                integer                       ,
     d_quarter_seq             integer                       ,
@@ -163,8 +163,8 @@ create table store
 (
     s_store_sk                integer               not null,
     s_store_id                char(16)              not null,
-    s_rec_start_date          date                          ,
-    s_rec_end_date            date                          ,
+    s_rec_start_date          date,
+    s_rec_end_date            date,
     s_closed_date_sk          integer                       ,
     s_store_name              varchar(50)                   ,
     s_number_employees        integer                       ,
@@ -197,8 +197,8 @@ create table call_center
 (
     cc_call_center_sk         integer               not null,
     cc_call_center_id         char(16)              not null,
-    cc_rec_start_date         date                          ,
-    cc_rec_end_date           date                          ,
+    cc_rec_start_date         date,
+    cc_rec_end_date           date,
     cc_closed_date_sk         integer                       ,
     cc_open_date_sk           integer                       ,
     cc_name                   varchar(50)                   ,
@@ -256,8 +256,8 @@ create table web_site
 (
     web_site_sk               integer               not null,
     web_site_id               char(16)              not null,
-    web_rec_start_date        date                          ,
-    web_rec_end_date          date                          ,
+    web_rec_start_date        date,
+    web_rec_end_date          date,
     web_name                  varchar(50)                   ,
     web_open_date_sk          integer                       ,
     web_close_date_sk         integer                       ,
@@ -322,8 +322,8 @@ create table web_page
 (
     wp_web_page_sk            integer               not null,
     wp_web_page_id            char(16)              not null,
-    wp_rec_start_date         date                          ,
-    wp_rec_end_date           date                          ,
+    wp_rec_start_date         date,
+    wp_rec_end_date           date,
     wp_creation_date_sk       integer                       ,
     wp_access_date_sk         integer                       ,
     wp_autogen_flag           char(1)                       ,
@@ -551,53 +551,65 @@ ss_sold_date_sk int4 ,
   ,primary key (ss_item_sk, ss_ticket_number)
 ) distkey(ss_item_sk) sortkey(ss_sold_date_sk);
 
-copy store_sales from 's3://tpc-h/tpc-ds/3T/store_sales.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy catalog_sales from 's3://tpc-h/tpc-ds/3T/catalog_sales.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy web_sales from 's3://tpc-h/tpc-ds/3T/web_sales.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy web_returns from 's3://tpc-h/tpc-ds/3T/web_returns.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy store_returns from 's3://tpc-h/tpc-ds/3T/store_returns.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy catalog_returns from 's3://tpc-h/tpc-ds/3T/catalog_returns.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy call_center from 's3://tpc-h/tpc-ds/3T/call_center.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy catalog_page from 's3://tpc-h/tpc-ds/3T/catalog_page.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy customer_address from 's3://tpc-h/tpc-ds/3T/customer_address.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy customer from 's3://tpc-h/tpc-ds/3T/customer/' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy customer_demographics from 's3://tpc-h/tpc-ds/3T/customer_demographics.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy date_dim from 's3://tpc-h/tpc-ds/3T/date_dim.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy household_demographics from 's3://tpc-h/tpc-ds/3T/household_demographics.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy income_band from 's3://tpc-h/tpc-ds/3T/income_band.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy inventory from 's3://tpc-h/tpc-ds/3T/inventory.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy item from 's3://tpc-h/tpc-ds/3T/item.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy promotion from 's3://tpc-h/tpc-ds/3T/promotion.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy reason from 's3://tpc-h/tpc-ds/3T/reason.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy ship_mode from 's3://tpc-h/tpc-ds/3T/ship_mode.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy store from 's3://tpc-h/tpc-ds/3T/store.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy time_dim from 's3://tpc-h/tpc-ds/3T/time_dim.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy warehouse from 's3://tpc-h/tpc-ds/3T/warehouse.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy web_page from 's3://tpc-h/tpc-ds/3T/web_page.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
-copy web_site from 's3://tpc-h/tpc-ds/3T/web_site.' credentials 'aws_access_key_id=.. ;aws_secret_access_key=..' gzip delimiter '|' ;
+/*
+	To load the sample data, you must provide authentication for your cluster to access Amazon S3 on your behalf.
+	You can provide either role-based authentication or key-based authentication.
 
+	Text files needed to load test data under s3://redshift-downloads/TPC-DS/3TB are publicly available.
+	Any valid credentials should have read access.
 
-select count(*) from call_center;
-select count(*) from catalog_page;
-select count(*) from catalog_returns;
-select count(*) from catalog_sales;
-select count(*) from customer_address;
-select count(*) from customer_demographics;
-select count(*) from customer;
-select count(*) from date_dim;
-select count(*) from household_demographics;
-select count(*) from income_band;
-select count(*) from inventory;
-select count(*) from item;
-select count(*) from promotion;
-select count(*) from reason;
-select count(*) from ship_mode;
-select count(*) from store_returns;
-select count(*) from store_sales;
-select count(*) from store;
-select count(*) from time_dim;
-select count(*) from warehouse;
-select count(*) from web_page;
-select count(*) from web_returns;
-select count(*) from web_sales;
-select count(*) from web_site;
+	The COPY commands include a placeholder for the aws_access_key_id and aws_secret_access_key.
+	User must update the credentials clause below with valid credentials or the command will fail.
+
+	For more information check samples in https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-create-sample-db.html
+*/
+
+copy store_sales from 's3://redshift-downloads/TPC-DS/3TB/store_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1';
+copy catalog_sales from 's3://redshift-downloads/TPC-DS/3TB/catalog_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy web_sales from 's3://redshift-downloads/TPC-DS/3TB/web_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy web_returns from 's3://redshift-downloads/TPC-DS/3TB/web_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy store_returns from 's3://redshift-downloads/TPC-DS/3TB/store_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy catalog_returns from 's3://redshift-downloads/TPC-DS/3TB/catalog_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy call_center from 's3://redshift-downloads/TPC-DS/3TB/call_center/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy catalog_page from 's3://redshift-downloads/TPC-DS/3TB/catalog_page/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy customer_address from 's3://redshift-downloads/TPC-DS/3TB/customer_address/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy customer from 's3://redshift-downloads/TPC-DS/3TB/customer/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy customer_demographics from 's3://redshift-downloads/TPC-DS/3TB/customer_demographics/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy date_dim from 's3://redshift-downloads/TPC-DS/3TB/date_dim/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy household_demographics from 's3://redshift-downloads/TPC-DS/3TB/household_demographics/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy income_band from 's3://redshift-downloads/TPC-DS/3TB/income_band/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy inventory from 's3://redshift-downloads/TPC-DS/3TB/inventory/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy item from 's3://redshift-downloads/TPC-DS/3TB/item/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy promotion from 's3://redshift-downloads/TPC-DS/3TB/promotion/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy reason from 's3://redshift-downloads/TPC-DS/3TB/reason/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy ship_mode from 's3://redshift-downloads/TPC-DS/3TB/ship_mode/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy store from 's3://redshift-downloads/TPC-DS/3TB/store/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy time_dim from 's3://redshift-downloads/TPC-DS/3TB/time_dim/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy warehouse from 's3://redshift-downloads/TPC-DS/3TB/warehouse/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy web_page from 's3://redshift-downloads/TPC-DS/3TB/web_page/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+copy web_site from 's3://redshift-downloads/TPC-DS/3TB/web_site/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' region 'us-east-1' ;
+
+select count(*) from call_center; -- 48
+select count(*) from catalog_page; -- 36000
+select count(*) from catalog_returns; -- 432018033
+select count(*) from catalog_sales; -- 4320078880
+select count(*) from customer_address; -- 15000000
+select count(*) from customer_demographics; -- 1920800
+select count(*) from customer; -- 30000000
+select count(*) from date_dim; -- 73049
+select count(*) from household_demographics; -- 7200
+select count(*) from income_band; -- 20
+select count(*) from inventory; -- 1033560000
+select count(*) from item; -- 360000
+select count(*) from promotion; -- 1800
+select count(*) from reason; -- 67
+select count(*) from ship_mode; -- 20
+select count(*) from store_returns; -- 863989652
+select count(*) from store_sales; -- 8639936081
+select count(*) from store; -- 1350
+select count(*) from time_dim; -- 86400
+select count(*) from warehouse; -- 22
+select count(*) from web_page; -- 3600
+select count(*) from web_returns; -- 216003761
+select count(*) from web_sales; -- 2159968881
+select count(*) from web_site; -- 66
