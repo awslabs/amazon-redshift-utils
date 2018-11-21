@@ -43,7 +43,7 @@ regular maintenance/housekeeping activities, when there are less database activi
 
 # Cloud Data Warehousing Benchmark
 
-The [Cloud DW Benchmark](src/CloudDataWarehouseBenchmark) consists of the same set of 99 queries as in TPC-DS, which have a wide variation of complexity, amount of data scanned, answer set size and elapsed time. Each query asks a business question and includes the corresponding query to answer the question. We have generated instances of the 99 queries for a database size of 3TB. The intent of this benchmark is to simulate a set of basic scenarios to answer fundamental business questions and report business outcomes relevant to many industry sectors.
+The [Cloud DW Benchmark](src/CloudDataWarehouseBenchmark) consists of a set of workloads used to characterize and study the performance of Redshift running a variety of analytic queries.   The DDL to set up the databases, including COPY utility commands  to load the data from a public S3 directory,  as well as the queries for both single user and multi-user throughput testing are provided.
 
 # Unload/Copy Utility
 

@@ -443,7 +443,7 @@ wr_returned_date_sk int4 ,
   wr_account_credit numeric(7,2) ,   
   wr_net_loss numeric(7,2)           
   ,primary key (wr_item_sk, wr_order_number)
-) distkey(wr_item_sk) sortkey(wr_returned_date_sk);
+) distkey(wr_order_number) sortkey(wr_returned_date_sk);
 
 create table web_sales
 (
@@ -482,7 +482,7 @@ create table web_sales
   ws_net_paid_inc_ship_tax numeric(7,2) ,         
   ws_net_profit numeric(7,2)                      
   ,primary key (ws_item_sk, ws_order_number)
-) distkey(ws_item_sk) sortkey(ws_sold_date_sk);
+) distkey(ws_order_number) sortkey(ws_sold_date_sk);
 
 create table catalog_sales
 (
