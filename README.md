@@ -41,6 +41,10 @@ By turning on/off '--analyze-flag' and  '--vacuum-flag' parameters, you can run 
 or  'analyze-only' utility. This script can be scheduled to run VACUUM and ANALYZE as part of 
 regular maintenance/housekeeping activities, when there are less database activities (quiet period).
 
+# Cloud Data Warehousing Benchmark
+
+The [Cloud DW Benchmark](src/CloudDataWarehouseBenchmark) consists of the same set of 99 queries as in TPC-DS, which have a wide variation of complexity, amount of data scanned, answer set size and elapsed time. Each query asks a business question and includes the corresponding query to answer the question. We have generated instances of the 99 queries for a database size of 3TB. The intent of this benchmark is to simulate a set of basic scenarios to answer fundamental business questions and report business outcomes relevant to many industry sectors.
+
 # Unload/Copy Utility
 
 The [Redshift Unload/Copy Utility](src/UnloadCopyUtility) helps you to migrate data between Redshift Clusters or Databases. It exports data from a source cluster to a location on S3, and all data is encrypted with Amazon Key Management Service. It then automatically imports the data into the configured Redshift Cluster, and will cleanup S3 if required. This utility is intended to be used as part of an ongoing scheduled activity, for instance run as part of a Data Pipeline Shell Activity (http://docs.aws.amazon.com/datapipeline/latest/DeveloperGuide/dp-object-shellcommandactivity.html).
