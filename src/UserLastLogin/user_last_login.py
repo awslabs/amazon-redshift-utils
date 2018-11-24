@@ -27,26 +27,6 @@ __version__ = "1.0"
 pg8000.paramstyle = "qmark"
 
 
-
-def run_command(cursor, statement):
-    logger.debug( ("Running Statement: %s" % statement)  )
-
-    t = datetime.datetime.now()
-    cursor.execute(statement)
-    interval = (datetime.datetime.now() - t).microseconds / 1000
-
-    return interval
-
-
-# nasty hack for backward compatibility, to extract label values from os.environ or event
-def get_config_value(labels, configs):
-    for l in labels:
-        for c in configs:
-            if l in c:
-                logger.debug( ("Resolved label value %s from config" % l) )
-                return c[l]
-    return None
-
 def update_user_last_login(cluster=None, dbPort=5439, dbName=None, dbUser=None):
     logger.info("Starting updating user last login information for the cluster %s" % (cluster) )
     credentials = getiamcredentials(cluster,dbName, dbUser )
