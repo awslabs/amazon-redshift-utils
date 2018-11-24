@@ -1,3 +1,26 @@
+# !/usr/bin/python
+
+"""
+user_last_login.py
+* Copyright 2016, Amazon.com, Inc. or its affiliates. All Rights Reserved.
+*
+* Licensed under the Amazon Software License (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+* http://aws.amazon.com/asl/
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+
+Managed by indubh
+
+2018-11-24: Initial Version 
+
+"""
+
 import logging
 import logging.config
 logging.config.fileConfig('config/logging.conf')
@@ -5,11 +28,6 @@ logger = logging.getLogger()
 
 import os
 import sys
-
-# Copyright 2016-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
-# http://aws.amazon.com/apache2.0/
-# or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
 # add the lib directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
