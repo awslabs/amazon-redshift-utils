@@ -47,7 +47,7 @@ Parameters:
     Default: s3://my-bucket/prefix/config-file.json
     Description: Configuration File for this Utility instance
     Type: String
-    AllowedPattern: ^s3:\/\/([A-z\-]+)\/(.*)$
+    AllowedPattern: ^s3:\/\/([A-z0-9\-]+)\/(.*)$
   SecurityGroups:
     Default: mygroup1, mygroup2
     Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
@@ -90,7 +90,7 @@ Parameters:
     Default: s3://mybucket/prefix/config.json
     Description: Configuration File Location for the WLM Scheduler
     Type: String
-    AllowedPattern: ^s3:\/\/([A-z\-]+)\/(.*)$
+    AllowedPattern: ^s3:\/\/([A-z0-9\-]+)\/(.*)$
 Resources:
   LambdaRedshiftAutomation:
     Type: AWS::Serverless::Function
