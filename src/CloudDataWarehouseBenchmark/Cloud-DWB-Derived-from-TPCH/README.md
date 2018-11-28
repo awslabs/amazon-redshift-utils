@@ -2,7 +2,7 @@
 
 Amazon Redshift is a fast, scalable data warehouse that makes it simple and cost-effective to analyze all your data across your data warehouse and data lake. Redshift delivers faster performance than other data warehouses by using machine learning, massively parallel query execution, and columnar storage on high-performance disk. We continuously improve the performance of the Redshift service. One workload that we use is the Cloud DW benchmark derived from TPC-H (http://www.tpc.org/tpch/default.asp).
 
-_Note: The TPC Benchmark and TPC-H are trademarks of the Transaction Processing Performance Council (http://www.tpc.org). The Cloud DW benchmark is not comparable to published TPC-H results._
+_Note: The TPC Benchmark and TPC-H are trademarks of the Transaction Processing Performance Council (http://www.tpc.org). The Cloud DW benchmark is derived from the TPC-H Benchmark and as such is not comparable to published TPC-H results._
 
 The intent of this benchmark is to simulate a set of basic scenarios to answer fundamental business questions and report business outcomes relevant to many industry sectors. 
 
