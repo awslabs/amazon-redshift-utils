@@ -13,7 +13,7 @@ develop-eggs/
 downloads/
 eggs/
 .eggs/
-# lib/
+lib/
 !src/AnalyzeVacuumUtility/lib/analyze_vacuum.py
 lib64/
 parts/

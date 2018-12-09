@@ -21,22 +21,12 @@ TRUNCATE_STAGE_TABLE = "truncate table history.stg_user_last_login;"
 
 LOAD_STAGE_TABLE="""
 insert into history.stg_user_last_login
-select case when username LIKE 'IAM:%' OR username LIKE 'IAMA:%' 
-       then
-            case when charindex(':', substring(username,
-                                     charindex(':', username) +1 )  
-                      ) = 0
-            then substring(username,
-                                charindex(':', username) +1 )
-
-            else substring ( username, charindex(':', username) +1, 
-                charindex(':', substring(username,
-                                charindex(':', username) +1 )  
-                          ) -1
-                          )      
-            end 
-       else username 
-       end as username, max(recordtime) lastlogin
+select 
+NVL(
+       substring(NULLIF(regexp_substr(username, ':[^:]*'),''),2)
+    ,  trim(username)
+  ) as extracted_username
+, max(recordtime) lastlogin
 from stl_connection_log 
 where event='authenticated' and username<>'rdsdb'
 group by 1
