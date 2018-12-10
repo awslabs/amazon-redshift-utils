@@ -18,9 +18,11 @@ Notes:
 - Best run after period of heaviest query activity 
 History:
 2015-08-31 chriz-bigdata created
+2018-12-10 zach-data improved performance by switching to stl_scan with 5 second granularity
 **********************************************************************************************/
 WITH 
-	generate_dt_series AS (select sysdate - (n * interval '1 second') as dt from (select row_number() over () as n from svl_query_report limit 604800)),
+	generate_dt_series AS (select sysdate - (n * interval '5 second') as dt from (select row_number() over () as n from stl_scan limit 120960)),
+	-- For 1 second granularity use the below CTE for generate_dt_series scanning any table with more than 604800 rows								      
 	-- generate_dt_series AS (select sysdate - (n * interval '1 second') as dt from (select row_number() over () as n from [table_with_604800_rows] limit 604800)),
 	apex AS (SELECT iq.dt, iq.service_class, iq.num_query_tasks, count(iq.slot_count) as service_class_queries, sum(iq.slot_count) as service_class_slots
 		FROM  
