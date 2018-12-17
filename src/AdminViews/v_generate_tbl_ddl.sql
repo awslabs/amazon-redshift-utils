@@ -187,7 +187,7 @@ FROM pg_namespace AS n
    ,CASE WHEN c.reldiststyle = 0 THEN 'DISTSTYLE EVEN'
     WHEN c.reldiststyle = 1 THEN 'DISTSTYLE KEY'
     WHEN c.reldiststyle = 8 THEN 'DISTSTYLE ALL'
-    ELSE 'DISTSTYLE AUTO'
+    ELSE ''
     END AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
