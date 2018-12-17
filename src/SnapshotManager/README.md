@@ -85,6 +85,17 @@ Once running, you will see that existing automatic snapshots, or new manual snap
 
 __Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the Lambda function's CloudWatch Log Streams for execution details, which include output about what the function is doing.
 
+## Networking
+
+This utility only connects to the Redshift service on your behalf, and doesn't require any access to your Redshift clusters. You therefore have 2 options for networking this function in your account:
+
+1. Run outside of VPC: in this model, your Lambda functions will run in your account, not using VPC, and will connect to AWS public services directly
+2. Run inside of VPC: in this model, your Lambda functions must run in a private Subnet which route to the internet via a NAT Gateway. [This article](https://aws.amazon.com/premiumsupport/knowledge-center/internet-access-lambda-function) gives you step-by-step instructions to set up this configuration.
+
+If you misconfigure the networking for your deployment, then you will observe that the functions try to run, but never end up returning from a call to the Redshift services. This is because while the function may be able to talk to the Redshift endpoints, the return traffic cannot be routed to your container without a NAT in front. For more information, please consult [this reference architecture](https://github.com/aws-samples/aws-dbs-refarch-edw/tree/master/src/lambda-connections).
+
+![Networking](networking.png)
+
 ## Making Changes
 
 If you'd like to make changes, then great - we love open source. You can code your changes, and then you'll need to pull in the Node.js dependencies in order to test or deploy. From the `src/SnapshotManager` folder, run `npm install`, which will perform this download. You can then create a new Lambda zip archive by running `./build.sh assemble`, which will create `RedshiftSnapshotManager-<version>.zip` in the the `dist` folder. You can then run `./build.sh deploy...schedule...` as before.
