@@ -4,13 +4,29 @@ Amazon Redshift is a fast, fully managed, petabyte-scale data warehouse that mak
 
 This module gives you the ability to coordinate the Automatic Snapshot mechanism in your Amazon Redshift Clusters so that you can meet fine grained backup requirements. You don't have to write any code or manage any servers; all execution is done within [AWS Lambda](https://aws.amazon.com/lambda), and scheduled with [Amazon CloudWatch Events](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html).
 
+![Architecture Diagram](Diagram.png)
 
 _This codebase is now deprecated in favour of using native Redshift Snapshot Schedules. We will continue to maintain this code and fix bugs, but would highly recommend you consider using the following native API's:_
+
 * CreateSnapshotSchedule: https://docs.aws.amazon.com/redshift/latest/APIReference/API_CreateSnapshotSchedule.html  
 * DescribeSnapshotSchedules: https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeSnapshotSchedules.html
+* ModifyClusterSnapshotSchedule: https://docs.aws.amazon.com/redshift/latest/APIReference/API_ModifyClusterSnapshotSchedule.html
 * DescribeStorage: https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeStorage.html
 
-![Architecture Diagram](Diagram.png)
+For example, using the aws-cli, you can create a schedule that creates snapshots every 4 hours:
+
+```
+aws redshift create-snapshot-schedule --schedule-definitions "rate(4 hours)" --schedule-identifier every-4-hours --schedule-description "4 hour snapshots"
+aws redshift modify-cluster-snapshot-schedule --schedule-identifier every-4-hours --cluster-id <my-cluster-id>
+```
+
+You could then delete old snapshots with:
+
+```
+for snap in `aws redshift describe-cluster-snapshots --cluster-identifier <my-cluster-id> --start-time <begin-retetion-period> --end-time <end-retetion-period> --query Snapshots[*].SnapshotIdentifier --output text` ; do
+    aws redshift delete-cluster-snapshot --snapshot-identifier $snap
+done
+```
 
 ## Addressing your Disaster Recovery requirements
 
