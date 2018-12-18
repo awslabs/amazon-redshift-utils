@@ -1,6 +1,4 @@
-
 --DROP VIEW admin.v_generate_cancel_query;
-
 /**********************************************************************************************
 Purpose: View to get cancel query 
 History:
@@ -17,4 +15,3 @@ SELECT pid,
 FROM stv_recents
 WHERE status = 'Running'
 ORDER BY starttime DESC;
-

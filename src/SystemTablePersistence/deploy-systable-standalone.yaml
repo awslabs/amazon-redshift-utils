@@ -1,0 +1,121 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: Configuration
+        Parameters:
+          - S3ConfigPath
+          - SecurityGroups
+          - SubnetIds
+      -
+        Label:
+          default: Run Schedule Cron Expressions
+        Parameters:
+          - SysTablesCronExpression
+    ParameterLabels:
+      S3ConfigPath:
+        default: S3 Config File
+      SecurityGroups:
+        default: VPC Security Group ID
+      SubnetIds:
+        default: VPC Subnet ID's for Networking
+      SysTablesCronExpression:
+        default: System Tables Persistence
+Parameters:
+  S3ConfigPath:
+    Default: s3://my-bucket/prefix/config-file.json
+    Description: Configuration File for this Utility instance
+    Type: String
+    AllowedPattern: ^s3:\/\/([A-z\-]+)\/(.*)$
+  SecurityGroups:
+    Default: mygroup1, mygroup2
+    Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
+    Type: CommaDelimitedList
+  SubnetIds:
+    Default: subnet1, subnet2, subnet3
+    Description: List of private Subnets in VPC in which the function will egress network connections
+    Type: CommaDelimitedList
+  SysTablesCronExpression:
+    Default: 0 0 * * ? *
+    Description: Cron expression for when to run System Table Persistence (nightly at midnight)
+    Type: String
+    AllowedPattern: ^([0-5]?[0-9]|\*|\,|\-|\/) ([ 01]?[0-9]|2[0-3]|\*|\,|\-|\/) ([ 012]?[1-9]|3[01]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC|\*|\,|\-|\/|\?|L|W) ([0]?[1-9]|1[0-2]|\*|\,|\-|\/) ([1-7]|MON|TUE|WED|THU|FRI|SAT|SUN|\*|\,|\-|\/|\?|L|\#) (19[7-9][0-9]|2[01][0-9][0-9]|\*|\,|\-|\/)$
+Resources:
+  LambdaRedshiftAutomation:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: lambda_function.event_handler
+      Runtime: python2.7
+      CodeUri:
+        Bucket: !Sub awslabs-code-${AWS::Region}
+        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.4.zip
+      MemorySize: 192
+      Timeout: 300
+      Tags:
+        Name: LambdaRedshiftRunner-SystemTablePersistence
+      Role: !GetAtt RedshiftAutomationIAMRole.Arn
+      VpcConfig:
+        SecurityGroupIds:
+          !Ref SecurityGroups
+        SubnetIds:
+          !Ref SubnetIds
+  RedshiftAutomationIAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+        RoleName: "LambdaRedshiftAutomationRole"
+        Path: "/"
+        ManagedPolicyArns:
+            - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            -
+              Sid: "AllowLambdaServiceToAssumeRole"
+              Effect: "Allow"
+              Action:
+                - "sts:AssumeRole"
+              Principal:
+                Service:
+                  - "lambda.amazonaws.com"
+        Policies:
+          -
+            PolicyName: "LambdaRedshiftRunnerPolicy"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                -
+                  Effect: "Allow"
+                  Action:
+                    - "s3:GetObject"
+                    - "kms:Decrypt"
+                    - "cloudwatch:PutMetricData"
+                    - "redshift:ModifyClusterParameterGroup"
+                  Resource: "*"
+
+  SystablesEventRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Description: CloudWatch Events Rule to invoke Redshift Automation - System Tables Persistence
+      Name: InvokeLambdaRedshiftRunner-SystemTablesPersistence
+      ScheduleExpression: !Sub cron(${SysTablesCronExpression})
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaRedshiftAutomation.Arn
+          Id: SystemTablePersistenceUtility
+          Input:
+            !Sub |
+                {
+                  "ExecuteUtility":"SystemTablePersistence",
+                  "ConfigLocation":"${S3ConfigPath}"
+                }
+  CWEventsInvokeSystablesPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName: !GetAtt LambdaRedshiftAutomation.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt SystablesEventRule.Arn

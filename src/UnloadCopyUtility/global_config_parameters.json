@@ -1,0 +1,77 @@
+{
+  "connectionPreTest": {
+    "description": "Before starting any work make a connection to each cluster to make sure connection is possible",
+    "value": "True",
+    "possibleValues": "True|False"
+  },
+  "sourceTablePreTest": {
+    "description": "Before starting work make sure every source table is present",
+    "value": "True",
+    "possibleValues": "True|False"
+  },
+  "destinationTablePreTest": {
+    "description": "Before starting work make sure every target table is present. Fail application execution if table not present and auto-create is disabled.",
+    "value": "False",
+    "possibleValues": "True|False"
+  },
+  "destinationTableAutoCreate": {
+    "description": "If True and target table does not exist create target table with same DDL as source table.  Schema-name and table-name will be altered to make sure to match target table definition in the s3ConfigFile.  At this time dependencies needed for table creation (e.g. in case of a foreign key) need to be present already.",
+    "value": "False",
+    "possibleValues": "True|False"
+  },
+  "destinationTableForceDropCreate": {
+    "description": "If True and target table will be dropped if it exists and subsequently will be re-created from source definition.  Schema-name and table-name will be altered to make sure to match target table definition in this config.",
+    "value": "False",
+    "possibleValues": "True|False"
+  },
+  "destinationSchemaAutoCreate": {
+    "description": "If True and a target schema does not exist create target schema with same DDL as source schema.",
+    "value": "False",
+    "possibleValues": "True|False"
+  },
+  "destinationDatabaseAutoCreate": {
+    "description": "If True and database where target table will be placed does not exist then create target database with same DDL as source database.  This is used to copy databases.",
+    "value": "False",
+    "possibleValues": "True|False"
+  },
+  "logLevel":{
+    "description": "Log level for the output",
+    "value": "INFO",
+    "possibleValues": "DEBUG|INFO|WARNING|ERROR|CRITICAL|FATAL"
+  },
+  "locationGenerateTableDDLView": {
+    "description": "Path to v_generate_tbl_ddl.sql.  The default assumes that UnloadCopyUtility is part of a fully cloned amazon-redshift-utils (https://github.com/awslabs/amazon-redshift-utils.git)",
+    "value": "./../AdminViews/v_generate_tbl_ddl.sql",
+    "possibleValues": "/any/valid/system/path"
+  },
+  "locationGenerateSchemaDDLView": {
+    "description": "Path to v_generate_schema_ddl.sql.  The default assumes that UnloadCopyUtility is part of a fully cloned amazon-redshift-utils (https://github.com/awslabs/amazon-redshift-utils.git)",
+    "value": "./../AdminViews/v_generate_schema_ddl.sql",
+    "possibleValues": "/any/valid/system/path"
+  },
+  "locationGenerateDatabaseDDLView": {
+    "description": "Path to v_generate_database_ddl.sql.  The default assumes that UnloadCopyUtility is part of a fully cloned amazon-redshift-utils (https://github.com/awslabs/amazon-redshift-utils.git)",
+    "value": "./../AdminViews/v_generate_database_ddl.sql",
+    "possibleValues": "/any/valid/system/path"
+  },
+  "failOnError": {
+    "description": "If False and multiple resources are considered then it will skip the further processing of the current resource but will try to continue with subsequent resources (useful for test-purposes/planning) .",
+    "value": "True",
+    "possibleValues": "True|False"
+  },
+  "region": {
+    "description": "The short region name (e.g. eu-west-1) where you will use KMS or S3 for S3-stored configuration files",
+    "value": "None",
+    "possibleValues": "short-region-name"
+  },
+  "s3ConfigFile": {
+    "description": "The path to the config file used for this execution.  Should only be used as CLI parameter.",
+    "value": "None",
+    "possibleValues": "/any/valid/system/path|s3://any/valid/s3/path"
+  },
+  "tableName": {
+    "description": "Provide the table name of the table that you want to copy from source to destination.  The name from source and destination table needs to be the same.",
+    "value": "None",
+    "possibleValues": "table_name"
+  }
+}

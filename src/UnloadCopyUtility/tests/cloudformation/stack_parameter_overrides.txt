@@ -1,0 +1,6 @@
+#Example configuration entries but disabled by putting them in comment
+#SourceClusterSnapshot=unload-copy-test-cluster
+#SSHKeyForEc2=global
+#GitHubUrl=https://github.com/pvbouwel/amazon-redshift-utils.git
+#GitHubBranch=pvbouwel_unload_copy_utility
+#ReportBucket=copy-unload

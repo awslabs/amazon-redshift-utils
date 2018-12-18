@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+from __future__ import print_function
+
+import argparse
+import os
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib/ColumnEncodingUtility"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib/AnalyzeVacuumUtility"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib/SystemTablePersistence"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib/WorkloadManagementScheduler"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib/amazon-redshift-monitoring"))
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+import analyze_schema_compression
+import analyze_vacuum
+import redshift_monitoring
+import config_constants
+import snapshot_system_stats
+import wlm_scheduler
+import common
+import boto3
+
+REGION_KEY = 'AWS_REGION'
+debug = False
+
+def usage():
+    print("Redshift Automation CLI - Automation Utilities for Amazon Redshift")
+    print("ra <utility> <config>")
+    utilities = [config_constants.COLUMN_ENCODING, config_constants.ANALYZE_VACUUM, config_constants.ANALYZE,
+                 config_constants.VACUUM, config_constants.MONITORING, config_constants.TABLE_PERSISTENCE]
+    print("<utility>: Available Utilities: (%s)" % ", ".join(utilities))
+    print("<config>: Path to configuration file on Amazon S3, for example 's3://my-bucket/my-prefix/config.json'")
+
+    sys.exit(-1)
+
+
+def cli(utility, config_loc, use_region):
+    kms_connection = boto3.client('kms', region_name=use_region)
+
+    global debug
+    if 'DEBUG' in os.environ and os.environ['DEBUG'] == True:
+        debug = True
+
+    # extract the configuration
+    config = common.get_config(config_loc, use_region, debug)
+
+    if config_constants.DEBUG in config and config[config_constants.DEBUG]:
+        debug = True
+
+    if debug:
+        print("Using Provided Configuration:")
+        print(config)
+
+    # decrypt the password
+    if config_constants.ENCRYPTED_PASSWORD in config:
+        use_password = common.get_password(kms_connection, config, debug)
+        config[config_constants.DB_PASSWORD] = use_password
+
+    # run the requested utilities
+    results = []
+    if utility.lower() == config_constants.COLUMN_ENCODING.lower():
+        print("Running %s" % utility)
+        analyze_schema_compression.configure(**config)
+        encoding_result = analyze_schema_compression.run()
+        results.append(encoding_result)
+    elif utility.lower() == config_constants.ANALYZE_VACUUM.lower():
+        print("Running %s" % utility)
+        analyze_result = analyze_vacuum.run_analyze_vacuum(**config)
+        if analyze_result == 0:
+            results.append("OK")
+    elif utility.lower() == config_constants.ANALYZE.lower():
+        print("Running %s" % utility)
+        # turn on correct flag
+        config[config_constants.DO_ANALYZE] = True
+        config[config_constants.DO_VACUUM] = False
+
+        analyze_result = analyze_vacuum.run_analyze_vacuum(**config)
+        if analyze_result == 0:
+            results.append("OK")
+    elif utility.lower() == config_constants.VACUUM.lower():
+        print("Running %s" % utility)
+        # turn on correct flag
+        config[config_constants.DO_ANALYZE] = False
+        config[config_constants.DO_VACUUM] = True
+
+        analyze_result = analyze_vacuum.run_analyze_vacuum(**config)
+        if analyze_result == 0:
+            results.append("OK")
+    elif utility.lower() == config_constants.MONITORING.lower():
+        print("Running %s" % utility)
+        redshift_monitoring.monitor_cluster([config, os.environ])
+    elif utility.lower() == config_constants.TABLE_PERSISTENCE.lower():
+        print("Running %s" % utility)
+        snapshot_system_stats.snapshot([config, os.environ])
+    elif utility.lower() == config_constants.WLM_SCHEDULER.lower():
+        print("Running %s" % utility)
+        wlm_scheduler.run_scheduler(config)
+    else:
+        usage()
+
+
+if __name__ == "__main__":
+    if REGION_KEY not in os.environ:
+        raise Exception("Unable to run without environment variable %s set" % REGION_KEY)
+    else:
+        use_region = os.environ[REGION_KEY]
+    parser = argparse.ArgumentParser(description='cli args')
+    parser.add_argument('--utility', dest='utility', required=True,
+                        help='Utility to invoke (ColumnEncodingUtility, Analyze, Vacuum, Monitor, SystemTablePersistence, WlmScheduler)')
+    parser.add_argument('--config', dest='config', required=True,
+                        help='Config File location (s3://bucket/prefix/file.json)')
+    args = parser.parse_args()
+
+    cli(args.utility, args.config, use_region)

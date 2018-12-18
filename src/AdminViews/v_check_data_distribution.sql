@@ -12,6 +12,8 @@ SELECT
 	,pgn.nspname AS schemaname
 	,id AS tbl_oid
 	,name AS tablename
+	,stv.diststyle AS diststyle
+  	,stv.sortkey1 AS sortkey
 	,rows AS rowcount_on_slice
 	,SUM(rows) OVER (PARTITION BY name, id) AS total_rowcount
 	,CASE
@@ -34,6 +36,9 @@ INNER JOIN
 INNER JOIN
 	pg_namespace AS pgn 
 		ON pgn.oid = pgc.relnamespace
+INNER JOIN
+  svv_table_info AS stv
+    ON stv.schema = pgn.nspname AND stv."table" = name
 WHERE slice < 3201
 AND pgc.relowner > 1
 ;

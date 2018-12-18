@@ -1,0 +1,36 @@
+{
+    "name": "amazon-redshift-snapshot-manager",
+    "description": "An Amazon Redshift Database Snapshot Manager written in AWS Lambda",
+    "version": "1.1.1",
+    "homepage": "https://github.com/awslabs/amazon-redshift-utils/tree/master/src/SnapshotManager",
+    "bugs": {
+        "url": "http://github.com/awslabs/amazon-redshift-utils/issues",
+        "email": "meyersi@amazon.com"
+    },
+    "dependencies": {
+        "async": "2.0.0-rc.5 ",
+        "moment": "2.13.0"
+    },
+    "keywords": [
+        "amazon",
+        "redshift",
+        "lambda"
+    ],
+    "author": {
+        "name": "Ian Meyers",
+        "email": "meyersi@amazon.com"
+    },
+    "main": "./snapshotManager.js",
+    "license" : "SEE LICENSE IN LICENSE.txt",
+    "files": [   
+        "index.js",
+        "constants.js",
+        "snapshotManager.js",
+        "README.md",
+        "LICENSE.txt"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "http://github.com/awslabs/amazon-redshift-utils"
+    }
+}

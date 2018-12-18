@@ -1,0 +1,7 @@
+{
+	"targetResource": "energy-demo",
+	"region": "eu-west-1",
+	"namespace" : "nightly",
+	"snapshotIntervalHours": 24,
+	"snapshotRetentionDays": 30
+}
