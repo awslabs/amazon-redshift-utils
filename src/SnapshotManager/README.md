@@ -4,6 +4,12 @@ Amazon Redshift is a fast, fully managed, petabyte-scale data warehouse that mak
 
 This module gives you the ability to coordinate the Automatic Snapshot mechanism in your Amazon Redshift Clusters so that you can meet fine grained backup requirements. You don't have to write any code or manage any servers; all execution is done within [AWS Lambda](https://aws.amazon.com/lambda), and scheduled with [Amazon CloudWatch Events](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html).
 
+
+_This codebase is now deprecated in favour of using native Redshift Snapshot Schedules. We will continue to maintain this code and fix bugs, but would highly recommend you consider using the following native API's:_
+* CreateSnapshotSchedule: https://docs.aws.amazon.com/redshift/latest/APIReference/API_CreateSnapshotSchedule.html  
+* DescribeSnapshotSchedules: https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeSnapshotSchedules.html
+* DescribeStorage: https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeStorage.html
+
 ![Architecture Diagram](Diagram.png)
 
 ## Addressing your Disaster Recovery requirements

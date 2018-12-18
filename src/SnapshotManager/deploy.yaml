@@ -88,7 +88,7 @@ Resources:
       Runtime: nodejs8.10
       CodeUri:
         Bucket: !Sub awslabs-code-${AWS::Region}
-        Key: RedshiftSnapshotManager/RedshiftSnapshotManager-1.1.1.zip
+        Key: RedshiftSnapshotManager/RedshiftSnapshotManager-1.2.0.zip
       MemorySize: 192
       Timeout: 300
       Tags:
