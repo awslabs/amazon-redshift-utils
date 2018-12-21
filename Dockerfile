@@ -12,5 +12,4 @@ ENV PATH="/usr/src/app/AnalyzeVacuumUtility:/usr/src/app/ColumnEncodingUtility:/
 RUN pip install -r /usr/src/app/requirements.txt && \
     pip install -r /usr/src/app/UnloadCopyUtility/requirements.txt 
 
-# ENTRYPOINT ["/usr/src/app/bin/entrypoint.sh"]
-ENTRYPOINT ["/bin/sh"]
+ENTRYPOINT ["/usr/src/app/bin/entrypoint.sh"]
