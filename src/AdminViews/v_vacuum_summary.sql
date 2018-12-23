@@ -4,6 +4,7 @@ Purpose:      View to flatten stl_vacuum table and provide details like vacuum s
 
 History:
 2017-12-24 adedotua created
+2018-12-22 adedotua updated view to account for background auto vacuum process  
 **********************************************************************************************/ 
 
 CREATE OR REPLACE VIEW admin.v_vacuum_summary as SELECT a.userid,
@@ -44,7 +45,7 @@ CREATE OR REPLACE VIEW admin.v_vacuum_summary as SELECT a.userid,
                   stl_vacuum.max_merge_partitions,
                   stl_vacuum.eventtime
            FROM stl_vacuum
-           WHERE (stl_vacuum.status <> 'Finished'::bpchar)) a 
+           WHERE (stl_vacuum.status not ilike '%Finished%')) a 
            LEFT JOIN (SELECT stl_vacuum.userid,
            stl_vacuum.xid,
            stl_vacuum.table_id,
@@ -55,7 +56,7 @@ CREATE OR REPLACE VIEW admin.v_vacuum_summary as SELECT a.userid,
            stl_vacuum.max_merge_partitions,
            stl_vacuum.eventtime
               FROM stl_vacuum
-              WHERE (stl_vacuum.status = 'Finished'::bpchar)) b USING (xid)) 
+              WHERE (stl_vacuum.status ilike '%Finished%')) b USING (xid,table_id)) 
               LEFT JOIN (SELECT stv_tbl_perm.id,stv_tbl_perm.name,stv_tbl_perm.db_id
                   FROM stv_tbl_perm WHERE (stv_tbl_perm.slice = 0)) c ON ((a.table_id = c.id))) 
               JOIN pg_database d ON (((c.db_id)::OID = d.oid))) 
