@@ -28,7 +28,7 @@ when d.recordtime is not null then 'Disconnected'
 when f.process is not null then 'Active' else 'Connection Lost' end as current_state
 from
 (select * from stl_connection_log where event='authenticated') a
-left join (select * from stl_connection_log where event='initiating session') b using (pid,dbname,remotehost,remoteport,username)
+left join (select * from stl_connection_log where event='Initiating session') b using (pid,dbname,remotehost,remoteport,username)
 left join (select * from stl_connection_log where event='set application_name') c using (pid,dbname,remotehost,remoteport,username)
 left join (select * from stl_connection_log where event='disconnecting session') d using (pid,dbname,remotehost,remoteport,username) 
 left join (select * from stl_connection_log where event='Terminating backend on administrator''s request') e using (pid,dbname,remotehost,remoteport,username) 
