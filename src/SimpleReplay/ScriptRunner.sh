@@ -21,14 +21,16 @@
 10/26/2016 : Initial Release.
 '
 
-
-
-export PGPORT=`ls  /tmp/.s.PGSQL* | grep -v lock  | cut -c15-`
+#PSQL Client Setup:
+#export PGPASSWORD=
+#export PGUSER=
+#export PGHOST=
+#export PGPORT=
 
 # Functions
 show_help()
 {
-   echo "Usage: $0 <Number of Threads> [ <script list | sqls > ]"
+   echo "Usage: $0 [-H host] [-P port] [-U user] [-W password] <Number of Threads> [<script list>] "
 }
 
 run()
@@ -97,6 +99,33 @@ if [ "$#" -le 0 ]; then
   exit 0
 fi
 
+# Process command line variables
+
+OPTIND=1         # Reset in case getopts has been used previously in the shell.
+
+while getopts "h?H:P:U:W:" opt; do
+    case "$opt" in
+    h|\?)
+        show_help
+        exit 0
+        ;;
+    H)  PGHOST=$OPTARG
+        ;;
+    P)  PGPORT=$OPTARG
+        ;;
+    U)  PGUSER=$OPTARG
+        ;;
+    W)  PGPASSWORD=$OPTARG
+        ;;
+    esac
+done
+
+shift $((OPTIND-1))
+
+[ "$1" = "--" ] && shift
+
+# End of command line variable
+
 threads=${1:-1}
 sqls=${2:-sqls}
 
@@ -112,3 +141,4 @@ done
 wait
 echo -n ENDED ' '
 date
+
