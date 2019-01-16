@@ -50,7 +50,7 @@ def Remove_Problem_Keywords(reg_user_lines):
     #                    'create', 'pg_table_def', 'pg_catalog','pg_class', 'pg_namespace',
     #                    'pg_attribute', 'pg_tables', 'grant', 'set ',
     #                    'show ']
-    problem_keywords = ['context: SQL', 'ERROR:', 'CONTEXT:  SQL',
+    problem_keywords = ['context: SQL', 'ERROR:', 'CONTEXT:  SQL', '$2', '$1',
                         'pg_table_def', 'pg_catalog','pg_class', 'pg_namespace',
                         'pg_attribute', 'pg_tables', 'show ', 'Undoing transaction', 'Undo on', 'pg_terminate_backend','pg_cancel_backend', 'volt_', 'pg_temp_' , 'BIND']
     sanitizedList = []
