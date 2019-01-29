@@ -1,11 +1,16 @@
 /**********************************************************************************************
 Purpose:      View to flatten stl_vacuum table and provide details like vacuum start and 
               end times, current status, changed rows and freed blocks all in one row
+              
+Current Version:        1.03
 
 History:
-2017-12-24 adedotua created
-2018-12-22 adedotua updated view to account for background auto vacuum process  
-2018-12-30 adedotua fixed join condition to make vacuum on dropped tables visible
+Version 1.01
+        2017-12-24 adedotua created
+Version 1.02
+        2018-12-22 adedotua updated view to account for background auto vacuum process 
+Version 1.03
+        2018-12-30 adedotua fixed join condition to make vacuum on dropped tables visible
 **********************************************************************************************/ 
 
 CREATE OR REPLACE VIEW admin.v_vacuum_summary as SELECT a.userid,
