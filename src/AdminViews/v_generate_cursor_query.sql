@@ -28,4 +28,4 @@ FROM STV_ACTIVE_CURSORS cur
         AND util_text.text != 'begin;'
   JOIN PG_USER usr
     ON usr.usesysid = cur.userid
-GROUP BY cur.userid, cur.xid, cur.pid, usr.usename
+GROUP BY cur.userid, cur.xid, cur.pid, usr.usename;
