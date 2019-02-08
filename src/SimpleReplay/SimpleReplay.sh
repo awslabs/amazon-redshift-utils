@@ -18,10 +18,17 @@
 10/26/2016 : Initial Release.
 '
 
+#PSQL Client Setup:
+#export PGPASSWORD=
+#export PGUSER=
+#export PGHOST=
+#export PGPORT= 
+
+
 # Functions Definition
 show_help()
 {
-   echo "Usage: $0 [-b <begin time> ] [-e <end time> | -r <seconds to run> ] [ <script list> ] [ <target concurrency> ]"
+   echo "Usage: $0 [-b <begin time>] [-e <end time>|-r <seconds to run>] [-H <host>] [-P port][-U user] [-W password][<script list>] [<target concurrency>]"
 }
 
 datediff() 
@@ -60,11 +67,16 @@ replay_one()
 
 # End of Functions
 
+if [ "$#" -le 0 ]; then
+  show_help
+  exit 0
+fi
+
 # Process command line variables
 
 OPTIND=1         # Reset in case getopts has been used previously in the shell.
 
-while getopts "h?b:e:r:" opt; do
+while getopts "h?b:e:r:H:P:U:W:" opt; do
     case "$opt" in
     h|\?)
         show_help
@@ -75,6 +87,14 @@ while getopts "h?b:e:r:" opt; do
     e)  end_time=$OPTARG
         ;;
     r)  run_time=$OPTARG
+        ;;
+    H)  PGHOST=$OPTARG
+        ;;
+    P)  PGPORT=$OPTARG
+        ;;
+    U)  PGUSER=$OPTARG
+        ;;
+    W)  PGPASSWORD=$OPTARG
         ;;
     esac
 done

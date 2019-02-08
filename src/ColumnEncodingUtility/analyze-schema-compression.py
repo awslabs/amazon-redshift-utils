@@ -197,7 +197,7 @@ def get_pg_conn():
             cleanup(conn)
             return ERROR
 
-        aws_utils.set_search_paths(conn, schema_name, target_schema)
+        aws_utils.set_search_paths(conn, schema_name, target_schema, exclude_external_schemas=True)
 
         if query_group is not None:
             set_query_group = 'set query_group to %s' % query_group
