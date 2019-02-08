@@ -8,12 +8,12 @@ This module gives you the ability to coordinate the Automatic Snapshot mechanism
 
 _This codebase is now deprecated in favour of using native Redshift Snapshot Schedules. We will continue to maintain this code and fix bugs, but would highly recommend you consider using the following native API's:_
 
-* CreateSnapshotSchedule: https://docs.aws.amazon.com/redshift/latest/APIReference/API_CreateSnapshotSchedule.html  
-* DescribeSnapshotSchedules: https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeSnapshotSchedules.html
-* ModifyClusterSnapshotSchedule: https://docs.aws.amazon.com/redshift/latest/APIReference/API_ModifyClusterSnapshotSchedule.html
-* DescribeStorage: https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeStorage.html
+* __CreateSnapshotSchedule__: https://docs.aws.amazon.com/redshift/latest/APIReference/API_CreateSnapshotSchedule.html  
+* __DescribeSnapshotSchedules__: https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeSnapshotSchedules.html
+* __ModifyClusterSnapshotSchedule__: https://docs.aws.amazon.com/redshift/latest/APIReference/API_ModifyClusterSnapshotSchedule.html
+* __DescribeStorage__: https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeStorage.html
 
-For example, using the aws-cli, you can create a schedule that creates snapshots every 4 hours:
+For example, using the [aws-cli](https://aws.amazon.com/cli), you can create a schedule that creates snapshots every 4 hours:
 
 ```
 aws redshift create-snapshot-schedule --schedule-definitions "rate(4 hours)" --schedule-identifier every-4-hours --schedule-description "4 hour snapshots"

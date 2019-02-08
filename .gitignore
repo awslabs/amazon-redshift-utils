@@ -70,3 +70,4 @@ src/metadatatransfer/.idea/misc.xml
 *.iml
 Redshift_DBA_Commands.pptx
 src/metadatatransfer/dbconstring.py
+src/.DS_Store

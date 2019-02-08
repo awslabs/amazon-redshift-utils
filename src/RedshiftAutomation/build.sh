@@ -19,7 +19,7 @@ fi
 cp -r $PYTHON_PATH/pg8000 lib
 cp -r $PYTHON_PATH/shortuuid lib
 cp -r $PYTHON_PATH/boto3 lib
-cp -r $PYTHON_PATH/pgpasslib lib
+cp -r $PYTHON_PATH/pgpasslib* lib
 
 # import the column encoding utility
 if [ ! -d lib/ColumnEncodingUtility ]; then
