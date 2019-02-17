@@ -7,8 +7,10 @@ History:
 CREATE VIEW admin.v_wlm_queue_state
 AS
 SELECT 
-    (config.service_class-5) as queue
-    , trim (class.condition) AS description
+	config.service_class
+    , (config.service_class-5) AS queue
+    , trim (config.name) AS name
+    , trim (class.condition) AS condition
     , config.num_query_tasks AS slots
     , config.query_working_mem AS mem
     , config.max_execution_time AS max_time
@@ -24,5 +26,4 @@ FROM
 WHERE
     class.action_service_class = config.service_class 
     AND class.action_service_class = state.service_class 
-    AND config.service_class > 4
 ORDER BY config.service_class;
