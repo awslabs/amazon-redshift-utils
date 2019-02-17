@@ -7,7 +7,7 @@ History:
 CREATE VIEW admin.v_wlm_queue_state
 AS
 SELECT 
-	config.service_class
+    config.service_class
     , (config.service_class-5) AS queue
     , trim (config.name) AS name
     , trim (class.condition) AS condition
