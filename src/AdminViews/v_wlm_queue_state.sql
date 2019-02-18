@@ -4,7 +4,7 @@ Purpose: Add WLM_QUEUE_STATE_VW view from Amazon Redshift Tutorial https://docs.
 History:
 2019-02-16 benkim05 Created
 **********************************************************************************************/
-CREATE VIEW admin.v_wlm_queue_state
+CREATE OR REPLACE VIEW admin.v_wlm_queue_state
 AS
 SELECT 
     config.service_class
