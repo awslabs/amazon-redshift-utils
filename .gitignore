@@ -63,3 +63,6 @@ venv/
 # IDE's
 .project
 .idea
+.DS_Store
+src/.DS_Store
+
