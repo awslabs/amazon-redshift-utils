@@ -3,12 +3,6 @@
 /* Disable results caching */
 set enable_result_cache_for_session to off;
 
-/*
-  Features that are gradually being deployed across the fleet
-  Remove in a few weeks after features are fully deployed across all regions worldwide
-*/
-set volt_optimize_child_cse to on;
-
 set query_group to 'TPC-DS query89.tpl stream.3.1';
 select  *
 from(
