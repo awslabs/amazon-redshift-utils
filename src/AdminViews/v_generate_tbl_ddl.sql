@@ -45,6 +45,7 @@ History:
 2018-05-30 adedotua Add table_id column
 2018-05-30 adedotua Added ENCODE RAW keyword for non compressed columns (Issue #308)
 2018-10-12 dmenin Added table ownership to the script (as an alter table statment as the owner of the table is the issuer of the CREATE TABLE command)
+2019-03-24 adedotua added filter for diststyle AUTO distribution style
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
@@ -187,7 +188,8 @@ FROM pg_namespace AS n
    ,CASE WHEN c.reldiststyle = 0 THEN 'DISTSTYLE EVEN'
     WHEN c.reldiststyle = 1 THEN 'DISTSTYLE KEY'
     WHEN c.reldiststyle = 8 THEN 'DISTSTYLE ALL'
-    ELSE 'DISTSTYLE AUTO'
+    WHEN c.reldiststyle = 9 THEN 'DISTSTYLE AUTO'
+    ELSE 'UNKNOWN'
     END AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
