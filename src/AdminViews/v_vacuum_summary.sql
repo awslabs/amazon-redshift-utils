@@ -2,7 +2,7 @@
 Purpose:      View to flatten stl_vacuum table and provide details like vacuum start and 
               end times, current status, changed rows and freed blocks all in one row
               
-Current Version:        1.03
+Current Version:        1.04
 
 History:
 Version 1.01
