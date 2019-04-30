@@ -11,6 +11,8 @@ Version 1.02
         2018-12-22 adedotua updated view to account for background auto vacuum process 
 Version 1.03
         2018-12-30 adedotua fixed join condition to make vacuum on dropped tables visible
+Version 1.04
+        2019-04-30 adedotua added is_auto_vacuum flag to indicate whether vacuum was auto vacuum 
 **********************************************************************************************/ 
 
 CREATE OR REPLACE VIEW admin.v_vacuum_summary as SELECT a.userid,
@@ -40,7 +42,8 @@ CREATE OR REPLACE VIEW admin.v_vacuum_summary as SELECT a.userid,
        a."blocks" AS vac_start_blocks,
        b."blocks" AS vac_end_blocks,
        (b."blocks" - a."blocks") AS vac_block_diff,
-       NVL(e.empty_blk_cnt,0) AS empty_blk_cnt
+       NVL(e.empty_blk_cnt,0) AS empty_blk_cnt,
+       case when a.status ilike '%[VacuumBG]%' then true else false end is_auto_vacuum
        FROM 
        (SELECT * FROM stl_vacuum WHERE status not ilike '%Finished%') a 
        LEFT JOIN stl_vacuum b on a.xid=b.xid and a.table_id=b.table_id and a.eventtime < b.eventtime 
