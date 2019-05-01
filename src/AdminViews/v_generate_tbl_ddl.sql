@@ -189,7 +189,7 @@ FROM pg_namespace AS n
     WHEN c.reldiststyle = 1 THEN 'DISTSTYLE KEY'
     WHEN c.reldiststyle = 8 THEN 'DISTSTYLE ALL'
     WHEN c.reldiststyle = 9 THEN 'DISTSTYLE AUTO'
-    ELSE 'UNKNOWN'
+    ELSE '<<Error - UNKNOWN DISTSTYLE>>'
     END AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
