@@ -151,16 +151,16 @@ SELECT ti.database,
        ti.size || '/' || CASE
          WHEN stp.sum_r = stp.sum_sr OR stp.sum_sr = 0 THEN
            CASE
-             WHEN "diststyle" = 'EVEN' THEN (stp.pop_slices*(colenc.cols + 3))
+             WHEN ("diststyle" = 'EVEN' OR "diststyle"='AUTO(EVEN)') THEN (stp.pop_slices*(colenc.cols + 3))
              WHEN SUBSTRING("diststyle",1,3) = 'KEY' THEN (stp.pop_slices*(colenc.cols + 3))
-             WHEN "diststyle" = 'ALL' THEN (cluster_info.node_count*(colenc.cols + 3))
-           END 
+             WHEN ("diststyle" = 'ALL'  OR "diststyle"='AUTO(ALL)') THEN (cluster_info.node_count*(colenc.cols + 3))           
+            END 
          ELSE
            CASE
-             WHEN "diststyle" = 'EVEN' THEN (stp.pop_slices*(colenc.cols + 3)*2)
+             WHEN ( "diststyle" = 'EVEN' OR "diststyle"='AUTO(EVEN)')  THEN (stp.pop_slices*(colenc.cols + 3)*2)
              WHEN SUBSTRING("diststyle",1,3) = 'KEY' THEN (stp.pop_slices*(colenc.cols + 3)*2)
-             WHEN "diststyle" = 'ALL' THEN (cluster_info.node_count*(colenc.cols + 3)*2)
-           END 
+             WHEN ( "diststyle" = 'ALL' OR "diststyle"='AUTO(ALL)') THEN (cluster_info.node_count*(colenc.cols + 3)*2)           
+            END 
          END|| ' (' || ti.pct_used || ')' AS size,
          ti.tbl_rows,
          ti.unsorted,
