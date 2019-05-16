@@ -59,7 +59,7 @@ create table part (
   p_type varchar(25) not null,
   p_size int4 not null,
   p_container char(10) not null,
-  p_retailprice numeric(12,2) not null32k,
+  p_retailprice numeric(12,2) not null,
   p_comment varchar(23) not null,
   PRIMARY KEY (P_PARTKEY)
 ) distkey(p_partkey) sortkey(p_partkey);
@@ -67,7 +67,7 @@ create table part (
 create table partsupp (
   ps_partkey int8 not null,
   ps_suppkey int4 not null,
-  ps_availqty int4 not null32k,
+  ps_availqty int4 not null,
   ps_supplycost numeric(12,2) not null,
   ps_comment varchar(199) not null,
   Primary Key(PS_PARTKEY, PS_SUPPKEY)
