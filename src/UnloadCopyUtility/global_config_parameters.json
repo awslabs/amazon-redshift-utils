@@ -68,5 +68,10 @@
     "description": "The path to the config file used for this execution.  Should only be used as CLI parameter.",
     "value": "None",
     "possibleValues": "/any/valid/system/path|s3://any/valid/s3/path"
+  },
+  "tableName": {
+    "description": "Provide the table name of the table that you want to copy from source to destination.  The name from source and destination table needs to be the same.",
+    "value": "None",
+    "possibleValues": "table_name"
   }
 }

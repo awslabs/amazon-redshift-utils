@@ -42,18 +42,24 @@ History:
 2016-05-24 chriz-bigdata Added support for BACKUP NO tables
 2017-05-03 pvbouwel Change table & schemaname of Foreign key constraints to allow for filters
 2018-01-15 pvbouwel Add QUOTE_IDENT for identifiers (schema,table and column names)
+2018-05-30 adedotua Add table_id column
+2018-05-30 adedotua Added ENCODE RAW keyword for non compressed columns (Issue #308)
+2018-10-12 dmenin Added table ownership to the script (as an alter table statment as the owner of the table is the issuer of the CREATE TABLE command)
+2019-03-24 adedotua added filter for diststyle AUTO distribution style
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
 SELECT
- REGEXP_REPLACE (schemaname, '^zzzzzzzz', '') AS schemaname
+ table_id
+ ,REGEXP_REPLACE (schemaname, '^zzzzzzzz', '') AS schemaname
  ,REGEXP_REPLACE (tablename, '^zzzzzzzz', '') AS tablename
  ,seq
  ,ddl
 FROM
  (
  SELECT
-  schemaname
+  table_id
+  ,schemaname
   ,tablename
   ,seq
   ,ddl
@@ -61,7 +67,8 @@ FROM
   (
   --DROP TABLE
   SELECT
-   n.nspname AS schemaname
+   c.oid::bigint as table_id
+   ,n.nspname AS schemaname
    ,c.relname AS tablename
    ,0 AS seq
    ,'--DROP TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ';' AS ddl
@@ -70,7 +77,8 @@ FROM
   WHERE c.relkind = 'r'
   --CREATE TABLE
   UNION SELECT
-   n.nspname AS schemaname
+   c.oid::bigint as table_id
+   ,n.nspname AS schemaname
    ,c.relname AS tablename
    ,2 AS seq
    ,'CREATE TABLE IF NOT EXISTS ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + '' AS ddl
@@ -78,20 +86,22 @@ FROM
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
   --OPEN PAREN COLUMN LIST
-  UNION SELECT n.nspname AS schemaname, c.relname AS tablename, 5 AS seq, '(' AS ddl
+  UNION SELECT c.oid::bigint as table_id,n.nspname AS schemaname, c.relname AS tablename, 5 AS seq, '(' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
   --COLUMN LIST
   UNION SELECT
-   schemaname
+   table_id
+   ,schemaname
    ,tablename
    ,seq
    ,'\t' + col_delim + col_name + ' ' + col_datatype + ' ' + col_nullable + ' ' + col_default + ' ' + col_encoding AS ddl
   FROM
    (
    SELECT
-    n.nspname AS schemaname
+    c.oid::bigint as table_id
+   ,n.nspname AS schemaname
     ,c.relname AS tablename
     ,100000000 + a.attnum AS seq
     ,CASE WHEN a.attnum > 1 THEN ',' ELSE '' END AS col_delim
@@ -103,7 +113,7 @@ FROM
      ELSE UPPER(format_type(a.atttypid, a.atttypmod))
      END AS col_datatype
     ,CASE WHEN format_encoding((a.attencodingtype)::integer) = 'none'
-     THEN ''
+     THEN 'ENCODE RAW'
      ELSE 'ENCODE ' + format_encoding((a.attencodingtype)::integer)
      END AS col_encoding
     ,CASE WHEN a.atthasdef IS TRUE THEN 'DEFAULT ' + adef.adsrc ELSE '' END AS col_default
@@ -118,7 +128,8 @@ FROM
    )
   --CONSTRAINT LIST
   UNION (SELECT
-   n.nspname AS schemaname
+   c.oid::bigint as table_id
+   ,n.nspname AS schemaname
    ,c.relname AS tablename
    ,200000000 + CAST(con.oid AS INT) AS seq
    ,'\t,' + pg_get_constraintdef(con.oid) AS ddl
@@ -128,13 +139,14 @@ FROM
   WHERE c.relkind = 'r' AND pg_get_constraintdef(con.oid) NOT LIKE 'FOREIGN KEY%'
   ORDER BY seq)
   --CLOSE PAREN COLUMN LIST
-  UNION SELECT n.nspname AS schemaname, c.relname AS tablename, 299999999 AS seq, ')' AS ddl
+  UNION SELECT c.oid::bigint as table_id,n.nspname AS schemaname, c.relname AS tablename, 299999999 AS seq, ')' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r'
   --BACKUP
   UNION SELECT
-  n.nspname AS schemaname
+  c.oid::bigint as table_id
+   ,n.nspname AS schemaname
    ,c.relname AS tablename
    ,300000000 AS seq
    ,'BACKUP NO' as ddl
@@ -151,7 +163,8 @@ FROM pg_namespace AS n
   WHERE c.relkind = 'r'
   --BACKUP WARNING
   UNION SELECT
-  n.nspname AS schemaname
+  c.oid::bigint as table_id
+   ,n.nspname AS schemaname
    ,c.relname AS tablename
    ,1 AS seq
    ,'--WARNING: This DDL inherited the BACKUP NO property from the source table' as ddl
@@ -168,12 +181,14 @@ FROM pg_namespace AS n
   WHERE c.relkind = 'r'
   --DISTSTYLE
   UNION SELECT
-   n.nspname AS schemaname
+   c.oid::bigint as table_id
+   ,n.nspname AS schemaname
    ,c.relname AS tablename
    ,300000001 AS seq
    ,CASE WHEN c.reldiststyle = 0 THEN 'DISTSTYLE EVEN'
     WHEN c.reldiststyle = 1 THEN 'DISTSTYLE KEY'
     WHEN c.reldiststyle = 8 THEN 'DISTSTYLE ALL'
+    WHEN c.reldiststyle = 9 THEN 'DISTSTYLE AUTO'
     ELSE '<<Error - UNKNOWN DISTSTYLE>>'
     END AS ddl
   FROM pg_namespace AS n
@@ -181,10 +196,11 @@ FROM pg_namespace AS n
   WHERE c.relkind = 'r'
   --DISTKEY COLUMNS
   UNION SELECT
-   n.nspname AS schemaname
+   c.oid::bigint as table_id
+   ,n.nspname AS schemaname
    ,c.relname AS tablename
    ,400000000 + a.attnum AS seq
-   ,'DISTKEY (' + QUOTE_IDENT(a.attname) + ')' AS ddl
+   ,' DISTKEY (' + QUOTE_IDENT(a.attname) + ')' AS ddl
   FROM pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   INNER JOIN pg_attribute AS a ON c.oid = a.attrelid
@@ -192,10 +208,11 @@ FROM pg_namespace AS n
     AND a.attisdistkey IS TRUE
     AND a.attnum > 0
   --SORTKEY COLUMNS
-  UNION select schemaname, tablename, seq,
-       case when min_sort <0 then 'INTERLEAVED SORTKEY (' else 'SORTKEY (' end as ddl
+  UNION select table_id,schemaname, tablename, seq,
+       case when min_sort <0 then 'INTERLEAVED SORTKEY (' else ' SORTKEY (' end as ddl
 from (SELECT
-   n.nspname AS schemaname
+   c.oid::bigint as table_id
+   ,n.nspname AS schemaname
    ,c.relname AS tablename
    ,499999999 AS seq
    ,min(attsortkeyord) min_sort FROM pg_namespace AS n
@@ -204,9 +221,10 @@ from (SELECT
   WHERE c.relkind = 'r'
   AND abs(a.attsortkeyord) > 0
   AND a.attnum > 0
-  group by 1,2,3 )
+  group by 1,2,3,4 )
   UNION (SELECT
-   n.nspname AS schemaname
+   c.oid::bigint as table_id
+   ,n.nspname AS schemaname
    ,c.relname AS tablename
    ,500000000 + abs(a.attsortkeyord) AS seq
    ,CASE WHEN abs(a.attsortkeyord) = 1
@@ -221,7 +239,8 @@ from (SELECT
     AND a.attnum > 0
   ORDER BY abs(a.attsortkeyord))
   UNION SELECT
-   n.nspname AS schemaname
+   c.oid::bigint as table_id
+   ,n.nspname AS schemaname
    ,c.relname AS tablename
    ,599999999 AS seq
    ,'\t)' AS ddl
@@ -232,12 +251,23 @@ from (SELECT
     AND abs(a.attsortkeyord) > 0
     AND a.attnum > 0
   --END SEMICOLON
-  UNION SELECT n.nspname AS schemaname, c.relname AS tablename, 600000000 AS seq, ';' AS ddl
+  UNION SELECT c.oid::bigint as table_id ,n.nspname AS schemaname, c.relname AS tablename, 600000000 AS seq, ';' AS ddl
   FROM  pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
-  WHERE c.relkind = 'r' )
+  WHERE c.relkind = 'r' 
+  
+  UNION
+  --TABLE OWNERSHIP AS AN ALTER TABLE STATMENT
+  SELECT c.oid::bigint as table_id ,n.nspname AS schemaname, c.relname AS tablename, 600500000 AS seq, 
+  'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' owner to '+  QUOTE_IDENT(u.usename) +';' AS ddl
+  FROM  pg_namespace AS n
+  INNER JOIN pg_class AS c ON n.oid = c.relnamespace
+  INNER JOIN pg_user AS u ON c.relowner = u.usesysid
+  WHERE c.relkind = 'r'
+  
+  )
   UNION (
-    SELECT 'zzzzzzzz' || n.nspname AS schemaname,
+    SELECT c.oid::bigint as table_id,'zzzzzzzz' || n.nspname AS schemaname,
        'zzzzzzzz' || c.relname AS tablename,
        700000000 + CAST(con.oid AS INT) AS seq,
        'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
@@ -250,6 +280,6 @@ from (SELECT
     AND con.contype = 'f'
     ORDER BY seq
   )
- ORDER BY schemaname, tablename, seq
+ ORDER BY table_id,schemaname, tablename, seq
  )
 ;

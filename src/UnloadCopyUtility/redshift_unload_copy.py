@@ -24,7 +24,7 @@ import sys
 import logging
 from global_config import GlobalConfigParametersReader, config_parameters
 from util.s3_utils import S3Helper, S3Details
-from util.resources import ResourceFactory
+from util.resources import ResourceFactory, TableResource, DBResource
 from util.tasks import TaskManager, FailIfResourceDoesNotExistsTask, CreateIfTargetDoesNotExistTask, \
     FailIfResourceClusterDoesNotExistsTask, UnloadDataToS3Task, CopyDataFromS3Task, CleanupS3StagingAreaTask, \
     NoOperationTask
@@ -75,21 +75,54 @@ class UnloadCopyTool:
         # load the configuration
         self.config_helper = ConfigHelper(config_file, self.s3_helper)
 
-        source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
-
-        destination = ResourceFactory.get_target_resource_from_config_helper(self.config_helper, self.region)
-
         self.task_manager = TaskManager()
         self.barrier_after_all_cluster_pre_tests = NoOperationTask()
         self.task_manager.add_task(self.barrier_after_all_cluster_pre_tests)
         self.barrier_after_all_resource_pre_tests = NoOperationTask()
         self.task_manager.add_task(self.barrier_after_all_resource_pre_tests)
 
-        # TODO: Check whether both resources are of type table if that is not the case then perform other scenario's
-        # For example if both resources are of type schema then create target schema and migrate all tables
-        self.add_table_migration(source, destination, global_config_values)
+        src_config = self.config_helper.config['unloadSource']
+        dest_config = self.config_helper.config['copyTarget']
+        if(src_config['tableNames']):
+            src_tables = src_config['tableNames']
+            dest_tables = dest_config['tableNames']
+            logging.info("Migrating multiple tables")
+            if( not dest_tables or len(src_tables) != len(dest_tables) ):
+                logging.fatal("When migrating multiple tables 'tableNames' property must be configured in unloadSource and copyTarget, and be the same length")
+                raise NotImplementedError
+            for idx in range(0,len(src_tables)):
+                src_config['tableName'] = src_tables[idx]
+                dest_config['tableName'] = dest_tables[idx]
+                source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
+                destination = ResourceFactory.get_target_resource_from_config_helper(self.config_helper, self.region)
+                self.add_src_dest_tasks(source,destination,global_config_values)
+        else:
+            # Migrating a single table
+            source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
+            destination = ResourceFactory.get_target_resource_from_config_helper(self.config_helper, self.region)
+            self.add_src_dest_tasks(source,destination,global_config_values)
 
         self.task_manager.run()
+
+    def add_src_dest_tasks(self,source,destination,global_config_values):
+        # TODO: Check whether both resources are of type table if that is not the case then perform other scenario's
+        if isinstance(source, TableResource):
+            if isinstance(destination, DBResource):
+                if not isinstance(destination, TableResource):
+                    destination = ResourceFactory.get_table_resource_from_merging_2_resources(destination, source)
+                if global_config_values['tableName'] and global_config_values['tableName'] != 'None':
+                    destination.set_table(global_config_values['tableName'])
+                self.add_table_migration(source, destination, global_config_values)
+            else:
+                logging.fatal('Destination should be a database resource')
+                raise NotImplementedError
+            pass
+        else:
+            # TODO: add additional scenario's
+            # For example if both resources are of type schema then create target schema and migrate all tables
+            logging.fatal('Source is not a Table, this type of unload-copy is currently not supported.')
+            raise NotImplementedError
+
 
     def add_table_migration(self, source, destination, global_config_values):
         if global_config_values['connectionPreTest']:

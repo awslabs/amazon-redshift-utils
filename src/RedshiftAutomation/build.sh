@@ -1,7 +1,7 @@
 #!/bin/bash
 # set -x
 
-version=1.3
+version=1.4
 ARCHIVE=dist/lambda-redshift-util-runner-$version.zip
 
 if [ -f $ARCHIVE ]; then
@@ -15,6 +15,11 @@ fi
 if [ ! -d lib ]; then
 	mkdir lib
 fi
+
+cp -r $PYTHON_PATH/pg8000 lib
+cp -r $PYTHON_PATH/shortuuid lib
+cp -r $PYTHON_PATH/boto3 lib
+cp -r $PYTHON_PATH/pgpasslib* lib
 
 # import the column encoding utility
 if [ ! -d lib/ColumnEncodingUtility ]; then
@@ -59,4 +64,4 @@ echo "Imported Redshift Advance Monitoring"
 cd -
 
 # build the combined lambda package
-zip -r $ARCHIVE *.py config.json .pgpass ../aws_utils.py ../config_constants.py lib/AnalyzeVacuumUtility lib/ColumnEncodingUtility lib/SystemTablePersistence lib/pg8000* lib/shortuuid* lib/pgpasslib* lib/amazon-redshift-monitoring/redshift_monitoring.py lib/amazon-redshift-monitoring/sql/ lib/amazon-redshift-monitoring/monitoring-queries.json
+zip -r $ARCHIVE *.py config.json .pgpass ../aws_utils.py ../config_constants.py lib/AnalyzeVacuumUtility lib/ColumnEncodingUtility lib/WorkloadManagementScheduler lib/SystemTablePersistence lib/pg8000* lib/shortuuid* lib/pgpasslib* lib/amazon-redshift-monitoring/redshift_monitoring.py lib/amazon-redshift-monitoring/sql/ lib/amazon-redshift-monitoring/monitoring-queries.json

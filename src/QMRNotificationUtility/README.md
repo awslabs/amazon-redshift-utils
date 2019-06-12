@@ -1,11 +1,11 @@
 # Amazon Redshift WLM Query Monitoring Rule (QMR) Action Notification Utility
 
 ## Goals
-This utility uses a scheduled Lambda function to pull records from the QMR action system log table (stl_wlm_rule_action) and publish them to an SNS topic. This utility can be used to send periodic notifications based on the WLM query monitoring rule actions taken for your unique workload and rules configuration.
+This utility uses a scheduled Lambda function to pull records from the QMR action system log table (`stl_wlm_rule_action`) and publish them to an SNS topic. This utility can be used to send periodic notifications based on the WLM query monitoring rule actions taken for your unique workload and rules configuration.
 
-In Amazon Redshift workload management (WLM), query monitoring rules define metrics-based performance boundaries for WLM queues and specify what action to take when a query goes beyond those boundaries. For example, for a queue dedicated to short running queries, you might create a rule that aborts queries that run for more than 60 seconds. To track poorly designed queries, you might have another rule that logs queries that contain nested loops.  The rule violations are captured in stl_wlm_rule_action system table. For more information about Redshift workload management (WLM) query monitoring rules and how to configure it, please refer to Redshift [Documentation](http://docs.aws.amazon.com/redshift/latest/mgmt/workload-mgmt-config.html)
+In Amazon Redshift workload management (WLM), query monitoring rules define metrics-based performance boundaries for WLM queues and specify what action to take when a query goes beyond those boundaries. For example, for a queue dedicated to short running queries, you might create a rule that aborts queries that run for more than 60 seconds. To track poorly designed queries, you might have another rule that logs queries that contain nested loops.  The rule actions are captured in `stl_wlm_rule_action` system table. For more information about Redshift workload management (WLM) query monitoring rules and how to configure it, please refer to Redshift [Documentation](http://docs.aws.amazon.com/redshift/latest/mgmt/workload-mgmt-config.html)
 
-The utility periodically scans 'stl_wlm_rule_action.actions' (log/hop/abort) recorded by WLM query monitoring rules and sends the records as SNS notifications. In summary, a Lambda function is invoked on a scheduled interval, connects to your Redshift cluster, reads events from stl_wlm_rule_action and publishes them to an SNS topic as a JSON string.
+The utility periodically scans `stl_wlm_rule_action.actions` (log/hop/abort) recorded by WLM query monitoring rules and sends the records as SNS notifications. In summary, a Lambda function is invoked on a scheduled interval, connects to your Redshift cluster, reads events from `stl_wlm_rule_action` and publishes them to an SNS topic as a JSON string.
 
 ## Installation Notes:
 
@@ -20,7 +20,7 @@ This utility requires the following items:
 
 * An Amazon Redshift cluster in the above VPC. ***NOTE: Amazon Redshift cluster's Endpoint, Port, Database***
 
-* Database user credentials for an Amazon Redshift user with access to [STL_WLM_RULE_ACTION](http://docs.aws.amazon.com/redshift/latest/dg/r_STL_WLM_RULE_ACTION.html). A superuser will be able to see all rows in this table, and a non-privileged user will be able to see only their own rows. More on visibility here: [Visibility of Data in System Tables and Views](http://docs.aws.amazon.com/redshift/latest/dg/c_visibility-of-data.html). ***NOTE: Amazon Redshift cluster's user name and password***
+* Database user credentials for an Amazon Redshift user with access to [`STL_WLM_RULE_ACTION`](http://docs.aws.amazon.com/redshift/latest/dg/r_STL_WLM_RULE_ACTION.html). A superuser will be able to see all rows in this table, and a non-privileged user will be able to see only their own rows. More on visibility here: [Visibility of Data in System Tables and Views](http://docs.aws.amazon.com/redshift/latest/dg/c_visibility-of-data.html). ***NOTE: Amazon Redshift cluster's user name and password***
 
 * An active WLM configuration with QMR enabled ([Documentation](http://docs.aws.amazon.com/redshift/latest/mgmt/workload-mgmt-config.html)).
 
@@ -32,19 +32,20 @@ This utility requires the following items:
 
 The quickest way to get up and running with the QMRNotificationUtility is by leveraging the packaged CloudFormation template and the AWS CLI.
 
-1. Navigate to the QMRNotificationUtility's directory within the amazon-redshift-utils project:
+#### 1. Navigate to the QMRNotificationUtility's directory within the amazon-redshift-utils project:
 
-```bash
+```
+git clone/pull amazon-redshift-utils
 cd amazon-redshift-utils/src/QMRNotificationUtility
 ```
 
-2. Copy the zipped python Deployment Package for the Lambda function to a location of your choosing in S3:
+#### 2. Copy the zipped python Deployment Package for the Lambda function to a location of your choosing in S3:
 
 ```bash
 aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.4.zip s3://yourbucket/qmr-action-notification-utility-1.4.zip
 ```
 
-3. Gather the necessary identifiers noted in the prerequistes section above:
+#### 3. Gather the necessary identifiers noted in the prerequistes section above:
 
 * VPC ID
 * Subnet ID(s)
@@ -56,7 +57,9 @@ aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.4.zip s3://yourbucket/
 * Bucket to host the Lambda Deployment Package
 * Email address to be notified of WLM actions
 
-4. Use the AWS CLI to create a stack containing the necessary dependencies and Lambda function:
+#### 4. Create the Lambda Function
+
+Use the AWS CLI to create a stack containing the necessary dependencies and Lambda function:
 
 ```bash
 aws cloudformation create-stack \
@@ -77,13 +80,17 @@ aws cloudformation create-stack \
 --capabilities CAPABILITY_IAM
 ```
 
-5. It may take a few mintues for the stack's resources to be provisioned. Verify creation is complete when the following command returns "CREATE_COMPLETE":
+#### 5. Verify creation is complete
+
+It may take a few mintues for the stack's resources to be provisioned, and is completed when the following command returns "CREATE_COMPLETE":
 
 ```bash
 aws cloudformation describe-stacks --stack-name qmr-action-notification-utility --query 'Stacks[0].StackStatus' --output text
 ```
 
-6. From the completed stack creation, extract the KMS Key ID, and use that Key to process your plaintext database password to ciphertext:
+#### 6. Add an encrypted password
+
+From the completed stack creation, extract the KMS Key ID, and use that Key to process your plaintext database password to ciphertext:
 
 ```bash
 # Extract KMS Key ID
@@ -98,7 +105,9 @@ CIPHERTEXT=`aws kms encrypt --key-id $KMSKEYID --plaintext file://./passwd.txt -
 rm passwd.txt
 ```
 
-7. Update your CloudFormation stack with the MonitoringDBPasswordCiphertext parameter with the ciphertext generated from the previous step, leaving all other parameters unchanged:
+#### 7. Update your CloudFormation stack 
+
+Add the `MonitoringDBPasswordCiphertext` parameter with the ciphertext generated from the previous step, leaving all other parameters unchanged:
 
 ```bash
 aws cloudformation update-stack \
@@ -119,15 +128,20 @@ aws cloudformation update-stack \
 --capabilities CAPABILITY_IAM
 ```
 
-8. It may take a moment for the stack's resources to be updated. Verify the modification is complete when the following command returns "UPDATE_COMPLETE":
+#### 8. Verify the modification is complete
+
+It may take a moment for the stack's resources to be updated, and is done when the following command returns "UPDATE_COMPLETE":
 
 ```bash
 aws cloudformation describe-stacks --stack-name qmr-action-notification-utility --query 'Stacks[0].StackStatus' --output text
 ```
 
-9. Check the inbox of the email address you included for SNSEmailParameter. There should be an "AWS Notification - Subscription Confirmation" from no-reply@sns.amazonaws.com asking that you confirm your subscription. Click the link if you wish to receive updates on this email address.  
+#### 9. Check the inbox of the email address you included for SNSEmailParameter. 
+There should be an "AWS Notification - Subscription Confirmation" from no-reply@sns.amazonaws.com asking that you confirm your subscription. Click the link if you wish to receive updates on this email address.  
 
-10. Verify the email address receives an email notification within 5 minutes of purposely triggering a QMR action by manually running SQL that is known to violate a rule defined in your active WLM configuration. Below is one example SNS notification email message:
+#### 10. Verify the email address receives an email notification within 5 minutes
+
+By purposely triggering a QMR action by manually running SQL that is known to violate a rule defined in your active WLM configuration. Below is one example SNS notification email message:
 
 ```json
 [

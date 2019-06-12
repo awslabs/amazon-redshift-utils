@@ -1,0 +1,3 @@
+PyGreSQL
+boto3
+pytz

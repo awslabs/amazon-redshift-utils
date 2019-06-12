@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 echo "Running column-encoding utility"
 
 # Required
@@ -31,6 +33,7 @@ COMP_ROWS=${COMP_ROWS:-}
 QUERY_GROUP=${QUERY_GROUP:-}
 NEW_DIST_KEY=${NEW_DIST_KEY:-}
 NEW_SORT_KEYS=${NEW_SORT_KEYS:-}
+STATEMENT_TIMEOUT=${STATEMENT_TIMEOUT:-}
 
 if [ "${DB}" == "" ]; then echo "Environment Var 'DB' must be defined"
 elif [ "${DB_USER}" == "" ]; then echo "Environment Var 'DB_USER' must be defined"
@@ -44,6 +47,7 @@ else
     if [ "${QUERY_GROUP}" != "" ]; then QUERY_GROUP_CMD="--query_group ${QUERY_GROUP}"; fi
     if [ "${NEW_DIST_KEY}" != "" ]; then NEW_DIST_KEY_CMD="--new-dist-key ${NEW_DIST_KEY}"; fi
     if [ "${NEW_SORT_KEYS}" != "" ]; then NEW_SORT_KEYS_CMD="--new-sort-keys ${NEW_SORT_KEYS}"; fi
+    if [ "${STATEMENT_TIMEOUT}" != "" ]; then STATEMENT_TIMEOUT_CMD="--statement-timeout ${STATEMENT_TIMEOUT}"; fi
 
     python ColumnEncodingUtility/analyze-schema-compression.py \
         --db ${DB} \
@@ -62,7 +66,7 @@ else
         --drop-old-data ${DROP_OLD_DATA} \
         --ssl-option ${SSL_OPTION} \
         ${ANALYZE_TABLE_CMD} ${ANALYZE_COL_WIDTH_CMD} ${OUTPUT_FILE_CMD} ${COMP_ROWS_CMD} ${QUERY_GROUP_CMD} \
-        ${NEW_DIST_KEY_CMD} ${NEW_SORT_KEYS_CMD}
+        ${NEW_DIST_KEY_CMD} ${NEW_SORT_KEYS_CMD} ${STATEMENT_TIMEOUT_CMD}
 
     echo "Done"
 fi

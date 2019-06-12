@@ -271,6 +271,7 @@ class TableResource(SchemaResource):
                      manifest
                      encrypted
                      gzip
+                     null as 'NULL_STRING__'
                      delimiter '^' addquotes escape allowoverwrite"""
 
     copy_table_stmt = """copy {schema_name}.{table_name} {columns}
@@ -278,8 +279,12 @@ class TableResource(SchemaResource):
                    '{s3_access_credentials};master_symmetric_key={master_symmetric_key}'
                    manifest 
                    encrypted
-                   gzip
-                   delimiter '^' removequotes escape compupdate off"""
+                   gzip 
+                   null as 'NULL_STRING__'
+                   {explicit_ids}
+                   dateformat 'auto'
+                   timeformat 'auto'
+                   delimiter '^' removequotes escape compupdate off """
 
     drop_table_stmt = """DROP TABLE {schema_name}.{table_name}"""
 
@@ -292,6 +297,7 @@ class TableResource(SchemaResource):
         self.commands['copy_table'] = TableResource.copy_table_stmt
         self.commands['drop_table'] = TableResource.drop_table_stmt
         self.columns = None
+        self.explicit_ids = False  # Only relevant to copy command
 
     def __eq__(self, other):
         return type(self) == type(other) and \
@@ -328,7 +334,8 @@ class TableResource(SchemaResource):
                            'master_symmetric_key': s3_details.symmetric_key,
                            'dataStagingPath': s3_details.dataStagingPath,
                            'region': s3_details.dataStagingRegion,
-                           'columns': self.columns or ''}
+                           'columns': self.columns or '',
+                           'explicit_ids': 'explicit_ids' if self.explicit_ids else ''}
 
         self.run_command_against_resource('copy_table', copy_parameters)
 
@@ -349,6 +356,8 @@ class TableResource(SchemaResource):
     def set_columns(self, columns):
         self.columns = columns
 
+    def set_explicit_ids(self, explicit_ids):
+        self.explicit_ids = explicit_ids
 
 class ResourceFactory:
     def __init__(self):
@@ -358,6 +367,23 @@ class ResourceFactory:
     def get_source_resource_from_config_helper(config_helper, kms_region=None):
         cluster_dict = config_helper.config['unloadSource']
         return ResourceFactory.get_resource_from_dict(cluster_dict, kms_region)
+
+    @staticmethod
+    def get_table_resource_from_merging_2_resources(resource1, resource2):
+        cluster = resource1.get_cluster()
+        try:
+            schema = resource1.get_schema()
+        except AttributeError:
+            logging.info('Destination did not have a schema declared fetching from resource2.')
+            schema = resource2.get_schema()
+            logging.info('Using resource2 schema {s}'.format(s=schema))
+        try:
+            table = resource1.get_table()
+        except AttributeError:
+            logging.info('Destination did not have a table declared fetching from resource2.')
+            table = resource2.get_table()
+            logging.info('Using resource2 table {t}'.format(t=table))
+        return TableResource(cluster, schema, table)
 
     @staticmethod
     def get_target_resource_from_config_helper(config_helper, kms_region=None):
@@ -398,4 +424,6 @@ class ResourceFactory:
             table_resource = TableResource(cluster, cluster_dict['schemaName'], cluster_dict['tableName'])
             if 'columns' in cluster_dict and cluster_dict['columns'].strip():
                 table_resource.set_columns(cluster_dict['columns'].strip())
+            if 'explicit_ids' in cluster_dict and cluster_dict['explicit_ids']:
+                table_resource.set_explicit_ids(True)
             return table_resource

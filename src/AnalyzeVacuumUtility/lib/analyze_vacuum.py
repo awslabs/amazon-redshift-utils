@@ -1,7 +1,9 @@
 from __future__ import print_function
 
+import datetime
 import os
 import re
+import socket
 import sys
 import traceback
 import socket
@@ -104,7 +106,7 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
         return None
 
     # set search paths
-    aws_utils.set_search_paths(conn, schema_name)
+    aws_utils.set_search_paths(conn, schema_name, exclude_external_schemas=True)
 
     if query_group is not None and query_group != '':
         set_query_group = 'set query_group to %s' % query_group
@@ -152,12 +154,12 @@ def run_commands(conn, commands, cw=None, cluster_name=None, suppress_errors=Fal
                 cursor = conn.cursor()
                 cursor.execute(c)
                 comment('Success.')
-            except Exception:
+            except:
                 # cowardly bail on errors
                 conn.rollback()
+                print(traceback.format_exc())
                 if not suppress_errors:
-                    print(traceback.format_exc())
-                raise
+                    raise
 
             # emit a cloudwatch metric for the statement
             if cw is not None and cluster_name is not None:
@@ -239,7 +241,8 @@ def run_vacuum(conn,
                        + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') 
                        + ', Stats Off : ' + stats_off :: varchar(10)
                        + ' */ ;' as statement,
-                       table_name
+                       table_name,
+                       schema_name
                 FROM (SELECT schema_name,
                              table_name
                       FROM (SELECT TRIM(n.nspname) schema_name,
@@ -259,7 +262,7 @@ def run_vacuum(conn,
                               JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                             WHERE l.userid > 1
                             AND   l.event_time >= dateadd(DAY,%s,CURRENT_DATE)
-                            AND   regexp_instr(solution,'.*VACUUM.reclaim deleted.') > 0
+                            AND   regexp_instr(solution,'.*VACUUM.*reclaim deleted.') > 0
                             GROUP BY TRIM(n.nspname),
                                      TRIM(c.relname)) anlyz_tbl
                       WHERE anlyz_tbl.qry_rnk <%s) feedback_tbl
@@ -287,9 +290,9 @@ def run_vacuum(conn,
 
     for vs in vacuum_statements:
         statements.append(vs[0])
-        statements.append("analyze %s.\"%s\"" % (schema_name, vs[1]))
+        statements.append("analyze %s.\"%s\"" % (vs[2], vs[1]))
 
-    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
         if not ignore_errors:
             if debug:
                 print("Error running statements: %s" % (str(statements),))
@@ -337,7 +340,7 @@ def run_vacuum(conn,
             statements.append(vs[0])
             statements.append("analyze %s.\"%s\"" % (vs[2], vs[1]))
 
-        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -379,7 +382,7 @@ def run_vacuum(conn,
             statements.append(vs[0])
             statements.append("analyze %s.\"%s\"" % (vs[2], vs[1]))
 
-        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -560,7 +563,7 @@ def run_analyze(conn,
 
     comment("Found %s Tables requiring Analysis" % len(statements))
 
-    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+    if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
         if not ignore_errors:
             if debug:
                 print("Error running statements: %s" % (str(statements),))
@@ -601,7 +604,7 @@ def run_analyze(conn,
         for vs in analyze_statements:
             statements.append(vs[0])
 
-        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name):
+        if not run_commands(conn, statements, cw=cw, cluster_name=cluster_name, suppress_errors=ignore_errors):
             if not ignore_errors:
                 if debug:
                     print("Error running statements: %s" % (str(statements),))
@@ -653,12 +656,16 @@ def run_analyze_vacuum(**kwargs):
     # get the password using .pgpass, environment variables, and then fall back to config
     db_pwd = None
     try:
-        db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST],kwargs[config_constants.DB_PORT], kwargs[config_constants.DB_NAME],kwargs[config_constants.DB_USER])
+        db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST], kwargs[config_constants.DB_PORT],
+                                   kwargs[config_constants.DB_NAME], kwargs[config_constants.DB_USER])
     except pgpasslib.FileNotFound as e:
         pass
 
     if db_pwd is None:
         db_pwd = kwargs[config_constants.DB_PASSWORD]
+
+    if config_constants.SCHEMA_NAME not in kwargs:
+        kwargs[config_constants.SCHEMA_NAME] = 'public'
 
     # get a connection for the controlling processes
     master_conn = get_pg_conn(kwargs[config_constants.DB_HOST],
@@ -667,8 +674,10 @@ def run_analyze_vacuum(**kwargs):
                               db_pwd,
                               kwargs[config_constants.SCHEMA_NAME],
                               kwargs[config_constants.DB_PORT],
-                              None if config_constants.QUERY_GROUP not in kwargs else kwargs[config_constants.QUERY_GROUP],
-                              None if config_constants.QUERY_SLOT_COUNT not in kwargs else kwargs[config_constants.QUERY_SLOT_COUNT],
+                              None if config_constants.QUERY_GROUP not in kwargs else kwargs[
+                                  config_constants.QUERY_GROUP],
+                              None if config_constants.QUERY_SLOT_COUNT not in kwargs else kwargs[
+                                  config_constants.QUERY_SLOT_COUNT],
                               None if config_constants.SSL not in kwargs else kwargs[config_constants.SSL])
 
     if master_conn is None:

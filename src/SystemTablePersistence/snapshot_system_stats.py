@@ -20,6 +20,8 @@ from datetime import timedelta
 import json
 import config_constants
 import pgpasslib
+import traceback
+import re
 
 #### Static Configuration
 ssl = True
@@ -66,8 +68,11 @@ def create_schema_objects(cursor, conn):
             try:
                 cursor.execute(stmt)
             except Exception as e:
-                print(e)
-                raise e
+                if re.search(".*column.*already exists", str(e)) is not None:
+                    pass
+                else:
+                    print(e)
+                    raise e
 
     conn.commit()
     if debug:
@@ -78,7 +83,19 @@ def snapshot_system_tables(cursor, conn, table_config):
     rowcounts = {}
     for t in table_config:
         table = t['table']
-        stmt = t['insert']
+        snapshot_new = t['snapshotNew']
+        stmt = None
+
+        # extract and format the column list from the select statement if it has one
+        if re.search("select.*\*", snapshot_new.lower()) is not None:
+            stmt = 'insert into history.%s (%s);' % (table, snapshot_new)
+        else:
+            columns = snapshot_new.lower().split("from")[0].split("select")[1].strip()
+            column_list = []
+            for c in columns.split(','):
+                column_list.append(c.strip())
+            stmt = 'insert into history.%s(%s)(%s);' % (table, ','.join(column_list), snapshot_new)
+
         if debug:
             print("%s: %s" % (table, stmt))
         cursor.execute(stmt)
@@ -103,8 +120,8 @@ def cleanup_snapshots(cursor, conn, cleanup_after_days, table_config):
     for s in table_config:
         table = s['table']
 
-        if 'override_sql' in s:
-            stmt = s['override_sql'] % delete_after
+        if 'cleanupQuery' in s:
+            stmt = s['cleanupQuery'] % delete_after
         else:
             stmt = "delete from history.%s where %s < to_timestamp('%s','yyyy-mm-dd HH:MI:SS')" % (
                 table, s['archiveColumn'], delete_after)
@@ -124,6 +141,22 @@ def cleanup_snapshots(cursor, conn, cleanup_after_days, table_config):
     return rowcounts
 
 
+def unload_stats(cursor, table_config, cluster, s3_export_location, redshift_unload_iam_role_arn):
+    for s in table_config:
+        table = s['table']
+        unload_select = s['snapshotNew']
+        export_location = '%s/%s/cluster=%s/datetime=%s/' % (s3_export_location, table, cluster, datetime.datetime.now())
+        statement = "unload ('%s') to '%s' IAM_ROLE '%s' gzip delimiter '|' addquotes escape allowoverwrite;" % (
+            unload_select.replace("'","\\'"), export_location, redshift_unload_iam_role_arn)
+
+        if debug:
+            print(statement)
+
+        cursor.execute(statement)
+
+        print("Unloaded table stats for %s to %s" % (table, export_location))
+
+
 def snapshot(config_sources):
     aws_region = get_config_value(['AWS_REGION'], config_sources)
 
@@ -141,13 +174,21 @@ def snapshot(config_sources):
     host = get_config_value(['HostName', 'cluster_endpoint', 'dbHost', 'db_host'], config_sources)
     port = int(get_config_value(['HostPort', 'db_port', 'dbPort'], config_sources))
     database = get_config_value(['DatabaseName', 'db_name', 'db'], config_sources)
+    cluster_name = get_config_value([config_constants.CLUSTER_NAME], config_sources)
+    unload_s3_location = get_config_value([config_constants.S3_UNLOAD_LOCATION], config_sources)
+    unload_role_arn = get_config_value([config_constants.S3_UNLOAD_ROLE_ARN], config_sources)
+
+    if unload_s3_location is not None and unload_role_arn is None:
+        raise Exception("If you configure S3 unload then you must also provide the UnloadRoleARN")
 
     # we may have been passed the password in the configuration, so extract it if we can
     pwd = get_config_value(['db_pwd'], config_sources)
 
     # override the password with the contents of .pgpass or environment variables
     try:
-        pwd = pgpasslib.getpass(host,port, database,user)
+        pg_pwd = pgpasslib.getpass(host, port, database, user)
+        if pg_pwd:
+            pwd = pg_pwd
     except pgpasslib.FileNotFound as e:
         pass
 
@@ -179,6 +220,7 @@ def snapshot(config_sources):
             print('Connecting to Redshift: %s' % host)
 
         conn = pg8000.connect(database=database, user=user, password=pwd, host=host, port=port, ssl=ssl)
+        conn.autocommit = True
     except:
         print('Redshift Connection Failed: exception %s' % sys.exc_info()[1])
         raise
@@ -205,6 +247,14 @@ def snapshot(config_sources):
 
     # snapshot stats into history tables
     insert_rowcounts = snapshot_system_tables(cursor, conn, table_config)
+
+    # export the data to s3 if configured
+    try:
+        if unload_s3_location is not None:
+            unload_stats(cursor, table_config, cluster_name, unload_s3_location, unload_role_arn)
+    except e:
+        print("Exception during System Table Detail unload to S3. This will not prevent automated cleanup.");
+        print(traceback.format_exc())
 
     # cleanup history tables if requested in the configuration
     delete_rowcounts = None

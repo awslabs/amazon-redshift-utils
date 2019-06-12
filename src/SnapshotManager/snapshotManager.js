@@ -63,7 +63,6 @@ function getTags(config, forDate) {
 
 // function to query for snapshots created since the configuration start time
 function getSnapshots(config, callback) {
-
     var snapStartTime;
     var intervalExpression;
 
@@ -210,7 +209,7 @@ function cleanupSnapshots(config, callback) {
             intervalExpression = config.snapshotRetentionDays + " days (" + snapEndTime.format() + ")";
         }
 
-        console.log("Cleaning up '" + config.namespace + "' Snapshots older than ");
+        console.log("Cleaning up '" + config.namespace + "' Snapshots older than " + config.snapshotRetentionDays + " days");
 
         exports.getSnapshotsInInterval(config.targetResource, config.namespace, undefined, snapEndTime, {
             SnapshotType: "manual"
@@ -303,6 +302,19 @@ function validateConfig(config, callback) {
 
 exports.validateConfig = validateConfig;
 
+function getSnapshotStorage(config, callback) {
+    redshift.describeStorage(function (err, data) {
+        if (err) {
+            callback(err);
+        } else {
+            console.log("You are currently using " + data.TotalBackupSizeInMegaBytes + " MB of Snapshot Storage");
+            callback(null, data.TotalBackupSizeInMegaBytes);
+        }
+    });
+}
+
+exports.getSnapshotStorage = getSnapshotStorage;
+
 // processor entry point
 function run(config, callback) {
     var checksPassed = true;
@@ -334,8 +346,11 @@ function run(config, callback) {
                     // create additional snaps
                     createOrConvertSnapshots.bind(undefined),
                     // now cleanup the existing snapshots
-                    cleanupSnapshots.bind(undefined)], function (err) {
-                    callback(err);
+                    cleanupSnapshots.bind(undefined),
+                    // get the current snapshot usage for the account
+                    getSnapshotStorage.bind(undefined, config)
+                ], function (err, totalStorageSizeMB) {
+                    callback(err, totalStorageSizeMB);
                 });
             }
         });

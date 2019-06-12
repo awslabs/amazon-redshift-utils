@@ -2,13 +2,12 @@
 
 This project includes code that is able to run several of the Amazon Redshift Utilities in AWS Lambda to automate the most common administrative tasks on a Redshift database. By using a Lambda function scheduled via a [CloudWatch Event](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html), you can ensure that these valuable utilities run automatically and keep your Redshift cluster running well.
 
+
+Currently the [Column Encoding Utility](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/ColumnEncodingUtility), [Analyze/Vacuum Utility](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/AnalyzeVacuumUtility), [Redshift Advanced Monitoring](https://github.com/awslabs/amazon-redshift-monitoring), and [System Table Persistence](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/SystemTablePersistence) are supported for automated invocation:
+
 ![Architecture](Architecture.png)
 
 This utility creates a Lambda function which imports other Redshift Utils modules, and then invokes them against a cluster. It runs within your VPC, and should be configured to connect via a Subnet which is either the same, or can route to the subnet where your Redshift cluster is running. It should also be configured with a Security Group which is trusted by your [Redshift Cluster Security Configuration](http://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html).
-
-Currently the [Column Encoding Utility](src/ColumnEncodingUtility), [Analyze/Vacuum Utility](src/AnalyzeVacuumUtility), [Redshift Advanced Monitoring](https://github.com/awslabs/amazon-redshift-monitoring), and [System Table Persistence](src/SystemTablePersistence) are supported for automated invocation:
-
-![what it does](WhatItDoes.png)
 
 ## Setup Pre-Tasks
 
@@ -18,13 +17,13 @@ To encrypt your password for use by this function, please run the [encrypt_passw
 
 ```
 > export AWS_REGION=my-aws-region
-> (python) encrypt_password.py MY_SECRET_PASSWORD
+> (python) encrypt_password.py MY_DB_PASSWORD
 ```
 
 This will create the required Customer Master Key in KMS, along with a key alias that makes it easy to work with (called ```alias/RedshiftUtilsLambdaRunner```) and so must be run as a user with rights to do so. It will then encrypt the supplied password and output the encrypted ciphertext as a base64 encoded string:
 
 ```
-$ ./encrypt_password.py MY_SECRET_PASSWORD
+$ ./encrypt_password.py MY_DB_PASSWORD
 Encryption Complete
 Encrypted Password: CiChAYm4goRPj1CuMlY+VbyChti8kHVW4kxInA+keC7gPxKZAQEBAgB4oQGJuIKET49QrjJWPlW8gobYvJB1VuJMSJwPpHgu4D8AAABwMG4GCSqGSIb3DQEHBqBhMF8CAQAwWgYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwdVzuq29SCuPKlh9ACARCALY1H/Tb4Hw73yqLyL+Unjp4NC0F5UjETNUGPtM+DTHG8urILNTKvdv1t9S5zuQ==
 ```
@@ -33,7 +32,7 @@ Copy the value after ```Encrypted Password: ``` and use it for the creation of t
 
 ## Configuration
 
-This lambda function uses a configuration file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. An example `config-example.json` is included to get you started. You configure which utility to run in the ```'utilities'``` array - currently the values ```ColumnEncodingUtility, AnalyzeVacuumUtility``` are supported
+This lambda function uses a configuration file to get information about which cluster to connect to, which utilities to run, and other information it needs to accomplish its task. An example `config-example.json` is included to get you started. You configure which utility to run in the ```'utilities'``` array - currently the values ```ColumnEncodingUtility, AnalyzeVacuumUtility``` and ```Monitoring``` are supported.
 
 The required configuration items are placed into the ```configuration``` part of the config file, and include:
 
@@ -44,7 +43,7 @@ The required configuration items are placed into the ```configuration``` part of
   "schema_name": "Schema to be analyzed, vacuumed, or encoded (string)",
   "comprows": "Rows to use in the analyze compression request (int | default -1 meaning unspecified)",
   "db": "Database Name to connect to (string)",
-  "db_host": "Your cluster DNS name (string)",
+  "db_host": "Your cluster DNS name (string). If your lambda function is on the same VPC, using private IP address here will be more secure",
   "db_password": "Your base64 encoded encrypted password here (string - generated with encrypt_password.py)",
   "db_port": "The database port number (int)",
   "db_user": "The database User to connect to (string)",
@@ -57,7 +56,7 @@ The required configuration items are placed into the ```configuration``` part of
   "output_file":"/tmp/analyze-schema-compression.sql",
   "debug": "Should the utilities run in debug mode? (boolean - true | false | default false)",
   "do_execute": "Should changes be made automatically, or just for reporting purposes (boolean - true |  false | default true)",
-  "analyze_col_width": "Analyze columns wider than this value (int)",
+  "analyze_col_width": "Analyze varchar columns wider that 255 characters and reduce size based on determined data length (boolean - default false)",
   "threads": "How many threads should the column encoding utility use (can run in parallel - default 1 for Lambda)",
   "ssl":"Should you connect to the cluster with SSL? (boolean true | false | default true)",
   "do_vacuum": "Should the Analyze Vacuum utility run Vacuum? (boolean true | false | default true)",
@@ -93,7 +92,13 @@ You can also add the following configuration options to finely tune the operatio
 
 ## Deploying
 
-We have provided the following AWS SAM templates so that you can deploy this function automatically (please note that we currently only support deploying into VPC):
+We provide three AWS SAM templates to help you deploy your utilities (please note that we currently only support deploying into VPC): 
+
+1. [`deploy.yaml`](deploy.yaml) to deploy all utilities. 
+1. [`deploy-function-and-schedule.yaml`](deploy-function-and-schedule.yaml) to deploy just a single utility and a scheduled event for it.
+1. [`deploy-schedule.yaml`](deploy-schedule.yaml) to only deploy a scheduled event for an existing function. 
+
+Use one of the following deploy buttons that matches your region to deploy using `deploy.yaml`.
 
 | Region | Template |
 | ------ | ---------- |
@@ -112,7 +117,7 @@ We have provided the following AWS SAM templates so that you can deploy this fun
 |us-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-west-1.amazonaws.com/awslabs-code-us-west-1/LambdaRedshiftRunner/deploy.yaml) |
 |us-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=RedshiftAutomation&templateURL=https://s3-us-west-2.amazonaws.com/awslabs-code-us-west-2/LambdaRedshiftRunner/deploy.yaml) |
 
-Alternatively, you can manually upload the template from the `dist` directory. There are also separate templates to [just deploy a single utility](deploy-function-and-schedule.yaml) or just [create a scheduled event for an existing function](deploy-schedule.yaml). You must supply the following parameters
+Alternatively, you can manually upload one of three templates from the `dist` directory. You must supply the following parameters
 
 ![parameters](parameters.png)
 
@@ -129,7 +134,7 @@ When completed, it will deploy the following objects:
 
 ## Manually executing the Lambda Function
 
-These utilites are configured to run via CloudWatch Scheduled Events. You will see that each of the scheduled events includes a payload of input which enables the function to download the configuration and run the correct utility per-instance:
+These utilities are configured to run via CloudWatch Scheduled Events. You will see that each of the scheduled events includes a payload of input which enables the function to download the configuration and run the correct utility per-instance:
 
 __To run the Column Encoding Utility__
 

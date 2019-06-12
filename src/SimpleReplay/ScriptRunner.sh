@@ -136,7 +136,7 @@ echo 0 > pos1; echo 0 > pos2;
 for i in $(seq 1 $1)
  do
   echo "started instance no: $i"
-  run $i 1 $sqls fork 2> error_${1}_1 &
+  run 1 $i $sqls fork 2> error_${1}_1 &
 done
 wait
 echo -n ENDED ' '

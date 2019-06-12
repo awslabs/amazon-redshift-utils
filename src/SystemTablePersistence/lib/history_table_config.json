@@ -1,27 +1,43 @@
 [
   {
     "table": "hist_stl_load_errors",
-    "insert": "INSERT INTO history.hist_stl_load_errors (SELECT le.* FROM stl_load_errors le, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_load_errors) h WHERE le.starttime > h.max_starttime)",
+    "snapshotNew": "SELECT le.* FROM stl_load_errors le, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_load_errors) h WHERE le.starttime > h.max_starttime",
     "archiveColumn": "starttime"
   },
   {
     "table": "hist_stl_wlm_query",
-    "insert": "INSERT INTO history.hist_stl_wlm_query (SELECT wq.* FROM stl_wlm_query wq, (SELECT NVL(MAX(service_class_start_time),'01/01/1902'::TIMESTAMP) AS max_service_class_start_time FROM history.hist_stl_wlm_query) h WHERE wq.service_class_start_time > h.max_service_class_start_time)",
+    "snapshotNew": "SELECT wq.* FROM stl_wlm_query wq, (SELECT NVL(MAX(service_class_start_time),'01/01/1902'::TIMESTAMP) AS max_service_class_start_time FROM history.hist_stl_wlm_query) h WHERE wq.service_class_start_time > h.max_service_class_start_time",
     "archiveColumn": "service_class_start_time"
   },
   {
     "table": "hist_stl_explain",
-    "insert": "INSERT INTO history.hist_stl_explain (SELECT e.* FROM stl_explain e, stl_query q, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_query) h WHERE e.query = q.query AND q.starttime > h.max_starttime)",
-    "override_sql": "delete from history.hist_stl_explain using history.hist_stl_query b where hist_stl_explain.query = b.query and b.starttime < to_timestamp('%s','yyyy-mm-dd HH:MI:SS')"
+    "snapshotNew": "SELECT e.* FROM stl_explain e, stl_query q, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_query) h WHERE e.query = q.query AND q.starttime > h.max_starttime",
+    "cleanupQuery": "delete from history.hist_stl_explain using history.hist_stl_query b where hist_stl_explain.query = b.query and b.starttime < to_timestamp('%s','yyyy-mm-dd HH:MI:SS')"
   },
   {
     "table": "hist_svl_query_summary",
-    "insert": "INSERT INTO history.hist_svl_query_summary (SELECT qs.* FROM svl_query_summary qs, stl_query q, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_query) h WHERE qs.query = q.query AND q.starttime > h.max_starttime);",
-    "override_sql": "delete from history.hist_svl_query_summary using history.hist_stl_query b where hist_svl_query_summary.query = b.query and b.starttime < to_timestamp('%s','yyyy-mm-dd HH:MI:SS')"
+    "snapshotNew": "SELECT qs.* FROM svl_query_summary qs, stl_query q, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_query) h WHERE qs.query = q.query AND q.starttime > h.max_starttime",
+    "cleanupQuery": "delete from history.hist_svl_query_summary using history.hist_stl_query b where hist_svl_query_summary.query = b.query and b.starttime < to_timestamp('%s','yyyy-mm-dd HH:MI:SS')"
   },
   {
     "table": "hist_stl_query",
-    "insert": "INSERT INTO history.hist_stl_query (SELECT q.* FROM stl_query q, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_query) h WHERE q.starttime > h.max_starttime)",
+    "snapshotNew": "SELECT q.* FROM stl_query q, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_query) h WHERE q.starttime > h.max_starttime",
+    "archiveColumn": "starttime"
+  },
+  {
+    "table": "hist_svl_s3query_summary",
+    "snapshotNew": "select userid, query, xid, pid, segment, step, starttime, endtime, elapsed, aborted, external_table_name, file_format, is_partitioned, is_rrscan, s3_scanned_rows, s3_scanned_bytes, s3query_returned_rows, s3query_returned_bytes, files, files_max, files_avg, splits, splits_max, splits_avg, total_split_size, max_split_size, avg_split_size, total_retries, max_retries, max_request_duration, avg_request_duration, max_request_parallelism, avg_request_parallelism,is_nested from svl_s3query_summary where starttime > (select nvl(max(starttime), '01/01/1970'::timestamp) from history.hist_svl_s3query_summary)",
+    "archiveColumn": "starttime"
+  },
+  {
+    "table": "hist_svl_s3query",
+    "snapshotNew": "select userid, query, segment, step, node, slice, starttime, endtime, elapsed, external_table_name, file_format, is_partitioned, is_rrscan, s3_scanned_rows, s3_scanned_bytes, s3query_returned_rows, s3query_returned_bytes, files, splits, total_split_size, max_split_size, total_retries, max_retries, max_request_duration, avg_request_duration, max_request_parallelism, avg_request_parallelism,is_nested from svl_s3query where starttime > (select nvl(max(starttime), '01/01/1970'::timestamp) from history.hist_svl_s3query)",
+    "archiveColumn": "starttime"
+  },
+  {
+    "table": "hist_stl_query_metrics",
+    "snapshotNew": "select * from stl_query_metrics  where starttime > (select nvl(max(starttime), '01/01/1970'::TIMESTAMP) from history.hist_stl_query_metrics)",
     "archiveColumn": "starttime"
   }
 ]
+        

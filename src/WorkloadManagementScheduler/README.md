@@ -2,7 +2,7 @@
 
 Redshift supports a powerful Workload Management feature through the [WLM system](https://docs.aws.amazon.com/redshift/latest/dg/c_workload_mngmt_classification.html). This gives you the ability to create segregated sets of users where capacity is allocated to that group, and behaviour can be controlled at a very fine grained level.
 
-This utility gives you a convenience mechanism to dynamically change your WLM configuration in Redshift based on a schedule. This is commonly needed if you load your tables only periodically, but then have ad-hoc query users over time. When you perform data loads, you may wish to reconfigure the system to support more memory allocation and longer runnign queries:
+This utility gives you a convenience mechanism to dynamically change your WLM configuration in Redshift based on a schedule. This is commonly needed if you load your tables only periodically, but then have ad-hoc query users over time. When you perform data loads, you may wish to reconfigure the system to support more memory allocation and longer running queries:
 
 ![image](WlmScheduleChart.png)
 

@@ -1,19 +1,46 @@
 
 # Amazon Redshift System Object Persistence Utility
-Some Redshift users would prefer a custom retention period for their Redshift system objects. The Redshift system tables and views, numbering over 100, have a system-controlled retention that is variable but tends to be less than a week for common Redshift use-cases.
+Amazon Redshift, like most databases, contains monitoring and diagnostic information in the form of internal tables and views that can be queried to understand system behaviour better. Redshift system tables and views, numbering over 100, have a system-controlled retention that is variable but tends to be less than a week for common Redshift use-cases.
 
-## More About the Redshift System Tables and Views:
-
-This is the taxonomy of Redshift system tables and views from [link](https://docs.aws.amazon.com/redshift/latest/dg/c_types-of-system-tables-and-views.html).
+This [link](https://docs.aws.amazon.com/redshift/latest/dg/c_types-of-system-tables-and-views.html) outlines the most important tables and views for diagnostic performance information.
 
 * The **stl_** prefix denotes system table logs. stl_ tables contain logs about operations that happened on the cluster in the past few days.
 * The **stv_** prefix denotes system table snapshots. stv_ tables contain a snapshot of the current state of the cluster.
 * The **svl_** prefix denotes system view logs. svl_ views join some number of system tables to provide more descriptive info.
 * The **svv_** prefix denotes system view snapshots. Like the svl_ views, the svv_ views join some system tables to provide more descriptive info.
 
-To persist the tables for a longer amount of time, the material below provides an example implementation to create, populate, and use five of the most common objects that we see being given this treatment: STL_QUERY, STL_WLM_QUERY, STL_EXPLAIN, SVL_QUERY_SUMMARY and STL_LOAD_ERRORS. This mix of tables and views will highlight some of the edge cases users will encounter when applying the techniques to their own list of tables.
+To persist the tables for a longer amount of time, this project provides an example implementation to create, populate, and use five of the most common objects that we see requiring long term retention. This mix of tables and views will highlight some of the edge cases users will encounter when applying tuning techniques techniques to their own list of tables.
 
-## One Time Only Actions: ##
+## Deploying
+
+The [Redshift Automation project](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/RedshiftAutomation) can be used to host and run this utility, plus others including table analysis and vacuum, and can be setup with a one-click deployment to AWS Lambda. 
+
+We have provided the following AWS SAM templates so that you can deploy this function as stand-alone, without the other functions from the wider RedshiftAutomation modules (please note that we currently only support deploying into VPC):
+
+| Region | Template |
+| ------ | ---------- |
+|ap-northeast-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ap-northeast-1.amazonaws.com/awslabs-code-ap-northeast-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|ap-northeast-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-northeast-2#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ap-northeast-2.amazonaws.com/awslabs-code-ap-northeast-2/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|ap-south-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-south-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ap-south-1.amazonaws.com/awslabs-code-ap-south-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|ap-southeast-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ap-southeast-1.amazonaws.com/awslabs-code-ap-southeast-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|ap-southeast-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ap-southeast-2.amazonaws.com/awslabs-code-ap-southeast-2/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|ca-central-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ca-central-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-ca-central-1.amazonaws.com/awslabs-code-ca-central-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|eu-central-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-eu-central-1.amazonaws.com/awslabs-code-eu-central-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|eu-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-west-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-eu-west-1.amazonaws.com/awslabs-code-eu-west-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|eu-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-west-2#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-eu-west-2.amazonaws.com/awslabs-code-eu-west-2/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|sa-east-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=sa-east-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-sa-east-1.amazonaws.com/awslabs-code-sa-east-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|us-east-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3.amazonaws.com/awslabs-code-us-east-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|us-east-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-2#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-us-east-2.amazonaws.com/awslabs-code-us-east-2/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|us-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-us-west-1.amazonaws.com/awslabs-code-us-west-1/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+|us-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=RedshiftAutomationSystemTablePersistence&templateURL=https://s3-us-west-2.amazonaws.com/awslabs-code-us-west-2/LambdaRedshiftRunner/deploy-systable-standalone.yaml) |
+
+We’ve also run across some customers who already have an EC2 host for cron/scheduling related activities. If you wish to use ec2 or other runners with cron, then the Redshift Automation command line provides an option to run this application:
+
+```
+./ra --utility SystemTablePersistence --config s3://mybucket/prefix/config.json
+```
+
+## Manual Setup Actions (optional if you are using the above Lambda function): ##
 
 ### Creating the HISTORY Schema: ###
 
@@ -25,34 +52,9 @@ CREATE SCHEMA IF NOT EXISTS history;
 
 ### Creating the History Tables: ###
 
-The persisted data will be stored in direct-attached storage tables in Redshift. For the tables, the CREATE TABLE {tablename} LIKE technique is an easy way to inherit the column names, datatypes, encoding, and table distribution from system tables. For system views, an Internet search on the view name (for example: SVL_QUERY_SUMMARY) will direct the user to the Redshift documentation which includes the column-level description. This table will frequently copy-and-paste well into a spreadsheet program, allow for easy extraction of the column name and data type information. This example uses ZSTD for its encoding; but that is of course up to the user.
+The persisted data will be stored in direct-attached storage tables in Redshift. For the tables, the `CREATE TABLE {tablename} LIKE` technique is an easy way to inherit the column names, datatypes, encoding, and table distribution from system tables. For system views, an Internet search on the view name (for example: `SVL_QUERY_SUMMARY`) will direct the user to the Redshift documentation which includes the column-level description. This table will frequently copy-and-paste well into a spreadsheet program, allow for easy extraction of the column name and data type information.
 
-```
-CREATE TABLE IF NOT EXISTS history.hist_stl_load_errors (LIKE STL_LOAD_ERRORS);
-CREATE TABLE IF NOT EXISTS history.hist_stl_query (LIKE stl_query);
-CREATE TABLE IF NOT EXISTS history.hist_stl_wlm_query (LIKE stl_wlm_query);
-CREATE TABLE IF NOT EXISTS history.hist_stl_explain (LIKE stl_explain);
-CREATE TABLE IF NOT EXISTS history.hist_svl_query_summary
-    (
-      userid            INTEGER ENCODE zstd, 
-      query             INTEGER ENCODE zstd,
-      stm               INTEGER ENCODE zstd,
-      seg               INTEGER ENCODE zstd,
-      step              INTEGER ENCODE zstd,
-      maxtime           BIGINT ENCODE zstd,
-      avgtime           BIGINT ENCODE zstd,
-      ROWS 		BIGINT ENCODE zstd,
-      bytes             BIGINT ENCODE zstd,
-      rate_row       	DOUBLE precision ENCODE zstd,
-      rate_byte      	DOUBLE precision ENCODE zstd,
-      label             TEXT ENCODE zstd,
-      is_diskbased    	CHARACTER(1) ENCODE zstd,
-      workmem           BIGINT ENCODE zstd,
-      is_rrscan         CHARACTER(1) ENCODE zstd,
-      is_delayed_scan   CHARACTER(1) ENCODE zstd,
-      rows_pre_filter   BIGINT ENCODE zstd
-    );
-```
+History tables are created in the `HISTORY` schema, and will be verified on each run of the table persistence system. You can view the table creation statements in [`lib/history_table_creation.sql`](lib/history_table_creation.sql).
 
 
 ### Creating the Views to Join the Historical and Current Information: ###
@@ -106,30 +108,19 @@ WHERE qs.query IS NULL
 );
 ```
 
-## Daily or User-Selected Frequency (we recommend populating the history tables daily): ##
+## Populating the History Tables: ##
 
-### Populating the History Tables: ###
+This can be done Daily or on a User-Selected Frequency (we recommend populating the history tables daily).
 
-There are two patterns described below. The first the a stand-only insert statement, where the table itself (for example, STL_LOAD_ERRORS) contains a timestamp column that can be used to disambiguate the new information, from the rows that are already in the history tables. The second pattern includes a join (typically to STL_QUERY) in order to obtain the timestamp for the activity. It’s recommended that a transaction is created that starts with the population of STL_QUERY, and then all the tables the user has selected that require a join to STL_QUERY.
+This utility will insert only the new rows using the model as described above, with an anti-join:
 
 ```
 INSERT INTO history.hist_stl_load_errors (
   SELECT le.* FROM stl_load_errors le, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_load_errors) h WHERE le.starttime > h.max_starttime);
-INSERT INTO history.hist_stl_wlm_query (
-  SELECT wq.* FROM stl_wlm_query wq, (SELECT NVL(MAX(service_class_start_time),'01/01/1902'::TIMESTAMP) AS max_service_class_start_time FROM history.hist_stl_wlm_query) h WHERE wq.service_class_start_time > h.max_service_class_start_time);
- 
-BEGIN; 
-INSERT INTO history.hist_stl_query (
-  SELECT q.* FROM stl_query q, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_query) h WHERE q.starttime > h.max_starttime);
-INSERT INTO history.hist_stl_explain (
-  SELECT e.* FROM stl_explain e, stl_query q, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_query) h WHERE e.query = q.query AND q.starttime > h.max_starttime);
-INSERT INTO history.hist_svl_query_summary (
-  SELECT qs.* FROM svl_query_summary qs, stl_query q, (SELECT NVL(MAX(starttime),'01/01/1902'::TIMESTAMP) AS max_starttime FROM history.hist_stl_query) h WHERE qs.query = q.query AND q.starttime > h.max_starttime);
-COMMIT;
 ```
 
-### Where to Run the Data Population SQL: ###
-We’ve run across many customers who already have an EC2 host for crontab-related activities. That would be a good fit for this work as well. In addition, this work could be folded into the Redshift Automation project (see the implementation at [link](https://github.com/awslabs/amazon-redshift-utils/tree/master/src/RedshiftAutomation). Finally, a Lambda function is an alternative for hosting this work.
+You can view the statements that will be run by the utility in [`lib/history_table_config.json`](lib/history_table_config.json);
+
 
 ### Querying the Views in the History Schema: ###
 The history schema views can be queried in exactly the same way that users have interacted with the existing system objects.
@@ -142,10 +133,30 @@ SELECT * FROM history.all_stl_explain WHERE query = 1121 ORDER BY nodeid;
 SELECT * FROM history.all_svl_query_summary WHERE bytes > 1000000;
 ```
 
+## Long term archival of System Table data
+
+If required, this utility can archive data from the internal HISTORY tables to Amazon S3. Add the following configuration values to your configuration file:
+
+```
+"s3_unload_location":"s3://mybucket/prefix/redshift/systables/archive"
+"s3_unload_role_arn":"arn:aws:iam::<acct>:role/<role name>"
+```
+
+Please note that the `s3_unload_role_arn` should be linked to the Redshift cluster to enable S3 access [as outlined here](https://docs.aws.amazon.com/redshift/latest/mgmt/copy-unload-iam-role.html).
+
+The structure of the exported data will make it suitable for querying via the AWS Glue Data Catalog. Both the cluster-name and the datetime of data export will be configured as partitions. The structure of the data in the exported location will be:
+
+* `Configured output location`
+	* `<table name>` - such as `hist_svl_query_summary`, `hist_stl_explain`
+		* `cluster=<your cluster name>`
+			* `datetime=<exported date time information>`
+
+For example: 
+![image](exported_s3_structure.png)
+
+All exported data is quoted, compressed csv data.
+
 ## Other Considerations: ##
 As with any table in Redshift, it's a best practice to analyze (even just a handful of columns) on a weekly basis. This will help inform the query planner of the attributes of the table. Users may also want to enhance the performance of the history views by adding sort keys to the underlying history tables. It is recommended to consider columns used in the filter condition on the associated view for good sort key candidates.
-
-## Conclusion: ##
-For five of the most commonly retained Redshift system tables and views that we encounter, the code on this page can be copied-and-pasted, and it’ll “just work”. Of course, each customer’s use-case is unique and extending this model to any of the Redshift system objects is possible. If you create any extensions to this framework, please don’t hesitate to share them back to the Redshift Engineering GitHub community.
 
 
