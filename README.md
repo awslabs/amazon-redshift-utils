@@ -21,6 +21,11 @@ diagnostics on your Cluster
 In the AdminViews directory, you will find a [collection of views](src/AdminViews) for managing
 your Cluster, generating Schema DDL, and ...
 
+# Stored Procedures
+
+In the StoredProcedures directory, you will find a [collection of stored procedures](src/StoredProcedures) for managing
+your Cluster or just to use as examples
+
 # Column Encoding Utility
 
 In order to get the best performance from your Redshift Database, you must ensure 
