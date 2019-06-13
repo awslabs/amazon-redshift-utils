@@ -764,13 +764,10 @@ def analyze(table_info):
                         comment("Adding Sortkeys: %s" % sortkeys)
                     sortkey = '%sSORTKEY(' % ('INTERLEAVED ' if has_zindex_sortkeys else '')
 
-                    for i in range(1, len(sortkeys) + 1):
-                        sortkey = sortkey + sortkeys[i]
+                    ordered_sortkey_columns = [sortkeys[index] for index in range(1, len(sortkeys) + 1)]
 
-                        if i != len(sortkeys):
-                            sortkey = sortkey + ','
-                        else:
-                            sortkey = sortkey + ')\n'
+                    sortkey += ','.join(ordered_sortkey_columns) + ')\n'
+
                     create_table = create_table + (' %s ' % sortkey)
 
                 create_table = create_table + ';'
@@ -803,8 +800,8 @@ def analyze(table_info):
                                                                             source_columns,
                                                                             schema_name,
                                                                             table_name)
-                if len(table_sortkeys) > 0:
-                    insert = "%s order by \"%s\";" % (insert, ",".join(table_sortkeys).replace(',', '\",\"'))
+                if len(ordered_sortkey_columns) > 0:
+                    insert = "%s order by \"%s\";" % (insert, ",".join(ordered_sortkey_columns).replace(',', '\",\"'))
                 else:
                     insert = "%s;" % (insert)
 
