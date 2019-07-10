@@ -1,4 +1,4 @@
---DROP VIEW admin.v_generate_tbl_ddl;
+--DROP VIEW admin.v_generate_external_tbl_ddl;
 /**********************************************************************************************
 Purpose: View to get the DDL for an external table.
 
