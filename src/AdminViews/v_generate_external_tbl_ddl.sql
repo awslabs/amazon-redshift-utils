@@ -59,7 +59,7 @@ CREATE OR REPLACE VIEW admin.v_generate_external_tbl_ddl AS
                  WHERE part_key > 1
 
              UNION ALL
-             SELECT 'ROW FORMAT SERDE ' + quote_literal(serialization_lib)
+             SELECT ') ROW FORMAT SERDE ' + quote_literal(serialization_lib)
 
                   , 1000000 AS seq
                   , schemaname
