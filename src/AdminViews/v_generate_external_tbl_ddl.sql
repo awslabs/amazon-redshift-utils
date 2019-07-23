@@ -59,7 +59,7 @@ CREATE OR REPLACE VIEW admin.v_generate_external_tbl_ddl AS
                  WHERE part_key > 1
              UNION ALL
              SELECT ')'                 AS ddl
-                  , 1000000 + part_key + columnnum                                      AS seq
+                  , 99999                                      AS seq
                   , schemaname
                   , tablename
                  FROM svv_external_columns
