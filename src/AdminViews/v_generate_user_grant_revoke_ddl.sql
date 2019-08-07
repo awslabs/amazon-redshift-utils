@@ -204,4 +204,4 @@ UNION ALL
 SELECT null::text AS objowner, null::text AS schemaname, decode(b.defaclobjtype,'r','tables','f','functions')::text AS objname,
 		'default acl'::text AS objtype,  pg_get_userbyid(b.defacluser)::text AS grantor, null::text AS grantee, 'revoke'::text AS ddltype, 5 as grantseq, 5 AS objseq,
   'ALTER DEFAULT PRIVILEGES for user '||QUOTE_IDENT(pg_get_userbyid(b.defacluser))||' GRANT ALL on '||decode(b.defaclobjtype,'r','tables','f','functions')||' TO '||QUOTE_IDENT(pg_get_userbyid(b.defacluser))||
-CASE WHEN b.defaclobjtype = 'f' then ', PUBLIC;' ELSE ';' END::text AS ddl FROM pg_default_acl b where b.defaclnamespace=0; 
+CASE WHEN b.defaclobjtype = 'f' then ', PUBLIC;' ELSE ';' END::varchar(65535) AS ddl FROM pg_default_acl b where b.defaclnamespace=0; 
