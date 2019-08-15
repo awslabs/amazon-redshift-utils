@@ -199,10 +199,14 @@ def run_vacuum(conn,
                min_interleaved_count=0,
                **kwargs):
     statements = []
+
     threshold = MAX_PERCENT - int(min_unsorted_pct)
+    threshold_stanza = ""
+    if vacuum_parameter.upper() != 'REINDEX':
+        threshold_stanza = " to %d percent" % threshold
 
     if table_name is not None:
-        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" to %d percent; '
+        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '"%s ; '
                                          + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                          + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') 
                                          + ', Stats Off : ' + stats_off :: varchar(10)
@@ -214,12 +218,12 @@ def run_vacuum(conn,
                                     AND  "schema" ~ '%s'
                                     AND  "table" = '%s';
                                         ''' % (
-            vacuum_parameter, threshold, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
+            vacuum_parameter, threshold_stanza, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
 
     elif blacklisted_tables is not None:
         comment("Extracting Candidate Tables for Vacuum...")
         blacklisted_tables_array = blacklisted_tables.split(',')
-        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" to %d percent; '
+        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '"%s ; '
                                          + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                          + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null')
                                          + ', Stats Off : ' + stats_off :: varchar(10)
@@ -231,7 +235,7 @@ def run_vacuum(conn,
                                     AND  "schema" ~ '%s'
                                     AND  "table" NOT IN (%s);
                                         ''' % (
-            vacuum_parameter, threshold, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name,
+            vacuum_parameter, threshold_stanza, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name,
             str(blacklisted_tables_array)[1:-1])
 
     else:
@@ -239,7 +243,7 @@ def run_vacuum(conn,
         comment("Extracting Candidate Tables for Vacuum...")
 
         get_vacuum_statement = '''
-                SELECT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" to %d percent; '
+                SELECT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '"%s; '
                        + '/* Size : ' + CAST(info_tbl."size" AS VARCHAR(10)) + ' MB' 
                        + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') 
                        + ', Stats Off : ' + stats_off :: varchar(10)
@@ -278,7 +282,7 @@ def run_vacuum(conn,
                 ORDER BY info_tbl.size,
                          info_tbl.skew_rows
                             ''' % (vacuum_parameter,
-                                   threshold,
+                                   threshold_stanza,
                                    goback_no_of_days,
                                    query_rank,
                                    min_unsorted_pct,
@@ -306,7 +310,7 @@ def run_vacuum(conn,
     if table_name is None and blacklisted_tables is None:
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Tables for Vacuum ...")
-        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" to %d percent; '
+        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '"%s; '
                                                    + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                                    + ',  Unsorted_pct : ' + coalesce(info_tbl.unsorted :: varchar(10),'N/A')
                                                    + ' */ ;' as statement,
@@ -326,7 +330,7 @@ def run_vacuum(conn,
                                                  )
                                         ORDER BY "size" ASC ,skew_rows ASC;
                                         ''' % (vacuum_parameter,
-                                               threshold,
+                                               threshold_stanza,
                                                schema_name,
                                                max_table_size_mb,
                                                min_unsorted_pct,
@@ -355,7 +359,7 @@ def run_vacuum(conn,
     if table_name is None and blacklisted_tables is None:
         # query for all tables in the schema for vacuum reindex
         comment("Extracting Candidate Tables for Vacuum reindex of Interleaved Sort Keys...")
-        get_vacuum_statement = ''' SELECT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" to %d percent; ' + '/* Rows : ' + CAST("rows" AS VARCHAR(10))
+        get_vacuum_statement = ''' SELECT 'vacuum REINDEX ' + schema_name + '."' + table_name + '" ; ' + '/* Rows : ' + CAST("rows" AS VARCHAR(10))
                                     + ', Interleaved_skew : ' + CAST("max_skew" AS VARCHAR(10))
                                     + ', Reindex Flag : '  + CAST(reindex_flag AS VARCHAR(10)) + ' */ ;' AS statement, table_name, schema_name
                                 FROM (SELECT TRIM(n.nspname) schema_name, TRIM(t.relname) table_name,
@@ -375,7 +379,7 @@ def run_vacuum(conn,
                                             GROUP BY 1, 2)
                                 WHERE reindex_flag = 'Yes'
                                     AND schema_name ~ '%s'
-                                        ''' % (threshold, min_interleaved_skew, min_interleaved_count, schema_name)
+                                        ''' % (min_interleaved_skew, min_interleaved_count, schema_name)
 
         if debug:
             comment(get_vacuum_statement)
