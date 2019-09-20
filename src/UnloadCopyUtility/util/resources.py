@@ -286,7 +286,7 @@ class TableResource(SchemaResource):
                    timeformat 'auto'
                    delimiter '^' removequotes escape compupdate off """
 
-    drop_table_stmt = """DROP TABLE {schema_name}.{table_name}"""
+    drop_table_stmt = """DROP TABLE IF EXISTS {schema_name}.{table_name}"""
 
     def __init__(self, rs_cluster, schema, table):
         SchemaResource.__init__(self, rs_cluster, schema)
