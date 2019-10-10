@@ -20,7 +20,7 @@ All views assume you have a schema called admin.
 | v\_generate\_terminate\_session.sql | View to get pg\_terminate\_backend() statements |
 | v\_generate\_udf\_ddl.sql | View to get the DDL for a UDF.
 | v\_generate\_unload\_copy\_cmd.sql |   View to get that will generate unload and copy commands for an object.  After running | 
-|v\_generate\_user\_grant\_revoke\_ddl.sql| View to gengerate grant or revoke ddl for users and groups in the database|
+|v\_generate\_user\_grant\_revoke\_ddl.sql| View to generate grant or revoke ddl for users and groups in the database|
 | v\_generate\_user\_object\_permissions.sql |   View to get the DDL for a users permissions to tables and views. | 
 | v\_generate\_view\_ddl.sql |   View to get the DDL for a view. | 
 | v\_get\_blocking\_locks.sql | View to identify blocking locks as well as determine what/who is blocking a query |
