@@ -82,7 +82,7 @@ SELECT 'Library',
        pgu.usesysid,
        '',
        pgl.name,
-       'No DDL avaible for Python Library. You should DROP OR REPLACE the Python Library'
+       'No DDL available for Python Library. You should DROP OR REPLACE the Python Library'
 FROM  pg_library pgl,
       pg_user pgu
 WHERE pgl.owner = pgu.usesysid) OWNER ("objtype","objowner","userid","schemaname","objname","ddl") 
