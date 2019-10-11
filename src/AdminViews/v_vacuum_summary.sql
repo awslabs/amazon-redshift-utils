@@ -13,6 +13,8 @@ Version 1.03
         2018-12-30 adedotua fixed join condition to make vacuum on dropped tables visible
 Version 1.04
         2019-04-30 adedotua added is_auto_vacuum flag to indicate whether vacuum was auto vacuum 
+Version 1.05
+        2019-10-09 adedotua set vac_end_status as null for autovacuum if end status is unknown
 **********************************************************************************************/ 
 
 CREATE OR REPLACE VIEW admin.v_vacuum_summary as SELECT a.userid,
@@ -24,7 +26,7 @@ CREATE OR REPLACE VIEW admin.v_vacuum_summary as SELECT a.userid,
        CASE
          WHEN (a.status ilike 'skipped%'::TEXT) THEN null
          WHEN (f.xid IS NOT NULL) THEN 'Running'::TEXT
-         WHEN (b.status IS NULL) THEN 'Failed'::TEXT
+         WHEN (b.status IS NULL) and a.status not ilike '%[VacuumBG]%' THEN 'Failed'::TEXT
          ELSE BTRIM((b.status)::TEXT)
        END AS vac_end_status,
        a.eventtime AS vac_start_time,
