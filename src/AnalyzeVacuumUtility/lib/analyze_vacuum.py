@@ -204,7 +204,8 @@ def run_vacuum(conn,
                                          + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') 
                                          + ', Stats Off : ' + stats_off :: varchar(10)
                                          + ' */ ;' as statement,
-                                         "table" as table_name
+                                         "table" as table_name,
+                                         "schema" as schema_name
                                   FROM svv_table_info
                                   WHERE (unsorted > %s or stats_off > %s)
                                     AND   size < %s
@@ -221,7 +222,8 @@ def run_vacuum(conn,
                                          + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null')
                                          + ', Stats Off : ' + stats_off :: varchar(10)
                                          + ' */ ;' as statement,
-                                         "table" as table_name
+                                         "table" as table_name,
+                                         "schema" as schema_name
                                   FROM svv_table_info
                                   WHERE (unsorted > %s or stats_off > %s)
                                     AND   size < %s
