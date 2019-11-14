@@ -81,7 +81,7 @@ SECURITY DEFINER;
         , ('CEO'     , 101, 100 , 'Board'    )
         , ('CTO'     , 102, 101 , 'IT'       )
         , ('CMO'     , 103, 101 , 'Sales/Mkt');
-    CREATE USER user_no_priv WITH PASSWORD 'Password01';
+    CREATE USER user_no_priv WITH PASSWORD DISABLE;
     CREATE TABLE hr.access_authority ( query_from VARCHAR, user_name VARCHAR, valid_until TIMESTAMP, max_rows INT ); 
     INSERT INTO hr.access_authority VALUES ('hr.employee','user_no_priv','2019-12-31',99);
     GRANT ALL ON SCHEMA public TO user_no_priv;
