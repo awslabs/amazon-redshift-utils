@@ -57,6 +57,13 @@ CREATE OR REPLACE VIEW admin.v_generate_external_tbl_ddl AS
                   , tablename
                  FROM svv_external_columns
                  WHERE part_key > 1
+             UNION ALL
+             SELECT ')'                 AS ddl
+                  , 999999                                      AS seq
+                  , schemaname
+                  , tablename
+                 FROM svv_external_columns
+                 WHERE part_key = 1
 
              UNION ALL
              SELECT 'ROW FORMAT SERDE ' + quote_literal(serialization_lib)
