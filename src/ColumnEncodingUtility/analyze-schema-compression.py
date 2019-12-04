@@ -16,7 +16,7 @@ analyze-schema-compression.py
 * express or implied. See the License for the specific language governing
 * permissions and limitations under the License.
 
-Analyses all tables in a Redshift Cluster Schema, and outputs a SQL script to 
+Analyses all tables in a Redshift Cluster Schema, and outputs a SQL script to
 migrate database tables with sub-optimal column encodings to optimal column
 encodings as recommended by the database engine.
 
@@ -347,12 +347,12 @@ def get_primary_key(schema_name, set_target_schema, original_table, new_table):
     has_pks = False
 
     # get the primary key columns
-    statement = '''SELECT /* fetch primary key information */   
+    statement = '''SELECT /* fetch primary key information */
   att.attname
 FROM pg_index ind, pg_class cl, pg_attribute att
-WHERE 
-  cl.oid = '%s."%s"'::regclass 
-  AND ind.indrelid = cl.oid 
+WHERE
+  cl.oid = '%s."%s"'::regclass
+  AND ind.indrelid = cl.oid
   AND att.attrelid = cl.oid
   and att.attnum = ANY(string_to_array(textin(int2vectorout(ind.indkey)), ' '))
   and attnum > 0
@@ -404,10 +404,10 @@ def get_table_desc(schema_name, table_name):
 def get_count_raw_columns(schema_name, table_name):
     # count the number of raw encoded columns which are not the sortkey, from the dictionary
     statement = '''select /* getting count of raw columns in table */ count(9) count_raw_columns
-      from pg_table_def 
+      from pg_table_def
       where schemaname = '%s'
-        and lower(encoding) in ('raw','none') 
-        and sortkey != 1        
+        and lower(encoding) in ('raw','none')
+        and sortkey != 1
         and tablename = '%s'
 ''' % (schema_name, table_name)
 
@@ -640,7 +640,12 @@ def analyze(table_info):
 
                 # compare the previous encoding to the new encoding
                 # don't use new encoding for first sortkey
-                new_encoding = row[2] if not abs(row_sortkey) == 1 else 'raw'
+                datatype = descr[col][1]
+
+                # use az64 coding if supported. ANALYZE COMPRESSION does not yet support this but it is recommended by AWS
+                # see https://docs.amazonaws.cn/en_us/redshift/latest/dg/c_Compression_encodings.html for supported types
+                new_encoding = 'az64' if datatype in ['integer', 'smallint', 'integer', 'bigint', 'decimal', 'date', 'timestamp without time zone', 'timestamp with time zone'] else row[2]
+                new_encoding = new_encoding if not abs(row_sortkey) == 1 else 'raw'
                 old_encoding = descr[col][2]
                 old_encoding = 'raw' if old_encoding == 'none' else old_encoding
                 if new_encoding != old_encoding:
@@ -700,7 +705,7 @@ def analyze(table_info):
                 else:
                     compression = row[2]
 
-                # extract null/not null setting            
+                # extract null/not null setting
                 col_null = descr[col][5]
 
                 if str(col_null).upper() == 'TRUE':
@@ -1032,7 +1037,7 @@ from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_
 join pg_class as pgc on pgc.oid = a.id
 left outer join pg_description pgd ON pgd.objoid = pgc.oid and pgd.objsubid = 0
 join pg_namespace as pgn on pgn.oid = pgc.relnamespace
-join pg_user pgu on pgu.usesysid = pgc.relowner 
+join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
 where pgn.nspname::text  ~ '%s'
@@ -1061,7 +1066,7 @@ order by 2;
     result = []
 
     if table_names is not None:
-        # we'll use a Pool to process all the tables with multiple threads, or just sequentially if 1 thread is requested         
+        # we'll use a Pool to process all the tables with multiple threads, or just sequentially if 1 thread is requested
         if threads > 1:
             # setup executor pool
             p = Pool(threads)
