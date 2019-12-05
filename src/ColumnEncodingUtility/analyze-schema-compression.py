@@ -84,6 +84,7 @@ STRING_REDUCTION_MAX_LENGTH_THRESHOLD = 255
 # compiled regular expressions
 IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \(?\'(?P<seed>\d+),(?P<step>\d+)\'.*\)')
 
+AZ64_SUPPORTED_COLUMNS = ['integer', 'smallint', 'integer', 'bigint', 'decimal', 'date', 'timestamp without time zone', 'timestamp with time zone']
 
 def get_env_var(name, default_value):
     return os.environ[name] if name in os.environ else default_value
@@ -529,7 +530,6 @@ def reduce_column_length(col_type, column_name, table_name):
 
     return set_col_type
 
-
 def analyze(table_info):
     schema_name = table_info[0]
     table_name = table_info[1]
@@ -636,6 +636,7 @@ def analyze(table_info):
                 if debug:
                     comment("Analyzed Compression Row State: %s" % str(row))
                 col = row[1]
+                recommended_encoding = row[2]
                 row_sortkey = descr[col][4]
 
                 # compare the previous encoding to the new encoding
@@ -644,10 +645,12 @@ def analyze(table_info):
 
                 # use az64 coding if supported. ANALYZE COMPRESSION does not yet support this but it is recommended by AWS
                 # see https://docs.amazonaws.cn/en_us/redshift/latest/dg/c_Compression_encodings.html for supported types
-                new_encoding = 'az64' if datatype in ['integer', 'smallint', 'integer', 'bigint', 'decimal', 'date', 'timestamp without time zone', 'timestamp with time zone'] else row[2]
+                new_encoding = 'az64' if datatype in AZ64_SUPPORTED_COLUMNS else recommended_encoding
                 new_encoding = new_encoding if not abs(row_sortkey) == 1 else 'raw'
+
                 old_encoding = descr[col][2]
                 old_encoding = 'raw' if old_encoding == 'none' else old_encoding
+
                 if new_encoding != old_encoding:
                     encodings_modified = True
                     count_optimized += 1
@@ -703,7 +706,7 @@ def analyze(table_info):
                         col in table_sortkeys and table_sortkeys.index(col) == 0):
                     compression = 'RAW'
                 else:
-                    compression = row[2]
+                    compression = 'az64' if datatype in AZ64_SUPPORTED_COLUMNS else recommended_encoding
 
                 # extract null/not null setting
                 col_null = descr[col][5]
