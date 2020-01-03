@@ -12,6 +12,11 @@ Parameters:
       - ColumnEncodingUtility
       - Monitoring
       - SystemTablePersistence
+  KmsKeyARN:
+    Default: arn:aws:kms:us-east-1/123456789012:key/MyKey
+    Description: KMS Key ARN used to decrypt the password
+    Type: String
+    AllowedPattern: arn:aws:kms:[a-zA-Z0-9-]+\/\d{12}:key\/.*
   SecurityGroups:
     Default: mygroup1, mygroup2
     Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
@@ -89,7 +94,11 @@ Resources:
                   Effect: "Allow"
                   Action:
                     - "s3:GetObject"
-                    - "kms:Decrypt"
                     - "cloudwatch:PutMetricData"
                     - "redshift:ModifyClusterParameterGroup"
                   Resource: "*"
+                -
+                  Effect: "Allow"
+                  Action:                
+                    - "kms:Decrypt"
+                  Resource: !Ref KmsKeyARN
