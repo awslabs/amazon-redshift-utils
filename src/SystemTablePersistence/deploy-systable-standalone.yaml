@@ -10,6 +10,7 @@ Metadata:
           - S3ConfigPath
           - SecurityGroups
           - SubnetIds
+          - KmsKeyARN
       -
         Label:
           default: Run Schedule Cron Expressions
@@ -18,6 +19,8 @@ Metadata:
     ParameterLabels:
       S3ConfigPath:
         default: S3 Config File
+      KmsKeyARN:
+        default: KMS Key ARN
       SecurityGroups:
         default: VPC Security Group ID
       SubnetIds:
@@ -30,6 +33,11 @@ Parameters:
     Description: Configuration File for this Utility instance
     Type: String
     AllowedPattern: ^s3:\/\/([A-z\-]+)\/(.*)$
+  KmsKeyARN:
+    Default: arn:aws:kms:us-east-1/123456789012:key/MyKey
+    Description: KMS Key ARN used to decrypt the password
+    Type: String
+    AllowedPattern: arn:aws:kms:[a-zA-Z0-9-]+\/\d{12}:key\/.*
   SecurityGroups:
     Default: mygroup1, mygroup2
     Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
@@ -90,10 +98,14 @@ Resources:
                   Effect: "Allow"
                   Action:
                     - "s3:GetObject"
-                    - "kms:Decrypt"
                     - "cloudwatch:PutMetricData"
                     - "redshift:ModifyClusterParameterGroup"
                   Resource: "*"
+                -
+                  Effect: "Allow"
+                  Action:                
+                    - "kms:Decrypt"
+                  Resource: !Ref KmsKeyARN
 
   SystablesEventRule:
     Type: "AWS::Events::Rule"
