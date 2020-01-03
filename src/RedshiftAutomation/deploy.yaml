@@ -11,6 +11,7 @@ Metadata:
           - SecurityGroups
           - SubnetIds
           - WlmSchedulerConfigLocation
+          - KmsKeyARN
       -
         Label:
           default: Run Schedule Cron Expressions
@@ -28,6 +29,8 @@ Metadata:
         default: VPC Security Group ID
       SubnetIds:
         default: VPC Subnet ID's for Networking
+      KmsKeyARN:
+        default: KMS Key ARN
       ColumnEncodingCronExpression:
         default: Column Encoding
       MonitorCronExpression:
@@ -56,6 +59,11 @@ Parameters:
     Default: subnet1, subnet2, subnet3
     Description: List of private Subnets in VPC in which the function will egress network connections
     Type: CommaDelimitedList
+  KmsKeyARN:
+    Default: arn:aws:kms:us-east-1/123456789012:key/MyKey
+    Description: KMS Key ARN used to decrypt the password
+    Type: String
+    AllowedPattern: arn:aws:kms:[a-zA-Z0-9-]+\/\d{12}:key\/.*
   ColumnEncodingCronExpression:
     Default: 0 0 * * ? *
     Description: Cron expression for when to run the Column Encoding Utility (default midnight daily)
@@ -138,10 +146,14 @@ Resources:
                   Effect: "Allow"
                   Action:
                     - "s3:GetObject"
-                    - "kms:Decrypt"
                     - "cloudwatch:PutMetricData"
                     - "redshift:ModifyClusterParameterGroup"
                   Resource: "*"
+                -
+                  Effect: "Allow"
+                  Action:                
+                    - "kms:Decrypt"
+                  Resource: !Ref KmsKeyARN
 
   AnalyzeEventRule:
     Type: "AWS::Events::Rule"
