@@ -644,17 +644,15 @@ def analyze(table_info):
 
                 # use az64 coding if supported. ANALYZE COMPRESSION does not yet support this but it is recommended by AWS
                 # see https://docs.amazonaws.cn/en_us/redshift/latest/dg/c_Compression_encodings.html for supported types
-                new_encoding = 'az64' if datatype in ['integer', 'smallint', 'integer', 'bigint', 'decimal', 'date', 'timestamp without time zone', 'timestamp with time zone'] else row[2]
+                new_encoding = 'az64' if datatype in ['integer', 'smallint', 'integer', 'bigint', 'decimal', 'date',
+                                                      'timestamp without time zone', 'timestamp with time zone'] else \
+                row[2]
                 new_encoding = new_encoding if not abs(row_sortkey) == 1 else 'raw'
                 old_encoding = descr[col][2]
                 old_encoding = 'raw' if old_encoding == 'none' else old_encoding
                 if new_encoding != old_encoding:
                     encodings_modified = True
                     count_optimized += 1
-
-                    if debug:
-                        comment("Column %s will be modified from %s encoding to %s encoding" % (
-                            col, old_encoding, new_encoding))
 
                 # fix datatypes from the description type to the create type
                 col_type = descr[col][1].replace('character varying', 'varchar').replace('without time zone', '')
@@ -703,7 +701,7 @@ def analyze(table_info):
                         col in table_sortkeys and table_sortkeys.index(col) == 0):
                     compression = 'RAW'
                 else:
-                    compression = row[2]
+                    compression = new_encoding
 
                 # extract null/not null setting
                 col_null = descr[col][5]
@@ -726,6 +724,10 @@ def analyze(table_info):
                 else:
                     default_value = ''
                     non_identity_columns.append('"%s"' % col)
+
+                if debug:
+                    comment("Column %s will be encoded as %s (previous %s)" % (
+                        col, compression, old_encoding))
 
                 # add the formatted column specification
                 encode_columns.extend(['"%s" %s %s %s encode %s %s'
