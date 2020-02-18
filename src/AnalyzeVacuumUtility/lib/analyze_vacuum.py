@@ -29,6 +29,8 @@ query_rank = 25
 # timeout for retries - 100ms
 RETRY_TIMEOUT = 100 / 1000
 
+MAX_PERCENT = 100
+
 OK = 0
 ERROR = 1
 INVALID_ARGS = 2
@@ -198,8 +200,13 @@ def run_vacuum(conn,
                **kwargs):
     statements = []
 
+    threshold = MAX_PERCENT - int(min_unsorted_pct)
+    threshold_stanza = ""
+    if vacuum_parameter.upper() != 'REINDEX':
+        threshold_stanza = " to %d percent" % threshold
+
     if table_name is not None:
-        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
+        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '"%s ; '
                                          + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                          + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') 
                                          + ', Stats Off : ' + stats_off :: varchar(10)
@@ -211,12 +218,12 @@ def run_vacuum(conn,
                                     AND  "schema" ~ '%s'
                                     AND  "table" = '%s';
                                         ''' % (
-            vacuum_parameter, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
+            vacuum_parameter, threshold_stanza, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
 
     elif blacklisted_tables is not None:
         comment("Extracting Candidate Tables for Vacuum...")
         blacklisted_tables_array = blacklisted_tables.split(',')
-        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
+        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '"%s ; '
                                          + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                          + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null')
                                          + ', Stats Off : ' + stats_off :: varchar(10)
@@ -228,7 +235,7 @@ def run_vacuum(conn,
                                     AND  "schema" ~ '%s'
                                     AND  "table" NOT IN (%s);
                                         ''' % (
-            vacuum_parameter, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name,
+            vacuum_parameter, threshold_stanza, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name,
             str(blacklisted_tables_array)[1:-1])
 
     else:
@@ -236,7 +243,7 @@ def run_vacuum(conn,
         comment("Extracting Candidate Tables for Vacuum...")
 
         get_vacuum_statement = '''
-                SELECT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '" ; ' 
+                SELECT 'vacuum %s ' + feedback_tbl.schema_name + '."' + feedback_tbl.table_name + '"%s; '
                        + '/* Size : ' + CAST(info_tbl."size" AS VARCHAR(10)) + ' MB' 
                        + ', Unsorted_pct : ' + coalesce(unsorted :: varchar(10),'null') 
                        + ', Stats Off : ' + stats_off :: varchar(10)
@@ -275,6 +282,7 @@ def run_vacuum(conn,
                 ORDER BY info_tbl.size,
                          info_tbl.skew_rows
                             ''' % (vacuum_parameter,
+                                   threshold_stanza,
                                    goback_no_of_days,
                                    query_rank,
                                    min_unsorted_pct,
@@ -302,7 +310,7 @@ def run_vacuum(conn,
     if table_name is None and blacklisted_tables is None:
         # query for all tables in the schema ordered by size descending
         comment("Extracting Candidate Tables for Vacuum ...")
-        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '" ; '
+        get_vacuum_statement = '''SELECT 'vacuum %s ' + "schema" + '."' + "table" + '"%s; '
                                                    + '/* Size : ' + CAST("size" AS VARCHAR(10)) + ' MB'
                                                    + ',  Unsorted_pct : ' + coalesce(info_tbl.unsorted :: varchar(10),'N/A')
                                                    + ' */ ;' as statement,
@@ -322,6 +330,7 @@ def run_vacuum(conn,
                                                  )
                                         ORDER BY "size" ASC ,skew_rows ASC;
                                         ''' % (vacuum_parameter,
+                                               threshold_stanza,
                                                schema_name,
                                                max_table_size_mb,
                                                min_unsorted_pct,
