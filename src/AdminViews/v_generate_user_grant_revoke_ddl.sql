@@ -5,21 +5,21 @@ Purpose:	View to generate grant or revoke ddl for users and groups. This is usef
 		
 Current Version:        1.08
 Columns -
-objowner:		Object owner 
-schemaname:		Object schema if applicable
-objname:		Name of the object the privilege is granted on
-grantor:		User that granted the privilege
-grantee:		User/Group the privilege is granted to
-objtype:		Type of object user has privilege on. Object types are Function, Schema, 
-				Table or View, Database, Language or Default ACL
-ddltype:		Type of ddl generated i.e grant or revoke
-grantseq:		Sequence number to order the DDLs by hierarchy
-objseq:			Sequence number to order the objects by hierarchy
-ddl:			DDL text
-colname:		Name of the column the privilege is granted on
+objowner:	Object owner 
+schemaname:	Object schema if applicable
+objname:	Name of the object the privilege is granted on
+grantor:	User that granted the privilege
+grantee:	User/Group the privilege is granted to
+objtype:	Type of object user has privilege on. Object types are Function, Schema, 
+		Table or View, Database, Language or Default ACL
+ddltype:	Type of ddl generated i.e grant or revoke
+grantseq:	Sequence number to order the DDLs by hierarchy
+objseq:		Sequence number to order the objects by hierarchy
+ddl:		DDL text
+colname:	Name of the column the privilege is granted on
 
 
-Notes:           
+Notes:         This version will NOT work with a cluster that has patch 1.0.12916 and below. Cluster must be on patch 1.0.13059 and above.
                 
 History:
 Version 1.01
@@ -47,10 +47,10 @@ Version 1.06
 
 Version 1.07
 	2019-10-10	adedotua added handling for privileges granted on procedures. Increased ddl column to varchar(4000) to incorporate 
-				CrisFavero #460 pull request. Fixed handling for empty default aclitem
+			CrisFavero #460 pull request. Fixed handling for empty default aclitem
 Version 1.08
-	2020-02-22	adedotua added support for generating grants for column privileges. added schemanames to catalog tables to allow 
-				creating this view as a late binding view
+	2020-02-22	adedotua added support for generating grants for column privileges (requires patch 1.0.13059 and above). added schemanames to catalog tables to allow 
+			creating this view as a late binding view
 
 
 Steps to revoking grants before dropping a user:
