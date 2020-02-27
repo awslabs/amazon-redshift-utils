@@ -105,11 +105,11 @@ create table supplier (
 	For more information check samples in https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-create-sample-db.html
 */
 
-copy region from 's3://redshift-downloads/TPC-H/3TB/region/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' COMPUPDATE ON;
-copy nation from 's3://redshift-downloads/TPC-H/3TB/nation/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' COMPUPDATE ON;
-copy lineitem from 's3://redshift-downloads/TPC-H/3TB/lineitem/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' COMPUPDATE ON;
-copy orders from 's3://redshift-downloads/TPC-H/3TB/orders/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' COMPUPDATE ON;
-copy part from 's3://redshift-downloads/TPC-H/3TB/part/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' COMPUPDATE ON;
-copy supplier from 's3://redshift-downloads/TPC-H/3TB/supplier/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' COMPUPDATE ON;
-copy partsupp from 's3://redshift-downloads/TPC-H/3TB/partsupp/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' COMPUPDATE ON;
-copy customer from 's3://redshift-downloads/TPC-H/3TB/customer/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' COMPUPDATE ON;
+copy region from 's3://redshift-downloads/TPC-H/3TB/region/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
+copy nation from 's3://redshift-downloads/TPC-H/3TB/nation/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
+copy lineitem from 's3://redshift-downloads/TPC-H/3TB/lineitem/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
+copy orders from 's3://redshift-downloads/TPC-H/3TB/orders/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
+copy part from 's3://redshift-downloads/TPC-H/3TB/part/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
+copy supplier from 's3://redshift-downloads/TPC-H/3TB/supplier/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
+copy partsupp from 's3://redshift-downloads/TPC-H/3TB/partsupp/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
+copy customer from 's3://redshift-downloads/TPC-H/3TB/customer/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
