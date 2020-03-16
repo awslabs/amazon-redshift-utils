@@ -9,3 +9,4 @@ Sample and Usefull Stored Procedures
 | `sp_controlled_access.sql`     | Provide controlled access to data without granting permission on the table/view       |
 | `sp_pivot_for.sql`             | Transpose row values into columns                                                     |
 | `sp_split_table_by_range.sql`  | Split a large table into parts using a numeric column                                 |
+| `sp_unload.sql`  | single procedure for exporting multiple tables                                 |
