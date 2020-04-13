@@ -83,6 +83,13 @@ You can provide a Redshift password as a base64 encoded KMS encrypted string in 
 
 Please note that this feature was added due to requests by customers, but does not represent the most secure solution. It stores the password in plaintext, which depending on how modules are deployed may be a security threat. Please use with caution!
 
+# Running utilities
+
+From the command line, you can run the utilities from the `src` directory with:
+
+```
+python3 ./<folder>/<utility> <args>
+```
 # Docker executions
 The Dockerfile provides an environment to execute the following utilities without having to install any dependencies locally:
 * Analyze & Vacuum Utility

@@ -78,24 +78,33 @@ def usage(with_message=None):
     print('           --db-port            - The Cluster endpoint port : Default = 5439')
     print('           --db-conn-opts       - Additional connection options. "name1=opt1[ name2=opt2].."')
     print('           --require-ssl        - Does the connection require SSL? (True | False)')
-    print('           --schema-name        - The Schema to be Analyzed or Vacuumed (REGEX): Default = public') 
-    print('           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
+    print('           --schema-name        - The Schema to be Analyzed or Vacuumed (REGEX): Default = public')
+    print(
+        '           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
     print('           --blacklisted-tables - The tables we do not want to Vacuum')
     print('           --output-file        - The full path to the output file to be generated')
     print('           --debug              - Generate Debug Output including SQL Statements being run')
     print('           --slot-count         - Modify the wlm_query_slot_count : Default = 1')
     print('           --ignore-errors      - Ignore errors raised when running and continue processing')
     print('           --query_group        - Set the query_group for all queries')
-    print('           --analyze-flag       - Flag to turn ON/OFF ANALYZE functionality (True or False) : Default = True ')
-    print('           --vacuum-flag        - Flag to turn ON/OFF VACUUM functionality (True or False) :  Default = True')
-    print('           --vacuum-parameter   - Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL')
-    print('           --min-unsorted-pct   - Minimum unsorted percentage(%) to consider a table for vacuum : Default = 5%')
-    print('           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
-    print('           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
+    print(
+        '           --analyze-flag       - Flag to turn ON/OFF ANALYZE functionality (True or False) : Default = True ')
+    print(
+        '           --vacuum-flag        - Flag to turn ON/OFF VACUUM functionality (True or False) :  Default = True')
+    print(
+        '           --vacuum-parameter   - Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL')
+    print(
+        '           --min-unsorted-pct   - Minimum unsorted percentage(%) to consider a table for vacuum : Default = 5%')
+    print(
+        '           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
+    print(
+        '           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
     print('           --predicate-cols     - Analyze predicate columns only')
     print('           --max-table-size-mb  - Maximum table size in MB : Default = 700*1024 MB')
-    print('           --min-interleaved-skew   - Minimum index skew to consider a table for vacuum reindex: Default = 1.4')
-    print('           --min-interleaved-cnt   - Minimum stv_interleaved_counts records to consider a table for vacuum reindex: Default = 0')
+    print(
+        '           --min-interleaved-skew   - Minimum index skew to consider a table for vacuum reindex: Default = 1.4')
+    print(
+        '           --min-interleaved-cnt   - Minimum stv_interleaved_counts records to consider a table for vacuum reindex: Default = 0')
     print('           --suppress-cloudwatch   - Don\'t emit CloudWatch metrics for analyze or vacuum when set to True')
 
     sys.exit(INVALID_ARGS)
@@ -215,20 +224,19 @@ def main(argv):
         else:
             usage("Unsupported Argument " + arg)
 
-    # Validate that we've got all the args needed
-    if config_constants.DB_NAME not in args:
-        usage("Missing Parameter 'db'")
-    if config_constants.DB_USER not in args:
-        usage("Missing Parameter 'db-user'")
-    if config_constants.DB_PASSWORD not in args:
-        usage("Missing Parameter 'db-pwd'")
-    if config_constants.DB_HOST not in args:
-        usage("Missing Parameter 'db-host'")
-    if config_constants.DB_PORT not in args:
-        usage("Missing Parameter 'db-port'")
+    def validate(param):
+        if param not in args or args.get(param) is None:
+            usage(f"Missing Parameter {param}")
 
-    if config_constants.OUTPUT_FILE in args:
-        sys.stdout = open(args['output_file'], 'w')
+    # Validate that we've got all the args needed
+    validate(config_constants.DB_NAME)
+    validate(config_constants.DB_USER)
+    validate(config_constants.DB_PASSWORD)
+    validate(config_constants.DB_HOST)
+    validate(config_constants.DB_PORT)
+
+    if args.get(config_constants.OUTPUT_FILE) is not None:
+        sys.stdout = open(args.get(config_constants.OUTPUT_FILE), 'w')
 
     # invoke the main method of the utility
     result = analyze_vacuum.run_analyze_vacuum(**args)
