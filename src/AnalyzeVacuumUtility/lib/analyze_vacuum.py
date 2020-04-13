@@ -20,7 +20,7 @@ except:
 import aws_utils
 import config_constants
 
-__version__ = ".9.1.6"
+__version__ = ".9.2.0"
 
 # set default values to vacuum, analyze variables
 goback_no_of_days = -1
@@ -200,9 +200,9 @@ def run_vacuum(conn,
                **kwargs):
     statements = []
 
-    threshold = MAX_PERCENT - int(min_unsorted_pct)
+    threshold = MAX_PERCENT - int(min_unsorted_pct) if min_unsorted_pct is not None else 5
     threshold_stanza = ""
-    if vacuum_parameter.upper() != 'REINDEX':
+    if vacuum_parameter is not None and vacuum_parameter.upper() != 'REINDEX':
         threshold_stanza = " to %d percent" % threshold
 
     if table_name is not None:
@@ -218,7 +218,8 @@ def run_vacuum(conn,
                                     AND  "schema" ~ '%s'
                                     AND  "table" = '%s';
                                         ''' % (
-            vacuum_parameter, threshold_stanza, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name, table_name)
+            vacuum_parameter, threshold_stanza, min_unsorted_pct, stats_off_pct, max_table_size_mb, schema_name,
+            table_name)
 
     elif blacklisted_tables is not None:
         comment("Extracting Candidate Tables for Vacuum...")
@@ -692,14 +693,14 @@ def run_analyze_vacuum(**kwargs):
     if master_conn is None:
         raise Exception("No Connection was established")
 
-    vacuum_flag = kwargs[config_constants.DO_VACUUM] if config_constants.DO_VACUUM in kwargs else False
+    vacuum_flag = kwargs.get(config_constants.DO_VACUUM, True)
     if vacuum_flag is True:
         # Run vacuum based on the Unsorted , Stats off and Size of the table
         run_vacuum(master_conn, cluster_name, cw, **kwargs)
     else:
         comment("Vacuum flag arg is not set. Vacuum not performed.")
 
-    analyze_flag = kwargs[config_constants.DO_ANALYZE] if config_constants.DO_ANALYZE in kwargs else False
+    analyze_flag = kwargs.get(config_constants.DO_ANALYZE, True)
     if analyze_flag is True:
         if not vacuum_flag:
             comment("Warning - Analyze without Vacuum may result in sub-optimal performance")
