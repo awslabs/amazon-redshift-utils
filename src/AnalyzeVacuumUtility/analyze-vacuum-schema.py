@@ -224,17 +224,6 @@ def main(argv):
         else:
             usage("Unsupported Argument " + arg)
 
-    def validate(param):
-        if param not in args or args.get(param) is None:
-            usage(f"Missing Parameter {param}")
-
-    # Validate that we've got all the args needed
-    validate(config_constants.DB_NAME)
-    validate(config_constants.DB_USER)
-    validate(config_constants.DB_PASSWORD)
-    validate(config_constants.DB_HOST)
-    validate(config_constants.DB_PORT)
-
     if args.get(config_constants.OUTPUT_FILE) is not None:
         sys.stdout = open(args.get(config_constants.OUTPUT_FILE), 'w')
 
