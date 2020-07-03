@@ -641,12 +641,7 @@ def analyze(table_info):
                 # compare the previous encoding to the new encoding
                 # don't use new encoding for first sortkey
                 datatype = descr[col][1]
-
-                # use az64 coding if supported. ANALYZE COMPRESSION does not yet support this but it is recommended by AWS
-                # see https://docs.amazonaws.cn/en_us/redshift/latest/dg/c_Compression_encodings.html for supported types
-                new_encoding = 'az64' if datatype in ['integer', 'smallint', 'integer', 'bigint', 'decimal', 'date',
-                                                      'timestamp without time zone', 'timestamp with time zone'] else \
-                row[2]
+                new_encoding = row[2]
                 new_encoding = new_encoding if not abs(row_sortkey) == 1 else 'raw'
                 old_encoding = descr[col][2]
                 old_encoding = 'raw' if old_encoding == 'none' else old_encoding
