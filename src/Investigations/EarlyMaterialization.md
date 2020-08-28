@@ -1,4 +1,4 @@
-#Investigation: Sortkey skew leading to excessive block I/O with early materialization 
+# Investigation: Sortkey skew leading to excessive block I/O with early materialization 
 
 *Authored by chriz-bigdata on 2016-11-08*
 
@@ -6,13 +6,13 @@ Redshift leverages an [early materialization strategy](http://db.lcs.mit.edu/pro
 majority of scans for Redshift workloads. The details of this investigation will show how certain edge cases where excessive compression is involved can lead to a performance degradation, relative to 
 less compression, or no compression at all.
 
-##Queries
+## Queries
 ```sql
 SELECT * FROM exercise_10.query_1; -- Delta encoding, query ID = 320310, runtime: 280.088 ms
 SELECT * FROM exercise_10.query_2; -- Runlength encoding, query ID = 320312, runtime: 2706.043 ms
 ```
 
-##Relations
+## Relations
 Two views with identical definitions, deviating only by the table which they scan.
 ```sql
 dev=# \d+ exercise_10.query_1
@@ -113,7 +113,7 @@ dev=# \d+ lineitem
 Has OIDs: yes
 ```
 
-##Queries
+## Queries
 
 Running the queries against the two tables we can see performance fluctuating between `280.088 ms` for the table encoded with delta, and `2706.043 ms` for the table encoded with runlength:
 
@@ -223,7 +223,7 @@ The column `rows_pre_filter` means how many rows were fetched from disk into mem
 (2 rows)
 ```
 
-##Explanation
+## Explanation
 
 To understand why `rows_pre_filter` increases significantly when we query the table with runlength encoding we need to dive deeper into the storage details of the column data blocks. The `l_shipdate` column is enumerated as 10 in the system catalog for these tables. Due to the data profile in `l_shipdate`, runlength encoding compresses the column extremely well. We can see that runlength encoding reduces the size of the column from 576MB with an average of 1041732 values per block, to 12MB with an average of 50,003,158 values per block.
 
@@ -287,7 +287,7 @@ Each query would leverage the zone maps to identify these 6 blocks to be fetched
 
 This results in `6 * 1048427 = 6290562` rows being fetched for query 320310, and `6 * 46698495 = 280190970` rows being fetched for query 320312. These numbers correlate directly to what we saw in the output from `svl_query_summary.rows_pre_filter`.
 
-##Translated to Block I/O?
+## Translated to Block I/O?
 
 In both cases we are still only fetching 6 blocks for this column, so there shouldn't be a significant performance degradation by that fact alone. This is where early materialization comes into play, and is responsible for the additional block I/O between queries. Checking the VIEW definition SQL we also see that these columns are necessary for the query to complete:
 
@@ -365,7 +365,7 @@ To calculate how many blocks this requires to fetch for another column on this t
 
 Now lets see how that changes with an exceptionally compressed sortkey. Instead of having a range of 97503712 -> 98552139, the values we need are in the very first block. Unfortunately this block contains 46713432 values, so our range is 1-46713432. The offset for that same `l_extendedprice` column is calculated as (46713432 / 253823) = 184 blocks per slice.
 
-##Mitigation
+## Mitigation
 
 The trick to mitigating this issue is that when leveraging queries which perform rrscans on a column which is ordered either by a sortkey, or naturally with the data ingestion strategy, then we should seek to reduce the number of values per block for that column such that it is inline with other blocks' average number of values, for columns relevant to the same query. This won't result in a significant impact to fetch time against that one column, since we are already leveraging the zonemaps to effectively prune blocks, but has a large impact reducing the size of the range needing to be matched in other relevant columns. 
 
