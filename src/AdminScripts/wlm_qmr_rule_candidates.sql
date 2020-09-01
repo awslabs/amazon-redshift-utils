@@ -36,12 +36,14 @@ Notes:
 History:
 2017-07-31 joeharris76 created
 2018-02-20 joeharris76 committed to Redshift Utils
+2020-08-26 vishnu-narayanan added query_queue_time metric to the candidates list
 **********************************************************************************************/
 
 WITH qmr AS (
               SELECT service_class, 'query_cpu_time'            ::VARCHAR(30) qmr_metric, MEDIAN(query_cpu_time            ) p50, PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY query_cpu_time            ) p99, MAX(query_cpu_time            ) pmax FROM svl_query_metrics_summary WHERE userid > 1 GROUP BY 1
     UNION ALL SELECT service_class, 'query_blocks_read'         ::VARCHAR(30) qmr_metric, MEDIAN(query_blocks_read         ) p50, PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY query_blocks_read         ) p99, MAX(query_blocks_read         ) pmax FROM svl_query_metrics_summary WHERE userid > 1 GROUP BY 1
     UNION ALL SELECT service_class, 'query_execution_time'      ::VARCHAR(30) qmr_metric, MEDIAN(query_execution_time      ) p50, PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY query_execution_time      ) p99, MAX(query_execution_time      ) pmax FROM svl_query_metrics_summary WHERE userid > 1 GROUP BY 1
+    UNION ALL SELECT service_class, 'query_queue_time'          ::VARCHAR(30) qmr_metric, MEDIAN(query_queue_time          ) p50, PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY query_queue_time          ) p99, MAX(query_execution_time      ) pmax FROM svl_query_metrics_summary WHERE userid > 1 GROUP BY 1
     UNION ALL SELECT service_class, 'query_cpu_usage_percent'   ::VARCHAR(30) qmr_metric, MEDIAN(query_cpu_usage_percent   ) p50, PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY query_cpu_usage_percent   ) p99, MAX(query_cpu_usage_percent   ) pmax FROM svl_query_metrics_summary WHERE userid > 1 GROUP BY 1
     UNION ALL SELECT service_class, 'query_temp_blocks_to_disk' ::VARCHAR(30) qmr_metric, MEDIAN(query_temp_blocks_to_disk ) p50, PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY query_temp_blocks_to_disk ) p99, MAX(query_temp_blocks_to_disk ) pmax FROM svl_query_metrics_summary WHERE userid > 1 GROUP BY 1
     UNION ALL SELECT service_class, 'segment_execution_time'    ::VARCHAR(30) qmr_metric, MEDIAN(segment_execution_time    ) p50, PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY segment_execution_time    ) p99, MAX(segment_execution_time    ) pmax FROM svl_query_metrics_summary WHERE userid > 1 GROUP BY 1
