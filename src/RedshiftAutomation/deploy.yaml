@@ -60,10 +60,10 @@ Parameters:
     Description: List of private Subnets in VPC in which the function will egress network connections
     Type: CommaDelimitedList
   KmsKeyARN:
-    Default: arn:aws:kms:us-east-1/123456789012:key/MyKey
+    Default: arn:aws:kms:us-east-1:123456789012:key/MyKey
     Description: KMS Key ARN used to decrypt the password
     Type: String
-    AllowedPattern: arn:aws:kms:[a-zA-Z0-9-]+\/\d{12}:key\/.*
+    AllowedPattern: arn:aws:kms:[a-zA-Z0-9-]+:\d{12}:key\/.*
   ColumnEncodingCronExpression:
     Default: 0 0 * * ? *
     Description: Cron expression for when to run the Column Encoding Utility (default midnight daily)
@@ -107,7 +107,7 @@ Resources:
       Runtime: python2.7
       CodeUri:
         Bucket: !Sub awslabs-code-${AWS::Region}
-        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.4.zip
+        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.5.zip
       MemorySize: 192
       Timeout: 300
       Tags:
@@ -121,39 +121,39 @@ Resources:
   RedshiftAutomationIAMRole:
     Type: "AWS::IAM::Role"
     Properties:
-        RoleName: "LambdaRedshiftAutomationRole"
-        Path: "/"
-        ManagedPolicyArns:
-            - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-        AssumeRolePolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-            -
-              Sid: "AllowLambdaServiceToAssumeRole"
-              Effect: "Allow"
-              Action:
-                - "sts:AssumeRole"
-              Principal:
-                Service:
-                  - "lambda.amazonaws.com"
-        Policies:
+      RoleName: "LambdaRedshiftAutomationRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
           -
-            PolicyName: "LambdaRedshiftRunnerPolicy"
-            PolicyDocument:
-              Version: "2012-10-17"
-              Statement:
-                -
-                  Effect: "Allow"
-                  Action:
-                    - "s3:GetObject"
-                    - "cloudwatch:PutMetricData"
-                    - "redshift:ModifyClusterParameterGroup"
-                  Resource: "*"
-                -
-                  Effect: "Allow"
-                  Action:                
-                    - "kms:Decrypt"
-                  Resource: !Ref KmsKeyARN
+            Sid: "AllowLambdaServiceToAssumeRole"
+            Effect: "Allow"
+            Action:
+              - "sts:AssumeRole"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      Policies:
+        -
+          PolicyName: "LambdaRedshiftRunnerPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action:
+                  - "s3:GetObject"
+                  - "cloudwatch:PutMetricData"
+                  - "redshift:ModifyClusterParameterGroup"
+                Resource: "*"
+              -
+                Effect: "Allow"
+                Action:
+                  - "kms:Decrypt"
+                Resource: !Ref KmsKeyARN
 
   AnalyzeEventRule:
     Type: "AWS::Events::Rule"

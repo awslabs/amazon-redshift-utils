@@ -17,7 +17,7 @@ try:
 except:
     pass
 
-import aws_utils
+import redshift_utils_helper as aws_utils
 import config_constants
 
 __version__ = ".9.2.0"

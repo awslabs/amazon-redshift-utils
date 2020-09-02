@@ -2,7 +2,7 @@ import sys
 import datetime
 
 '''
-aws_utils.py
+redshift_utils_helper.py
 
 Utility modules for the amazon-redshift-utils family of tools
 
