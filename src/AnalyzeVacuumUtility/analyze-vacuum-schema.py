@@ -102,7 +102,7 @@ parser.add_argument("--require-ssl", dest="require_ssl", default=False,
 parser.add_argument("--schema-name", dest="schema_name",
                     help="The Schema to be Analyzed or Vacuumed (REGEX: Default = public")
 parser.add_argument("--slot-count", dest="slot_count", help="Modify the wlm_query_slot_count : Default = 1")
-parser.add_argument("--suppress-cloudwatch", dest="suppress_cloudwatch",
+parser.add_argument("--suppress-cloudwatch", dest="suppress_cw",
                     help="Don't emit CloudWatch metrics for analyze or vacuum when set to True")
 parser.add_argument("--db", dest="db", help="The Database to Use")
 full_args = parser.parse_args()
