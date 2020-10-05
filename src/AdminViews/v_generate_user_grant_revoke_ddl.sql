@@ -71,7 +71,7 @@ SELECT objowner,
 	translate(trim(split_part(aclstring,'/',2)),'"','')::text AS grantor, 
 	trim(split_part(split_part(aclstring,'=',2),'/',1))::text AS privilege, 
 	CASE WHEN objtype = 'default acl' THEN objname 
-		WHEN objtype in ('procedure','function') AND regexp_instr(schemaname,'[^a-z]') > 0 THEN objname
+		WHEN objtype in ('procedure','function') AND regexp_instr(objname, schemaname) > 0 THEN objname
 		WHEN objtype in ('procedure','function','column') THEN QUOTE_IDENT(schemaname)||'.'||objname 
 		ELSE nvl(QUOTE_IDENT(schemaname)||'.'||QUOTE_IDENT(objname),QUOTE_IDENT(objname)) END::text as fullobjname,
 	CASE WHEN split_part(aclstring,'=',1)='' THEN 'PUBLIC' 
