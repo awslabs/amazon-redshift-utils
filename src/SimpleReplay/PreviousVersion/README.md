@@ -1,3 +1,5 @@
+**Please note that this is the README for Simpe Replay - Version 1.**
+
 ## Introduction
 
 Customers are always trying to reproduce issues or workloads from clusters or to do what-if scenarios. A customer can easily clone a production cluster, but replicating the workload is more complicated. This set of tools was created to bridge that gap. 
