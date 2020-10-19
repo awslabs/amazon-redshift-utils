@@ -4,7 +4,7 @@
 
 ## Introduction
 
-Customers are always trying to reproduce issues or workloads from clusters or to do what-if scenarios. A customer can easily clone a production cluster, but replicating the workload is more complicated. Simple Replay was created to bridge that gap. Simple Replay V2 enhances existing Simple Replay tool by providing following additional functionalities: 
+The Simple Replay tool enables customers to easily conduct what-if analysis and evaluate how their workload will perform in different scenarios. For example, customers can use the tool to benchmark their actual workload on a new instance type like RA3, evaluate a new feature, or different cluster configurations. The new version of Simple Replay enhances existing Simple Replay tool by providing following additional functionalities:
 
 * Ability to mimic COPY and UNLOAD workloads. 
 * Ability to execute the transactions and queries in the same time interval as executed in the source cluster. 
