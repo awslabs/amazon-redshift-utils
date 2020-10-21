@@ -265,7 +265,7 @@ class SchemaResource(DBResource, ChildObject):
 
 
 class TableResource(SchemaResource):
-    unload_table_stmt = """unload ('SELECT {columns} FROM {schema_name}.{table_name}')
+    default_unload_table_stmt = """unload ('SELECT {columns} FROM {schema_name}.{table_name}')
                      to '{dataStagingPath}.' credentials 
                      '{s3_access_credentials};master_symmetric_key={master_symmetric_key}'
                      manifest
@@ -286,14 +286,14 @@ class TableResource(SchemaResource):
                    timeformat 'auto'
                    delimiter '^' removequotes escape compupdate off """
 
-    drop_table_stmt = """DROP TABLE {schema_name}.{table_name}"""
+    drop_table_stmt = """DROP TABLE IF EXISTS {schema_name}.{table_name}"""
 
     def __init__(self, rs_cluster, schema, table):
         SchemaResource.__init__(self, rs_cluster, schema)
         self.parent = SchemaResource(rs_cluster, schema)
         self._table = table
         self.get_name_owner_acl_sql = GET_TABLE_NAME_OWNER_ACL
-        self.commands['unload_table'] = TableResource.unload_table_stmt
+        self.commands['unload_table'] = TableResource.default_unload_table_stmt
         self.commands['copy_table'] = TableResource.copy_table_stmt
         self.commands['drop_table'] = TableResource.drop_table_stmt
         self.columns = None
@@ -358,6 +358,9 @@ class TableResource(SchemaResource):
 
     def set_explicit_ids(self, explicit_ids):
         self.explicit_ids = explicit_ids
+
+    def set_unload_table_stmt(self, stmt):
+        self.commands['unload_table'] = stmt
 
 class ResourceFactory:
     def __init__(self):
@@ -426,4 +429,6 @@ class ResourceFactory:
                 table_resource.set_columns(cluster_dict['columns'].strip())
             if 'explicit_ids' in cluster_dict and cluster_dict['explicit_ids']:
                 table_resource.set_explicit_ids(True)
+            if 'unloadStatement' in cluster_dict and cluster_dict['unloadStatement']:
+                table_resource.set_unload_table_stmt(cluster_dict['unloadStatement'])
             return table_resource
