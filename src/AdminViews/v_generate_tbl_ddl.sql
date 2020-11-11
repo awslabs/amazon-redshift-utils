@@ -46,6 +46,7 @@ History:
 2018-05-30 adedotua Added ENCODE RAW keyword for non compressed columns (Issue #308)
 2018-10-12 dmenin Added table ownership to the script (as an alter table statment as the owner of the table is the issuer of the CREATE TABLE command)
 2019-03-24 adedotua added filter for diststyle AUTO distribution style
+2020-11-11 leisersohn Added COMMENT section
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
@@ -255,7 +256,16 @@ from (SELECT
   FROM  pg_namespace AS n
   INNER JOIN pg_class AS c ON n.oid = c.relnamespace
   WHERE c.relkind = 'r' 
-  
+  --COMMENT
+  UNION
+  SELECT 
+  c.oid::bigint as table_id ,n.nspname AS schemaname, c.relname AS tablename, 600250000 as seq,
+  'COMMENT ON TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' IS ''' + QUOTE_IDENT(des.description) + ''';' as ddl
+  FROM pg_description des
+  INNER JOIN pg_class AS c ON c.oid = des.objoid
+  INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
+  WHERE c.relkind = 'r'
+
   UNION
   --TABLE OWNERSHIP AS AN ALTER TABLE STATMENT
   SELECT c.oid::bigint as table_id ,n.nspname AS schemaname, c.relname AS tablename, 600500000 AS seq, 
