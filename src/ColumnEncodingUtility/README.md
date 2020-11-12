@@ -39,6 +39,7 @@ Arguments: --db                  - The database to use
            --analyze-schema      - The schema name or a regular expression pattern to resolve schemas for processing.
            --analyze-table       - A specific table or list of tables to be Analyzed, if --analyze-schema is not desired
            --analyze-cols        - Analyze column width and reduce the column width if needed
+           --new-varchar-min     - Set minimum varchar length for new width (to be used with --analyze-cols)
            --new-dist-key        - Set a new distribution key (only used if --analyze-table is specified)
            --new-sort-keys       - Set a new sort key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)
            --target-schema       - Name of a single schema into which the newly optimised tables and data should be created, rather than in place
