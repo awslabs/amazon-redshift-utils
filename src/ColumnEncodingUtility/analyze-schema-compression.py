@@ -103,6 +103,7 @@ new_sort_keys = None
 debug = False
 threads = 1
 analyze_col_width = False
+new_varchar_min = None
 do_execute = False
 query_slot_count = 1
 ignore_errors = False
@@ -506,6 +507,11 @@ def reduce_column_length(col_type, column_name, table_name):
         # if the new length would be greater than varchar(max) then return the current value - no changes
         if new_column_len > 65535:
             return col_type
+
+        # if the new length would be smaller than the specified new varchar minimum then set to varchar minimum
+        if new_column_len < new_varchar_min:
+            new_column_len = new_varchar_min
+
         # if the new length would be 0 then return the current value - no changes
         if new_column_len == 0:
             return col_type
@@ -886,6 +892,7 @@ def usage(with_message):
     print('           --analyze-schema      - The Schema to be Analyzed (default public)')
     print('           --analyze-table       - A specific table to be Analyzed, if --analyze-schema is not desired')
     print('           --analyze-cols        - Analyze column width and reduce the column width if needed')
+    print('           --new-varchar-min     - Set minimum varchar length for new width (to be used with --analyze-cols)')
     print('           --new-dist-key        - Set a new Distribution Key (only used if --analyze-table is specified)')
     print(
         '           --new-sort-keys       - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)')
@@ -923,6 +930,7 @@ def configure(**kwargs):
     global new_dist_key
     global new_sort_keys
     global analyze_col_width
+    global new_varchar_min
     global target_schema
     global debug
     global do_execute
@@ -1128,7 +1136,7 @@ order by 2;
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch= statement-timeout="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= new-varchar-min= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch= statement-timeout="""
 
     # extract the command line arguments
     try:
@@ -1176,6 +1184,9 @@ def main(argv):
         elif arg == "--analyze-cols":
             if value != '' and value is not None:
                 args['analyze_col_width'] = value
+        elif arg == "--new-varchar-min":
+            if value != '' and value is not None:
+                args['new_varchar_min'] = int(value)
         elif arg == "--target-schema":
             if value != '' and value is not None:
                 args[config_constants.TARGET_SCHEMA] = value
