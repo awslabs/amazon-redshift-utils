@@ -55,6 +55,8 @@ SYSTABLE_CLEANUP_AFTER_DAYS = "systable_cleanup_after_days"
 STATEMENT_TIMEOUT = "statement_timeout"
 S3_UNLOAD_LOCATION = "s3_unload_location"
 S3_UNLOAD_ROLE_ARN = "s3_unload_role_arn"
+NEW_DIST_KEY = "new_dist_key"
+NEW_SORT_KEYS = "new_sort_keys"
 
 config_aliases = {
     "db": ["db", "DatabaseName"],

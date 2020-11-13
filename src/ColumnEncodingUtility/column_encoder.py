@@ -24,6 +24,8 @@ import config_constants as constants
 
 __version__ = ".9.4.0"
 
+FORCE_LEGACY_REORG = True
+
 # timeout for retries - 100ms
 RETRY_TIMEOUT = 100. / 1000
 
@@ -38,16 +40,16 @@ IDENTITY_RE = re.compile(r'"identity"\((?P<current>.*), (?P<base>.*), \(?\'(?P<s
 
 
 class ColumnEncoder:
-    def get_env_var(name, default_value):
+    def _get_env_var(name, default_value):
         return os.environ[name] if name in os.environ else default_value
 
     # class level properties
     db_connections = {}
-    db = get_env_var('PGDATABASE', None)
-    db_user = get_env_var('PGUSER', None)
+    db = _get_env_var('PGDATABASE', None)
+    db_user = _get_env_var('PGUSER', None)
     db_pwd = None
-    db_host = get_env_var('PGHOST', None)
-    db_port = get_env_var('PGPORT', 5439)
+    db_host = _get_env_var('PGHOST', None)
+    db_port = _get_env_var('PGPORT', 5439)
     debug = False
     threads = 1
     analyze_col_width = False
@@ -61,11 +63,6 @@ class ColumnEncoder:
     statement_timeout = '1200000'
 
     # runtime properties
-    schema_name = 'public'
-    target_schema = None
-    table_name = None
-    new_dist_key = None
-    new_sort_keys = None
     force = False
     drop_old_data = False
     comprows = None
@@ -154,7 +151,7 @@ class ColumnEncoder:
                 if s is not None:
                     print(s)
 
-    def _get_pg_conn(self):
+    def _get_pg_conn(self, source_schema=None, target_schema=None):
         pid = str(os.getpid())
 
         conn = None
@@ -186,7 +183,7 @@ class ColumnEncoder:
                 self._cleanup(conn)
                 raise e
 
-            aws_utils.set_search_paths(conn, self.schema_name, self.target_schema, exclude_external_schemas=True)
+            aws_utils.set_search_paths(conn, source_schema, target_schema, exclude_external_schemas=True)
 
             if self.query_group is not None:
                 set_query_group = 'set query_group to %s' % self.query_group
@@ -283,7 +280,7 @@ class ColumnEncoder:
         grant_statements = []
 
         for grant in grants:
-            if grant[3] == True:
+            if grant[3] is True:
                 grant_statements.append(
                     "grant %s on %s.%s to group \"%s\";" % (grant[2].lower(), schema_name, table_name, grant[4]))
             else:
@@ -425,7 +422,7 @@ class ColumnEncoder:
 
         return True
 
-    def _reduce_column_length(self, col_type, column_name, table_name):
+    def _reduce_column_length(self, col_type, column_name, table_name, schema_name):
         set_col_type = col_type
 
         # analyze the current size length for varchar columns and return early if they are below the threshold
@@ -435,16 +432,16 @@ class ColumnEncoder:
                 return col_type
             else:
                 col_len_statement = 'select /* computing max column length */ max(octet_length("%s")) from %s."%s"' % (
-                    column_name, self.schema_name, table_name)
+                    column_name, schema_name, table_name)
         else:
             col_len_statement = 'select /* computing max column length */ max(abs("%s")) from %s."%s"' % (
-                column_name, self.schema_name, table_name)
+                column_name, schema_name, table_name)
 
         if self.debug:
             self._comment(col_len_statement)
 
         self._comment("Analyzing max length of column '%s' for table '%s.%s' " % (
-            column_name, self.schema_name, table_name))
+            column_name, schema_name, table_name))
 
         # run the analyze in a loop, because it could be locked by another process modifying rows
         # and get a timeout
@@ -499,7 +496,7 @@ class ColumnEncoder:
             if self.debug:
                 self._comment(
                     "Max width of character column '%s' for table '%s.%s' is %d. Current width is %d. Setting new size to %s" % (
-                        column_name, self.schema_name, table_name, col_max_len,
+                        column_name, schema_name, table_name, col_max_len,
                         curr_col_length, new_column_len))
 
             if new_column_len < curr_col_length:
@@ -515,8 +512,8 @@ class ColumnEncoder:
 
         return set_col_type
 
-    def analyze(self, table_info):
-        schema_name = table_info[0]
+    def analyze(self, table_info, target_schema, new_dist_key, new_sort_keys):
+        source_schema = table_info[0]
         table_name = table_info[1]
         dist_style = table_info[4]
         owner = table_info[5]
@@ -527,7 +524,7 @@ class ColumnEncoder:
         table_unoptimised = False
         count_unoptimised = 0
         encodings_modified = False
-        output = self._get_count_raw_columns(schema_name, table_name)
+        output = self._get_count_raw_columns(source_schema, table_name)
 
         if output is None:
             print("Unable to determine potential RAW column encoding for %s" % table_name)
@@ -539,14 +536,15 @@ class ColumnEncoder:
                     count_unoptimised += row[0]
 
         if not table_unoptimised and not self.force:
-            self._comment("Table %s.%s does not require encoding optimisation" % (schema_name, table_name))
+            self._comment("Table %s.%s does not require encoding optimisation" % (source_schema, table_name))
             return constants.OK
         else:
-            self._comment("Table %s.%s contains %s unoptimised columns" % (schema_name, table_name, count_unoptimised))
+            self._comment(
+                "Table %s.%s contains %s unoptimised columns" % (source_schema, table_name, count_unoptimised))
             if self.force:
                 self._comment("Using Force Override Option")
 
-            statement = 'analyze compression %s."%s"' % (schema_name, table_name)
+            statement = 'analyze compression %s."%s"' % (source_schema, table_name)
 
             if self.comprows is not None:
                 statement = statement + (" comprows %s" % int(self.comprows))
@@ -555,7 +553,7 @@ class ColumnEncoder:
                 if self.debug:
                     self._comment(statement)
 
-                self._comment("Analyzing Table '%s.%s'" % (schema_name, table_name,))
+                self._comment("Analyzing Table '%s.%s'" % (source_schema, table_name,))
 
                 # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
                 analyze_compression_result = None
@@ -587,65 +585,87 @@ class ColumnEncoder:
                         print("Unknown Error")
                     return constants.ERROR
 
-                if self.target_schema is None:
-                    set_target_schema = schema_name
+                if target_schema is None:
+                    set_target_schema = source_schema
                 else:
-                    set_target_schema = self.target_schema
+                    set_target_schema = target_schema
 
-                statements = self._get_physical_reorg_process(schema_name,
-                                                              table_name,
-                                                              dist_style,
-                                                              owner,
-                                                              table_comment, set_target_schema,
-                                                              analyze_compression_result)
+                if FORCE_LEGACY_REORG is True or new_dist_key is not None or new_sort_keys is not None:
+                    statements = self._get_physical_reorg_process(source_schema,
+                                                                  table_name,
+                                                                  dist_style,
+                                                                  owner,
+                                                                  table_comment, set_target_schema,
+                                                                  analyze_compression_result, new_dist_key,
+                                                                  new_sort_keys)
+                else:
+                    statements = self._get_alter_table_update_process(source_schema,
+                                                                      table_name,
+                                                                      dist_style,
+                                                                      owner,
+                                                                      table_comment, set_target_schema,
+                                                                      analyze_compression_result, new_dist_key,
+                                                                      new_sort_keys)
 
-                statements.extend(['commit;'])
+                if statements is not None:
+                    statements.extend(['commit;'])
 
-                if self.do_execute:
-                    if not self._run_commands(self._get_pg_conn(), statements):
-                        if not self.ignore_errors:
+                    self._print_statements(statements)
+
+                    if self.do_execute:
+                        if not self._run_commands(self._get_pg_conn(), statements):
+                            if not self.ignore_errors:
+                                if self.debug:
+                                    print("Error running statements: %s" % (str(statements),))
+                                return constants.ERROR
+
+                        # emit a cloudwatch metric for the table
+                        if self.cw is not None:
+                            dimensions = [
+                                {'Name': 'ClusterIdentifier', 'Value': self.db_host.split('.')[0]},
+                                {'Name': 'TableName', 'Value': table_name}
+                            ]
+                            aws_utils.put_metric(self.cw, 'Redshift', 'ColumnEncodingModification', dimensions, None, 1,
+                                                 'Count')
                             if self.debug:
-                                print("Error running statements: %s" % (str(statements),))
-                            return constants.ERROR
-
-                    # emit a cloudwatch metric for the table
-                    if self.cw is not None:
-                        dimensions = [
-                            {'Name': 'ClusterIdentifier', 'Value': self.db_host.split('.')[0]},
-                            {'Name': 'TableName', 'Value': table_name}
-                        ]
-                        aws_utils.put_metric(self.cw, 'Redshift', 'ColumnEncodingModification', dimensions, None, 1,
-                                             'Count')
-                        if self.debug:
-                            self._comment("Emitted Cloudwatch Metric for Column Encoded table")
-                else:
-                    self._comment("No encoding modifications run for %s.%s" % (schema_name, table_name))
+                                self._comment("Emitted Cloudwatch Metric for Column Encoded table")
+                    else:
+                        self._comment("No encoding modifications run for %s.%s" % (source_schema, table_name))
             except Exception as e:
                 print('Exception %s during analysis of %s' % (e, table_name))
                 print(traceback.format_exc())
                 return constants.ERROR
 
-            self._print_statements(statements)
-
             # add foreign keys
-            fks = self._get_foreign_keys(schema_name, set_target_schema, table_name)
+            fks = self._get_foreign_keys(source_schema, set_target_schema, table_name)
 
             # add grants back
-            grants = self._get_grants(schema_name, table_name, self.db_user)
+            grants = self._get_grants(source_schema, table_name, self.db_user)
             if grants is not None:
                 statements.extend(grants)
 
             return constants.OK, fks, encodings_modified
 
+    def _get_alter_table_update_process(self, schema_name: str,
+                                        table_name: str,
+                                        dist_style: str,
+                                        owner: str,
+                                        table_comment: str, set_target_schema: str, analyze_compression_result):
+        return None
+
     def _get_physical_reorg_process(self, schema_name: str,
                                     table_name: str,
                                     dist_style: str,
                                     owner: str,
-                                    table_comment: str, set_target_schema: str, analyze_compression_result):
+                                    table_comment: str,
+                                    set_target_schema: str,
+                                    analyze_compression_result,
+                                    new_dist_key: str,
+                                    new_sort_keys: str):
         if set_target_schema == schema_name:
             target_table = '%s_$mig' % table_name
         else:
-            target_table = self.table_name
+            target_table = table_name
 
         create_table = 'begin;\nlock table %s."%s";\ncreate table %s."%s"(' % (
             schema_name, table_name, set_target_schema, target_table,)
@@ -663,7 +683,7 @@ class ColumnEncoder:
         table_distkey = None
         table_sortkeys = []
         new_sortkey_arr = [t.strip() for t in
-                           self.new_sort_keys.split(',')] if self.new_sort_keys is not None else []
+                           new_sort_keys.split(',')] if new_sort_keys is not None else []
 
         # count of suggested optimizations
         count_optimized = 0
@@ -697,8 +717,8 @@ class ColumnEncoder:
 
             # link in the existing distribution key, or set the new one
             row_distkey = descr[col][3]
-            if table_name is not None and self.new_dist_key is not None:
-                if col == self.new_dist_key:
+            if table_name is not None and new_dist_key is not None:
+                if col == new_dist_key:
                     distkey = 'DISTKEY'
                     dist_style = 'KEY'
                     table_distkey = col
@@ -765,13 +785,13 @@ class ColumnEncoder:
                                    % (col, col_type, default_value, col_null, compression, distkey)])
 
         # abort if a new distkey was set but we couldn't find it in the set of all columns
-        if self.new_dist_key is not None and table_distkey is None:
-            msg = "Column '%s' not found when setting new Table Distribution Key" % self.new_dist_key
+        if new_dist_key is not None and table_distkey is None:
+            msg = "Column '%s' not found when setting new Table Distribution Key" % new_dist_key
             self._comment(msg)
             raise Exception(msg)
 
         # abort if new sortkeys were set but we couldn't find them in the set of all columns
-        if self.new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
+        if new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
             if self.debug:
                 self._comment("Requested Sort Keys: %s" % new_sortkey_arr)
                 self._comment("Resolved Sort Keys: %s" % table_sortkeys)
@@ -844,7 +864,7 @@ class ColumnEncoder:
             if len(table_sortkeys) > 0:
                 insert = "%s order by \"%s\";" % (insert, ",".join(table_sortkeys).replace(',', '\",\"'))
             else:
-                insert = "%s;" % (insert)
+                insert = "%s;" % insert
 
             statements.extend([insert])
 
@@ -876,32 +896,23 @@ class ColumnEncoder:
             new_dist_key: str = None,
             new_sort_keys: list = None,
             force: bool = None,
-            drop_old_data: bool = None,
-            comprows: int = None,
-            query_group: str = None):
-        # set class properties for arguments that are overridden here
-        args = locals().copy()
-        for argName in args:
-            if argName != 'self':
-                if args.get(argName) is not None:
-                    setattr(self, argName, args.get(argName))
-
+            drop_old_data: bool = None):
         # get a connection for the controlling processes
-        master_conn = self._get_pg_conn()
+        master_conn = self._get_pg_conn(schema_name, target_schema)
 
         if master_conn is None or master_conn == constants.ERROR:
             return constants.NO_CONNECTION
 
         self._comment("Connected to %s:%s:%s as %s" % (self.db_host, self.db_port, self.db, self.db_user))
-        if self.table_name is not None:
-            snippet = "Table '%s'" % self.table_name
+        if table_name is not None:
+            snippet = "Table '%s'" % table_name
         else:
-            snippet = "Schema '%s'" % self.schema_name
+            snippet = "Schema '%s'" % schema_name
 
         self._comment("Analyzing %s for Columnar Encoding Optimisations with %s Threads..." % (snippet, self.threads))
 
         if self.do_execute:
-            if self.drop_old_data and not self.force:
+            if drop_old_data and not force:
                 really_go = getpass.getpass(
                     "This will make irreversible changes to your database, and cannot be undone. Type 'Yes' to continue: ")
 
@@ -914,18 +925,18 @@ class ColumnEncoder:
             pass
 
         # process the table name to support multiple items
-        if self.table_name is not None:
+        if table_name is not None:
             tables = ""
-            if self.table_name is not None and ',' in self.table_name:
-                for t in self.table_name.split(','):
+            if table_name is not None and ',' in table_name:
+                for t in table_name.split(','):
                     tables = tables + "'" + t + "',"
 
                 tables = tables[:-1]
             else:
-                tables = "'" + self.table_name + "'"
+                tables = "'" + table_name + "'"
 
-        if self.table_name is not None:
-            statement = '''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
+        if table_name is not None:
+            statement = f'''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
     from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
     join pg_class as pgc on pgc.oid = a.id
     left outer join pg_description pgd ON pgd.objoid = pgc.oid and pgd.objsubid = 0
@@ -933,13 +944,13 @@ class ColumnEncoder:
     join pg_user pgu on pgu.usesysid = pgc.relowner
     join (select tbl, count(*) as mbytes
     from stv_blocklist group by tbl) b on a.id=b.tbl
-    and pgn.nspname::text ~ '%s' and pgc.relname in (%s)
-            ''' % (self.schema_name, tables)
+    and pgn.nspname::text ~ '{schema_name}' and pgc.relname in ({tables})
+            '''
         else:
             # query for all tables in the schema ordered by size descending
             self._comment("Extracting Candidate Table List...")
 
-            statement = '''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
+            statement = f'''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
     from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
     join pg_class as pgc on pgc.oid = a.id
     left outer join pg_description pgd ON pgd.objoid = pgc.oid and pgd.objsubid = 0
@@ -947,10 +958,10 @@ class ColumnEncoder:
     join pg_user pgu on pgu.usesysid = pgc.relowner
     join (select tbl, count(*) as mbytes
     from stv_blocklist group by tbl) b on a.id=b.tbl
-    where pgn.nspname::text  ~ '%s'
+    where pgn.nspname::text  ~ '{schema_name}'
       and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
     order by 2;
-            ''' % (self.schema_name,)
+            '''
 
         if self.debug:
             self._comment(statement)
@@ -961,18 +972,18 @@ class ColumnEncoder:
             self._comment("Unable to issue table query - aborting")
             return constants.ERROR
 
-        table_names = []
+        analysis_tuples = []
         for row in query_result:
-            table_names.append(row)
+            analysis_tuples.append(row)
 
-        self._comment("Analyzing %s table(s) which contain allocated data blocks" % (len(table_names)))
+        self._comment("Analyzing %s table(s) which contain allocated data blocks" % (len(analysis_tuples)))
 
         if self.debug:
-            [self._comment(str(x)) for x in table_names]
+            [self._comment(str(x)) for x in analysis_tuples]
 
         result = []
 
-        if table_names is not None:
+        if analysis_tuples is not None:
             # we'll use a Pool to process all the tables with multiple threads, or just sequentially if 1 thread is requested
             if self.threads > 1:
                 # setup executor pool
@@ -980,7 +991,7 @@ class ColumnEncoder:
 
                 try:
                     # run all concurrent steps and block on completion
-                    result = p.map(self.analyze, table_names)
+                    result = p.map(self.analyze, analysis_tuples, target_schema, new_dist_key, new_sort_keys)
                 except KeyboardInterrupt:
                     # To handle Ctrl-C from user
                     p.close()
@@ -996,8 +1007,8 @@ class ColumnEncoder:
 
                 p.terminate()
             else:
-                for t in table_names:
-                    result.append(self.analyze(t))
+                for t in analysis_tuples:
+                    result.append(self.analyze(t, target_schema, new_dist_key, new_sort_keys))
         else:
             self._comment("No Tables Found to Analyze")
 

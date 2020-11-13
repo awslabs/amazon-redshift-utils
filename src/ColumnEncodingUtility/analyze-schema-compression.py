@@ -64,27 +64,33 @@ def usage(with_message):
     print('           --analyze-schema      - The Schema to be Analyzed (default public)')
     print('           --analyze-table       - A specific table to be Analyzed, if --analyze-schema is not desired')
     print('           --analyze-cols        - Analyze column width and reduce the column width if needed')
-    print('           --new-varchar-min     - Set minimum varchar length for new width (to be used with --analyze-cols)')
+    print(
+        '           --new-varchar-min     - Set minimum varchar length for new width (to be used with --analyze-cols)')
     print('           --new-dist-key        - Set a new Distribution Key (only used if --analyze-table is specified)')
-    print('           --new-sort-keys       - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)')
-    print('           --target-schema       - Name of a Schema into which the newly optimised tables and data should be created, rather than in place')
+    print(
+        '           --new-sort-keys       - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)')
+    print(
+        '           --target-schema       - Name of a Schema into which the newly optimised tables and data should be created, rather than in place')
     print('           --threads             - The number of concurrent connections to use during analysis (default 2)')
     print('           --output-file         - The full path to the output file to be generated')
     print('           --debug               - Generate Debug Output including SQL Statements being run')
     print('           --do-execute          - Run the compression encoding optimisation')
     print('           --slot-count          - Modify the wlm_query_slot_count from the default of 1')
     print('           --ignore-errors       - Ignore errors raised in threads when running and continue processing')
-    print('           --force               - Force table migration even if the table already has Column Encoding applied')
+    print(
+        '           --force               - Force table migration even if the table already has Column Encoding applied')
     print('           --drop-old-data       - Drop the old version of the data table, rather than renaming')
     print('           --comprows            - Set the number of rows to use for Compression Encoding Analysis')
     print('           --query_group         - Set the query_group for all queries')
     print('           --ssl-option          - Set SSL to True or False (default False)')
     print('           --statement-timeout   - Set the runtime statement timeout in milliseconds (default 1200000)')
-    print('           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True')
+    print(
+        '           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True')
     sys.exit(config_constants.INVALID_ARGS)
 
+
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= new-varchar-min= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch= statement-timeout="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= new-varchar-min= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= query-group= ssl-option= suppress-cloudwatch= statement-timeout="""
 
     # extract the command line arguments
     try:
@@ -125,10 +131,10 @@ def main(argv):
                 args[config_constants.TABLE_NAME] = value
         elif arg == "--new-dist-key":
             if value != '' and value is not None:
-                args['new_dist_key'] = value
+                args[config_constants.NEW_DIST_KEY] = value
         elif arg == "--new-sort-keys":
             if value != '' and value is not None:
-                args['new_sort_keys'] = value
+                args[config_constants.NEW_SORT_KEYS] = value
         elif arg == "--analyze-cols":
             if value != '' and value is not None:
                 args['analyze_col_width'] = value
@@ -172,7 +178,7 @@ def main(argv):
             args[config_constants.QUERY_SLOT_COUNT] = int(value)
         elif arg == "--comprows":
             args[config_constants.COMPROWS] = int(value)
-        elif arg == "--query_group":
+        elif arg == "--query_group" or arg == '--query-group':
             if value != '' and value is not None:
                 args[config_constants.QUERY_GROUP] = value
         elif arg == "--ssl-option":
@@ -219,7 +225,13 @@ def main(argv):
     encoder = ColumnEncoder(**args)
 
     # run the analyser
-    result_code = encoder.run()
+    result_code = encoder.run(schema_name=args.get(config_constants.SCHEMA_NAME),
+                              target_schema=args.get(config_constants.TARGET_SCHEMA),
+                              table_name=args.get(config_constants.TABLE_NAME),
+                              new_dist_key=args.get(config_constants.NEW_DIST_KEY),
+                              new_sort_keys=args.get(config_constants.NEW_SORT_KEYS),
+                              force=args.get(config_constants.FORCE),
+                              drop_old_data=args.get(config_constants.DROP_OLD_DATA))
 
     # exit based on the provided return code
     return result_code
