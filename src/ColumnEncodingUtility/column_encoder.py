@@ -592,263 +592,34 @@ class ColumnEncoder:
                 else:
                     set_target_schema = self.target_schema
 
-                if set_target_schema == schema_name:
-                    target_table = '%s_$mig' % table_name
-                else:
-                    target_table = table_name
+                statements = self._get_physical_reorg_process(schema_name,
+                                                              table_name,
+                                                              dist_style,
+                                                              owner,
+                                                              table_comment, set_target_schema,
+                                                              analyze_compression_result)
 
-                create_table = 'begin;\nlock table %s."%s";\ncreate table %s."%s"(' % (
-                    schema_name, table_name, set_target_schema, target_table,)
+                statements.extend(['commit;'])
 
-                # query the table column definition
-                descr = self._get_table_desc(schema_name, table_name)
-
-                encode_columns = []
-                statements = []
-                sortkeys = {}
-                has_zindex_sortkeys = False
-                has_identity = False
-                non_identity_columns = []
-                fks = []
-                table_distkey = None
-                table_sortkeys = []
-                new_sortkey_arr = [t.strip() for t in
-                                   self.new_sort_keys.split(',')] if self.new_sort_keys is not None else []
-
-                # count of suggested optimizations
-                count_optimized = 0
-                # process each item given back by the analyze request
-                for row in analyze_compression_result:
-                    if self.debug:
-                        self._comment("Analyzed Compression Row State: %s" % str(row))
-                    col = row[1]
-                    row_sortkey = descr[col][4]
-
-                    # compare the previous encoding to the new encoding
-                    # don't use new encoding for first sortkey
-                    datatype = descr[col][1]
-                    new_encoding = row[2]
-                    new_encoding = new_encoding if not abs(row_sortkey) == 1 else 'raw'
-                    old_encoding = descr[col][2]
-                    old_encoding = 'raw' if old_encoding == 'none' else old_encoding
-                    if new_encoding != old_encoding:
-                        encodings_modified = True
-                        count_optimized += 1
-
-                    # fix datatypes from the description type to the create type
-                    col_type = descr[col][1].replace('character varying', 'varchar').replace('without time zone', '')
-
-                    # check whether columns are too wide
-                    if self.analyze_col_width and ("varchar" in col_type or "int" in col_type):
-                        new_col_type = self._reduce_column_length(col_type, descr[col][0], table_name)
-                        if new_col_type != col_type:
-                            col_type = new_col_type
-                            encodings_modified = True
-
-                    # link in the existing distribution key, or set the new one
-                    row_distkey = descr[col][3]
-                    if table_name is not None and self.new_dist_key is not None:
-                        if col == self.new_dist_key:
-                            distkey = 'DISTKEY'
-                            dist_style = 'KEY'
-                            table_distkey = col
-                        else:
-                            distkey = ''
-                    else:
-                        if str(row_distkey).upper()[0] == 'T':
-                            distkey = 'DISTKEY'
-                            dist_style = 'KEY'
-                            table_distkey = col
-                        else:
-                            distkey = ''
-
-                    # link in the existing sort keys, or set the new ones
-                    if table_name is not None and len(new_sortkey_arr) > 0:
-                        if col in new_sortkey_arr:
-                            sortkeys[new_sortkey_arr.index(col) + 1] = col
-                            table_sortkeys.append(col)
-                    else:
-                        if row_sortkey != 0:
-                            # add the absolute ordering of the sortkey to the list of all sortkeys
-                            sortkeys[abs(row_sortkey)] = col
-                            table_sortkeys.append(col)
-
-                            if row_sortkey < 0:
-                                has_zindex_sortkeys = True
-
-                    # don't compress first sort key column. This will be set on the basis of the existing sort key not
-                    # being modified, or on the assignment of the new first sortkey
-                    if (abs(row_sortkey) == 1 and len(new_sortkey_arr) == 0) or (
-                            col in table_sortkeys and table_sortkeys.index(col) == 0):
-                        compression = 'RAW'
-                    else:
-                        compression = new_encoding
-
-                    # extract null/not null setting
-                    col_null = descr[col][5]
-
-                    if str(col_null).upper() == 'TRUE':
-                        col_null = 'NOT NULL'
-                    else:
-                        col_null = ''
-
-                    # get default or identity syntax for this column
-                    default_or_identity = descr[col][6]
-                    if default_or_identity:
-                        ident_data = self._get_identity(default_or_identity)
-                        if ident_data is None:
-                            default_value = 'default %s' % default_or_identity
-                            non_identity_columns.append('"%s"' % col)
-                        else:
-                            default_value = 'identity (%s, %s)' % ident_data
-                            has_identity = True
-                    else:
-                        default_value = ''
-                        non_identity_columns.append('"%s"' % col)
-
-                    if self.debug:
-                        self._comment("Column %s will be encoded as %s (previous %s)" % (
-                            col, compression, old_encoding))
-
-                    # add the formatted column specification
-                    encode_columns.extend(['"%s" %s %s %s encode %s %s'
-                                           % (col, col_type, default_value, col_null, compression, distkey)])
-
-                # abort if a new distkey was set but we couldn't find it in the set of all columns
-                if self.new_dist_key is not None and table_distkey is None:
-                    msg = "Column '%s' not found when setting new Table Distribution Key" % self.new_dist_key
-                    self._comment(msg)
-                    raise Exception(msg)
-
-                # abort if new sortkeys were set but we couldn't find them in the set of all columns
-                if self.new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
-                    if self.debug:
-                        self._comment("Requested Sort Keys: %s" % new_sortkey_arr)
-                        self._comment("Resolved Sort Keys: %s" % table_sortkeys)
-                    msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sortkey_arr
-                    self._comment(msg)
-                    raise Exception(msg)
-
-                # if this table's encodings have not changed, then don't do a modification, unless force options is set
-                if (not self.force) and (not encodings_modified):
-                    self._comment("Column Encoding resulted in an identical table - no changes will be made")
-                else:
-                    self._comment("Column Encoding will be modified for %s.%s" % (schema_name, table_name))
-
-                    # add all the column encoding statements on to the create table statement, suppressing the leading
-                    # comma on the first one
-                    for i, s in enumerate(encode_columns):
-                        create_table += '\n%s%s' % ('' if i == 0 else ',', s)
-
-                    create_table = create_table + '\n)\n'
-
-                    # add diststyle all if needed
-                    if dist_style == 'ALL':
-                        create_table = create_table + 'diststyle all\n'
-
-                    # add sort key as a table block to accommodate multiple columns
-                    if len(sortkeys) > 0:
-                        if self.debug:
-                            self._comment("Adding Sortkeys: %s" % sortkeys)
-                        sortkey = '%sSORTKEY(' % ('INTERLEAVED ' if has_zindex_sortkeys else '')
-
-                        for i in range(1, len(sortkeys) + 1):
-                            sortkey = sortkey + sortkeys[i]
-
-                            if i != len(sortkeys):
-                                sortkey = sortkey + ','
-                            else:
-                                sortkey = sortkey + ')\n'
-                        create_table = create_table + (' %s ' % sortkey)
-
-                    create_table = create_table + ';'
-
-                    # run the create table statement
-                    statements.extend([create_table])
-
-                    # get the primary key statement
-                    statements.extend([self._get_primary_key(schema_name, set_target_schema, table_name, target_table)])
-
-                    # set the table owner
-                    statements.extend(['alter table %s."%s" owner to "%s";' % (set_target_schema, target_table, owner)])
-
-                    if table_comment is not None:
-                        statements.extend(
-                            ['comment on table %s."%s" is \'%s\';' % (set_target_schema, target_table, table_comment)])
-
-                    # insert the old data into the new table
-                    # if we have identity column(s), we can't insert data from them, so do selective insert
-                    if has_identity:
-                        source_columns = ', '.join(non_identity_columns)
-                        mig_columns = '(' + source_columns + ')'
-                    else:
-                        source_columns = '*'
-                        mig_columns = ''
-
-                    insert = 'insert into %s."%s" %s select %s from %s."%s"' % (set_target_schema,
-                                                                                target_table,
-                                                                                mig_columns,
-                                                                                source_columns,
-                                                                                schema_name,
-                                                                                table_name)
-                    if len(table_sortkeys) > 0:
-                        insert = "%s order by \"%s\";" % (insert, ",".join(table_sortkeys).replace(',', '\",\"'))
-                    else:
-                        insert = "%s;" % (insert)
-
-                    statements.extend([insert])
-
-                    # analyze the new table
-                    analyze = 'analyze %s."%s";' % (set_target_schema, target_table)
-                    statements.extend([analyze])
-
-                    if set_target_schema == schema_name:
-                        # rename the old table to _$old or drop
-                        if self.drop_old_data:
-                            drop = 'drop table %s."%s" cascade;' % (set_target_schema, table_name)
-                        else:
-                            # the alter table statement for the current data will use the first 104 characters of the
-                            # original table name, the current datetime as YYYYMMDD and a 10 digit random string
-                            drop = 'alter table %s."%s" rename to "%s_%s_%s_$old";' % (
-                                set_target_schema, table_name, table_name[0:104],
-                                datetime.date.today().strftime("%Y%m%d"),
-                                shortuuid.ShortUUID().random(length=10))
-
-                        statements.extend([drop])
-
-                        # rename the migrate table to the old table name
-                        rename = 'alter table %s."%s" rename to "%s";' % (set_target_schema, target_table, table_name)
-                        statements.extend([rename])
-
-                    # add foreign keys
-                    fks = self._get_foreign_keys(schema_name, set_target_schema, table_name)
-
-                    # add grants back
-                    grants = self._get_grants(schema_name, table_name, self.db_user)
-                    if grants is not None:
-                        statements.extend(grants)
-
-                    statements.extend(['commit;'])
-
-                    if self.do_execute:
-                        if not self._run_commands(self._get_pg_conn(), statements):
-                            if not self.ignore_errors:
-                                if self.debug:
-                                    print("Error running statements: %s" % (str(statements),))
-                                return constants.ERROR
-
-                        # emit a cloudwatch metric for the table
-                        if self.cw is not None:
-                            dimensions = [
-                                {'Name': 'ClusterIdentifier', 'Value': self.db_host.split('.')[0]},
-                                {'Name': 'TableName', 'Value': table_name}
-                            ]
-                            aws_utils.put_metric(self.cw, 'Redshift', 'ColumnEncodingModification', dimensions, None, 1,
-                                                 'Count')
+                if self.do_execute:
+                    if not self._run_commands(self._get_pg_conn(), statements):
+                        if not self.ignore_errors:
                             if self.debug:
-                                self._comment("Emitted Cloudwatch Metric for Column Encoded table")
-                    else:
-                        self._comment("No encoding modifications run for %s.%s" % (schema_name, table_name))
+                                print("Error running statements: %s" % (str(statements),))
+                            return constants.ERROR
+
+                    # emit a cloudwatch metric for the table
+                    if self.cw is not None:
+                        dimensions = [
+                            {'Name': 'ClusterIdentifier', 'Value': self.db_host.split('.')[0]},
+                            {'Name': 'TableName', 'Value': table_name}
+                        ]
+                        aws_utils.put_metric(self.cw, 'Redshift', 'ColumnEncodingModification', dimensions, None, 1,
+                                             'Count')
+                        if self.debug:
+                            self._comment("Emitted Cloudwatch Metric for Column Encoded table")
+                else:
+                    self._comment("No encoding modifications run for %s.%s" % (schema_name, table_name))
             except Exception as e:
                 print('Exception %s during analysis of %s' % (e, table_name))
                 print(traceback.format_exc())
@@ -856,7 +627,250 @@ class ColumnEncoder:
 
             self._print_statements(statements)
 
+            # add foreign keys
+            fks = self._get_foreign_keys(schema_name, set_target_schema, table_name)
+
+            # add grants back
+            grants = self._get_grants(schema_name, table_name, self.db_user)
+            if grants is not None:
+                statements.extend(grants)
+
             return constants.OK, fks, encodings_modified
+
+    def _get_physical_reorg_process(self, schema_name: str,
+                                    table_name: str,
+                                    dist_style: str,
+                                    owner: str,
+                                    table_comment: str, set_target_schema: str, analyze_compression_result):
+        if set_target_schema == schema_name:
+            target_table = '%s_$mig' % table_name
+        else:
+            target_table = self.table_name
+
+        create_table = 'begin;\nlock table %s."%s";\ncreate table %s."%s"(' % (
+            schema_name, table_name, set_target_schema, target_table,)
+
+        # query the table column definition
+        descr = self._get_table_desc(schema_name, table_name)
+
+        encode_columns = []
+        statements = []
+        sortkeys = {}
+        has_zindex_sortkeys = False
+        has_identity = False
+        non_identity_columns = []
+        fks = []
+        table_distkey = None
+        table_sortkeys = []
+        new_sortkey_arr = [t.strip() for t in
+                           self.new_sort_keys.split(',')] if self.new_sort_keys is not None else []
+
+        # count of suggested optimizations
+        count_optimized = 0
+        # process each item given back by the analyze request
+        for row in analyze_compression_result:
+            if self.debug:
+                self._comment("Analyzed Compression Row State: %s" % str(row))
+            col = row[1]
+            row_sortkey = descr[col][4]
+
+            # compare the previous encoding to the new encoding
+            # don't use new encoding for first sortkey
+            datatype = descr[col][1]
+            new_encoding = row[2]
+            new_encoding = new_encoding if not abs(row_sortkey) == 1 else 'raw'
+            old_encoding = descr[col][2]
+            old_encoding = 'raw' if old_encoding == 'none' else old_encoding
+            if new_encoding != old_encoding:
+                encodings_modified = True
+                count_optimized += 1
+
+            # fix datatypes from the description type to the create type
+            col_type = descr[col][1].replace('character varying', 'varchar').replace('without time zone', '')
+
+            # check whether columns are too wide
+            if self.analyze_col_width and ("varchar" in col_type or "int" in col_type):
+                new_col_type = self._reduce_column_length(col_type, descr[col][0], table_name)
+                if new_col_type != col_type:
+                    col_type = new_col_type
+                    encodings_modified = True
+
+            # link in the existing distribution key, or set the new one
+            row_distkey = descr[col][3]
+            if table_name is not None and self.new_dist_key is not None:
+                if col == self.new_dist_key:
+                    distkey = 'DISTKEY'
+                    dist_style = 'KEY'
+                    table_distkey = col
+                else:
+                    distkey = ''
+            else:
+                if str(row_distkey).upper()[0] == 'T':
+                    distkey = 'DISTKEY'
+                    dist_style = 'KEY'
+                    table_distkey = col
+                else:
+                    distkey = ''
+
+            # link in the existing sort keys, or set the new ones
+            if table_name is not None and len(new_sortkey_arr) > 0:
+                if col in new_sortkey_arr:
+                    sortkeys[new_sortkey_arr.index(col) + 1] = col
+                    table_sortkeys.append(col)
+            else:
+                if row_sortkey != 0:
+                    # add the absolute ordering of the sortkey to the list of all sortkeys
+                    sortkeys[abs(row_sortkey)] = col
+                    table_sortkeys.append(col)
+
+                    if row_sortkey < 0:
+                        has_zindex_sortkeys = True
+
+            # don't compress first sort key column. This will be set on the basis of the existing sort key not
+            # being modified, or on the assignment of the new first sortkey
+            if (abs(row_sortkey) == 1 and len(new_sortkey_arr) == 0) or (
+                    col in table_sortkeys and table_sortkeys.index(col) == 0):
+                compression = 'RAW'
+            else:
+                compression = new_encoding
+
+            # extract null/not null setting
+            col_null = descr[col][5]
+
+            if str(col_null).upper() == 'TRUE':
+                col_null = 'NOT NULL'
+            else:
+                col_null = ''
+
+            # get default or identity syntax for this column
+            default_or_identity = descr[col][6]
+            if default_or_identity:
+                ident_data = self._get_identity(default_or_identity)
+                if ident_data is None:
+                    default_value = 'default %s' % default_or_identity
+                    non_identity_columns.append('"%s"' % col)
+                else:
+                    default_value = 'identity (%s, %s)' % ident_data
+                    has_identity = True
+            else:
+                default_value = ''
+                non_identity_columns.append('"%s"' % col)
+
+            if self.debug:
+                self._comment("Column %s will be encoded as %s (previous %s)" % (
+                    col, compression, old_encoding))
+
+            # add the formatted column specification
+            encode_columns.extend(['"%s" %s %s %s encode %s %s'
+                                   % (col, col_type, default_value, col_null, compression, distkey)])
+
+        # abort if a new distkey was set but we couldn't find it in the set of all columns
+        if self.new_dist_key is not None and table_distkey is None:
+            msg = "Column '%s' not found when setting new Table Distribution Key" % self.new_dist_key
+            self._comment(msg)
+            raise Exception(msg)
+
+        # abort if new sortkeys were set but we couldn't find them in the set of all columns
+        if self.new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
+            if self.debug:
+                self._comment("Requested Sort Keys: %s" % new_sortkey_arr)
+                self._comment("Resolved Sort Keys: %s" % table_sortkeys)
+            msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sortkey_arr
+            self._comment(msg)
+            raise Exception(msg)
+
+        # if this table's encodings have not changed, then don't do a modification, unless force options is set
+        if (not self.force) and (not encodings_modified):
+            self._comment("Column Encoding resulted in an identical table - no changes will be made")
+        else:
+            self._comment("Column Encoding will be modified for %s.%s" % (schema_name, table_name))
+
+            # add all the column encoding statements on to the create table statement, suppressing the leading
+            # comma on the first one
+            for i, s in enumerate(encode_columns):
+                create_table += '\n%s%s' % ('' if i == 0 else ',', s)
+
+            create_table = create_table + '\n)\n'
+
+            # add diststyle all if needed
+            if dist_style == 'ALL':
+                create_table = create_table + 'diststyle all\n'
+
+            # add sort key as a table block to accommodate multiple columns
+            if len(sortkeys) > 0:
+                if self.debug:
+                    self._comment("Adding Sortkeys: %s" % sortkeys)
+                sortkey = '%sSORTKEY(' % ('INTERLEAVED ' if has_zindex_sortkeys else '')
+
+                for i in range(1, len(sortkeys) + 1):
+                    sortkey = sortkey + sortkeys[i]
+
+                    if i != len(sortkeys):
+                        sortkey = sortkey + ','
+                    else:
+                        sortkey = sortkey + ')\n'
+                create_table = create_table + (' %s ' % sortkey)
+
+            create_table = create_table + ';'
+
+            # run the create table statement
+            statements.extend([create_table])
+
+            # get the primary key statement
+            statements.extend([self._get_primary_key(schema_name, set_target_schema, table_name, target_table)])
+
+            # set the table owner
+            statements.extend(['alter table %s."%s" owner to "%s";' % (set_target_schema, target_table, owner)])
+
+            if table_comment is not None:
+                statements.extend(
+                    ['comment on table %s."%s" is \'%s\';' % (set_target_schema, target_table, table_comment)])
+
+            # insert the old data into the new table
+            # if we have identity column(s), we can't insert data from them, so do selective insert
+            if has_identity:
+                source_columns = ', '.join(non_identity_columns)
+                mig_columns = '(' + source_columns + ')'
+            else:
+                source_columns = '*'
+                mig_columns = ''
+
+            insert = 'insert into %s."%s" %s select %s from %s."%s"' % (set_target_schema,
+                                                                        target_table,
+                                                                        mig_columns,
+                                                                        source_columns,
+                                                                        schema_name,
+                                                                        table_name)
+            if len(table_sortkeys) > 0:
+                insert = "%s order by \"%s\";" % (insert, ",".join(table_sortkeys).replace(',', '\",\"'))
+            else:
+                insert = "%s;" % (insert)
+
+            statements.extend([insert])
+
+            # analyze the new table
+            analyze = 'analyze %s."%s";' % (set_target_schema, target_table)
+            statements.extend([analyze])
+
+            if set_target_schema == schema_name:
+                # rename the old table to _$old or drop
+                if self.drop_old_data:
+                    drop = 'drop table %s."%s" cascade;' % (set_target_schema, table_name)
+                else:
+                    # the alter table statement for the current data will use the first 104 characters of the
+                    # original table name, the current datetime as YYYYMMDD and a 10 digit random string
+                    drop = 'alter table %s."%s" rename to "%s_%s_%s_$old";' % (
+                        set_target_schema, table_name, table_name[0:104],
+                        datetime.date.today().strftime("%Y%m%d"),
+                        shortuuid.ShortUUID().random(length=10))
+
+                statements.extend([drop])
+
+                # rename the migrate table to the old table name
+                rename = 'alter table %s."%s" rename to "%s";' % (set_target_schema, target_table, table_name)
+                statements.extend([rename])
+
+            return statements
 
     def run(self, schema_name: str = 'public', target_schema: str = None, table_name: str = None,
             new_dist_key: str = None,
