@@ -198,7 +198,7 @@ def main(argv):
                 except ValueError:
                     pass
         else:
-            print("Unsupported Argument " + arg)
+            print(f"Unsupported Argument {arg}")
             usage()
 
     # Validate that we've got all the args needed
@@ -219,7 +219,7 @@ def main(argv):
 
     # get the database password
     if config_constants.DB_PASSWORD not in args:
-        args[config_constants.DB_PASSWORD] = getpass.getpass("Password <%s>: " % args[config_constants.DB_USER])
+        args[config_constants.DB_PASSWORD] = getpass.getpass(f"Password <{args[config_constants.DB_USER]}>: ")
 
     # setup the configuration
     encoder = ColumnEncoder(**args)

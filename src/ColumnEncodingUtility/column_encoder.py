@@ -24,7 +24,7 @@ import config_constants as constants
 
 __version__ = ".9.4.0"
 
-FORCE_LEGACY_REORG = True
+FORCE_LEGACY_REORG = False
 
 # timeout for retries - 100ms
 RETRY_TIMEOUT = 100. / 1000
@@ -100,7 +100,7 @@ class ColumnEncoder:
                 self._comment("Suppressing CloudWatch metrics")
             else:
                 if cw is not None:
-                    self._comment("Created Cloudwatch Emitter in %s" % aws_region)
+                    self._comment(f"Created CloudWatch Emitter in {aws_region}")
 
         # override stdout with the provided filename
         if constants.OUTPUT_FILE in kwargs:
@@ -186,7 +186,7 @@ class ColumnEncoder:
             aws_utils.set_search_paths(conn, source_schema, target_schema, exclude_external_schemas=True)
 
             if self.query_group is not None:
-                set_query_group = 'set query_group to %s' % self.query_group
+                set_query_group = f'set query_group to {self.query_group}'
 
                 if self.debug:
                     self._comment(set_query_group)
@@ -194,7 +194,7 @@ class ColumnEncoder:
                 self._run_commands(conn, [set_query_group])
 
             if self.query_slot_count is not None and self.query_slot_count != 1:
-                set_slot_count = 'set wlm_query_slot_count = %s' % self.query_slot_count
+                set_slot_count = f'set wlm_query_slot_count = {self.query_slot_count}'
 
                 if self.debug:
                     self._comment(set_slot_count)
@@ -202,14 +202,14 @@ class ColumnEncoder:
                 self._run_commands(conn, [set_slot_count])
 
             # set a long statement timeout
-            set_timeout = "set statement_timeout = '%s'" % self.statement_timeout
+            set_timeout = f"set statement_timeout = '{self.statement_timeout}'"
             if self.debug:
                 self._comment(set_timeout)
 
             self._run_commands(conn, [set_timeout])
 
             # set application name
-            set_name = "set application_name to 'ColumnEncodingUtility-v%s'" % __version__
+            set_name = f"set application_name to 'ColumnEncodingUtility-v{__version__}'"
 
             if self.debug:
                 self._comment(set_name)
@@ -236,7 +236,7 @@ class ColumnEncoder:
             return None
 
     def _get_grants(self, schema_name, table_name, current_user):
-        sql = '''
+        sql = f'''
             WITH priviledge AS
             (
                 SELECT 'SELECT'::varchar(10) as "grant"
@@ -266,11 +266,11 @@ class ColumnEncoder:
             JOIN pg_user ON pg_user.usename not in ('rdsdb')
             WHERE  (c.relkind = 'r'::"char" OR c.relkind = 'v'::"char")
             AND aclcontains(c.relacl, makeaclitem(usr.usesysid, usr.grosysid, pg_user.usesysid, priviledge."grant", false))
-            AND c.relname = '%s'
-            AND nc.nspname = '%s'
-            and grantee != '%s'
+            AND c.relname = '{table_name}'
+            AND nc.nspname = '{schema_name}'
+            and grantee != '{current_user}'
             ;
-        ''' % (table_name, schema_name, current_user)
+        '''
 
         if self.debug:
             self._comment(sql)
@@ -297,15 +297,15 @@ class ColumnEncoder:
     def _get_foreign_keys(self, schema_name, set_target_schema, table_name):
         has_fks = False
 
-        fk_statement = '''SELECT /* fetching foreign key relations */ conname,
+        fk_statement = f'''SELECT /* fetching foreign key relations */ conname,
       pg_catalog.pg_get_constraintdef(cons.oid, true) as condef
      FROM pg_catalog.pg_constraint cons,
      pg_class pgc
      WHERE cons.conrelid = pgc.oid
-     and pgc.oid = '%s."%s"'::regclass
+     and pgc.oid = '{schema_name}."{table_name}"'::regclass
      AND cons.contype = 'f'
      ORDER BY 1
-    ''' % (schema_name, table_name)
+    '''
 
         if self.debug:
             self._comment(fk_statement)
@@ -562,7 +562,16 @@ class ColumnEncoder:
                 last_exception = None
                 while attempt_count < analyze_retry and analyze_compression_result is None:
                     try:
+                        # Structure of the returned cursor will be:
+                        # 1. Table Name
+                        # 2. Column Name
+                        # 3. Target Encoding
+                        # 4. Estimated Reduction %
+                        #
+                        # see https://docs.aws.amazon.com/redshift/latest/dg/r_ANALYZE_COMPRESSION.html
+                        #
                         analyze_compression_result = self._execute_query(statement)
+
                         # Commiting otherwise anaylze keep an exclusive lock until a commit arrive which can be very long
                         self._execute_query('commit;')
                     except KeyboardInterrupt:
@@ -604,8 +613,7 @@ class ColumnEncoder:
                                                                       dist_style,
                                                                       owner,
                                                                       table_comment, set_target_schema,
-                                                                      analyze_compression_result, new_dist_key,
-                                                                      new_sort_keys)
+                                                                      analyze_compression_result)
 
                 if statements is not None:
                     statements.extend(['commit;'])
@@ -646,12 +654,38 @@ class ColumnEncoder:
 
             return constants.OK, fks, encodings_modified
 
-    def _get_alter_table_update_process(self, schema_name: str,
+    def _get_alter_table_update_process(self,
+                                        schema_name: str,
                                         table_name: str,
                                         dist_style: str,
                                         owner: str,
-                                        table_comment: str, set_target_schema: str, analyze_compression_result):
-        return None
+                                        table_comment: str,
+                                        set_target_schema: str,
+                                        analyze_compression_result):
+        # load the table description
+        descr = self._get_table_desc(schema_name, table_name)
+
+        alter_columns = []
+
+        for row in analyze_compression_result:
+            if self.debug:
+                self._comment("Analyzed Compression Row State: %s" % str(row))
+            col = row[1]
+            row_sortkey = descr[col][4]
+
+            # compare the previous encoding to the new encoding
+            # don't use new encoding for first sortkey
+            datatype = descr[col][1]
+            new_encoding = row[2]
+            new_encoding = new_encoding if not abs(row_sortkey) == 1 else 'raw'
+            old_encoding = descr[col][2]
+            old_encoding = 'raw' if old_encoding == 'none' else old_encoding
+            if new_encoding.lower() != 'raw' and new_encoding.lower() != old_encoding.lower():
+                # make sure this isn't the sort key
+                self._comment(f"Modifying column {col} encoding to {new_encoding} - will save projected {row[3]}% storage")
+                alter_columns.append(f'alter table "{schema_name}"."{table_name}" alter column "{col}" encode {new_encoding};')
+
+        return alter_columns
 
     def _get_physical_reorg_process(self, schema_name: str,
                                     table_name: str,
