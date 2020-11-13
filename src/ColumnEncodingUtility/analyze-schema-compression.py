@@ -790,7 +790,7 @@ def analyze(table_info):
                 statements.extend([get_primary_key(schema_name, set_target_schema, table_name, target_table)])
 
                 # set the table owner
-                statements.extend(['alter table %s."%s" owner to %s;' % (set_target_schema, target_table, owner)])
+                statements.extend(['alter table %s."%s" owner to "%s";' % (set_target_schema, target_table, owner)])
 
                 if table_comment is not None:
                     statements.extend(
