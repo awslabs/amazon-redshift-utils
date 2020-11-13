@@ -97,20 +97,20 @@ class ColumnEncoder:
                     print(traceback.format_exc())
 
         if self.debug:
-            self.comment("Redshift Column Encoding Utility Configuration")
+            self._comment("Redshift Column Encoding Utility Configuration")
 
             if "suppress_cw" in kwargs and kwargs["suppress_cw"]:
-                self.comment("Suppressing CloudWatch metrics")
+                self._comment("Suppressing CloudWatch metrics")
             else:
                 if cw is not None:
-                    self.comment("Created Cloudwatch Emitter in %s" % aws_region)
+                    self._comment("Created Cloudwatch Emitter in %s" % aws_region)
 
         # override stdout with the provided filename
         if constants.OUTPUT_FILE in kwargs:
             sys.stdout = open(kwargs.get(constants.OUTPUT_FILE), 'w+')
 
-    def execute_query(self, string):
-        conn = self.get_pg_conn()
+    def _execute_query(self, string):
+        conn = self._get_pg_conn()
         cursor = conn.cursor()
         cursor.execute(string)
 
@@ -124,7 +124,7 @@ class ColumnEncoder:
 
         return results
 
-    def close_conn(self, conn):
+    def _close_conn(self, conn):
         try:
             conn.close()
         except Exception as e:
@@ -132,29 +132,29 @@ class ColumnEncoder:
                 if 'connection is closed' not in str(e):
                     print(e)
 
-    def cleanup(self, conn):
+    def _cleanup(self, conn):
         # close all connections and close the output file
         if conn is not None:
-            self.close_conn(conn)
+            self._close_conn(conn)
 
         for key in self.db_connections:
             if self.db_connections[key] is not None:
-                self.close_conn(self.db_connections[key])
+                self._close_conn(self.db_connections[key])
 
-    def comment(self, string):
+    def _comment(self, string):
         if string is not None:
             if re.match('.*\\n.*', string) is not None:
                 print('/* [%s]\n%s\n*/\n' % (str(os.getpid()), string))
             else:
                 print('-- [%s] %s' % (str(os.getpid()), string))
 
-    def print_statements(self, statements):
+    def _print_statements(self, statements):
         if statements is not None:
             for s in statements:
                 if s is not None:
                     print(s)
 
-    def get_pg_conn(self):
+    def _get_pg_conn(self):
         pid = str(os.getpid())
 
         conn = None
@@ -168,7 +168,7 @@ class ColumnEncoder:
         if conn is None:
             # connect to the database
             if self.debug:
-                self.comment('Connect [%s] %s:%s:%s:%s' % (pid, self.db_host, self.db_port, self.db, self.db_user))
+                self._comment('Connect [%s] %s:%s:%s:%s' % (pid, self.db_host, self.db_port, self.db, self.db_user))
 
             try:
                 conn = pg8000.connect(user=self.db_user, host=self.db_host, port=self.db_port, database=self.db,
@@ -183,7 +183,7 @@ class ColumnEncoder:
             except Exception as e:
                 print(e)
                 print('Unable to connect to Cluster Endpoint')
-                self.cleanup(conn)
+                self._cleanup(conn)
                 raise e
 
             aws_utils.set_search_paths(conn, self.schema_name, self.target_schema, exclude_external_schemas=True)
@@ -192,32 +192,32 @@ class ColumnEncoder:
                 set_query_group = 'set query_group to %s' % self.query_group
 
                 if self.debug:
-                    self.comment(set_query_group)
+                    self._comment(set_query_group)
 
-                self.run_commands(conn, [set_query_group])
+                self._run_commands(conn, [set_query_group])
 
             if self.query_slot_count is not None and self.query_slot_count != 1:
                 set_slot_count = 'set wlm_query_slot_count = %s' % self.query_slot_count
 
                 if self.debug:
-                    self.comment(set_slot_count)
+                    self._comment(set_slot_count)
 
-                self.run_commands(conn, [set_slot_count])
+                self._run_commands(conn, [set_slot_count])
 
             # set a long statement timeout
             set_timeout = "set statement_timeout = '%s'" % self.statement_timeout
             if self.debug:
-                self.comment(set_timeout)
+                self._comment(set_timeout)
 
-            self.run_commands(conn, [set_timeout])
+            self._run_commands(conn, [set_timeout])
 
             # set application name
             set_name = "set application_name to 'ColumnEncodingUtility-v%s'" % __version__
 
             if self.debug:
-                self.comment(set_name)
+                self._comment(set_name)
 
-            self.run_commands(conn, [set_name])
+            self._run_commands(conn, [set_name])
 
             # turn off autocommit for the rest of the executions
             conn.autocommit = False
@@ -227,7 +227,7 @@ class ColumnEncoder:
 
         return conn
 
-    def get_identity(self, adsrc):
+    def _get_identity(self, adsrc):
         # checks if a column defined by adsrc (column from pg_attrdef) is
         # an identity, since both identities and defaults end up in this table
         # if is identity returns (seed, step); if not returns None
@@ -238,7 +238,7 @@ class ColumnEncoder:
         else:
             return None
 
-    def get_grants(self, schema_name, table_name, current_user):
+    def _get_grants(self, schema_name, table_name, current_user):
         sql = '''
             WITH priviledge AS
             (
@@ -276,9 +276,9 @@ class ColumnEncoder:
         ''' % (table_name, schema_name, current_user)
 
         if self.debug:
-            self.comment(sql)
+            self._comment(sql)
 
-        grants = self.execute_query(sql)
+        grants = self._execute_query(sql)
 
         grant_statements = []
 
@@ -294,10 +294,10 @@ class ColumnEncoder:
             return grant_statements
         else:
             if self.debug:
-                self.comment('Found no table grants to extend to the new table')
+                self._comment('Found no table grants to extend to the new table')
             return None
 
-    def get_foreign_keys(self, schema_name, set_target_schema, table_name):
+    def _get_foreign_keys(self, schema_name, set_target_schema, table_name):
         has_fks = False
 
         fk_statement = '''SELECT /* fetching foreign key relations */ conname,
@@ -311,9 +311,9 @@ class ColumnEncoder:
     ''' % (schema_name, table_name)
 
         if self.debug:
-            self.comment(fk_statement)
+            self._comment(fk_statement)
 
-        foreign_keys = self.execute_query(fk_statement)
+        foreign_keys = self._execute_query(fk_statement)
         fk_statements = []
 
         for fk in foreign_keys:
@@ -327,7 +327,7 @@ class ColumnEncoder:
         else:
             return None
 
-    def get_primary_key(self, schema_name, set_target_schema, original_table, new_table):
+    def _get_primary_key(self, schema_name, set_target_schema, original_table, new_table):
         pk_statement = 'alter table %s."%s" add primary key (' % (set_target_schema, new_table)
         has_pks = False
 
@@ -346,9 +346,9 @@ class ColumnEncoder:
     ''' % (schema_name, original_table)
 
         if self.debug:
-            self.comment(statement)
+            self._comment(statement)
 
-        pks = self.execute_query(statement)
+        pks = self._execute_query(statement)
 
         for pk in pks:
             has_pks = True
@@ -361,7 +361,7 @@ class ColumnEncoder:
         else:
             return None
 
-    def get_table_desc(self, schema_name, table_name):
+    def _get_table_desc(self, schema_name, table_name):
         # get the table definition from the dictionary so that we can get relevant details for each column
         statement = '''select /* fetching column descriptions for table */ "column", type, encoding, distkey, sortkey, "notnull", ad.adsrc
      from pg_table_def de, pg_attribute at LEFT JOIN pg_attrdef ad ON (at.attrelid, at.attnum) = (ad.adrelid, ad.adnum)
@@ -372,19 +372,19 @@ class ColumnEncoder:
     ''' % (schema_name, table_name, schema_name, table_name)
 
         if self.debug:
-            self.comment(statement)
+            self._comment(statement)
 
-        description = self.execute_query(statement)
+        description = self._execute_query(statement)
 
         descr = {}
         for row in description:
             if self.debug:
-                self.comment("Table Description: %s" % str(row))
+                self._comment("Table Description: %s" % str(row))
             descr[row[0]] = row
 
         return descr
 
-    def get_count_raw_columns(self, schema_name, table_name):
+    def _get_count_raw_columns(self, schema_name, table_name):
         # count the number of raw encoded columns which are not the sortkey, from the dictionary
         statement = '''select /* getting count of raw columns in table */ count(9) count_raw_columns
           from pg_table_def
@@ -395,18 +395,18 @@ class ColumnEncoder:
     ''' % (schema_name, table_name)
 
         if self.debug:
-            self.comment(statement)
+            self._comment(statement)
 
-        description = self.execute_query(statement)
+        description = self._execute_query(statement)
 
         return description
 
-    def run_commands(self, conn, commands):
+    def _run_commands(self, conn, commands):
         cursor = conn.cursor()
 
         for c in commands:
             if c is not None:
-                self.comment('[%s] Running %s' % (str(os.getpid()), c))
+                self._comment('[%s] Running %s' % (str(os.getpid()), c))
                 try:
                     if c.count(';') > 1:
                         subcommands = c.split(';')
@@ -416,7 +416,7 @@ class ColumnEncoder:
                                 cursor.execute(s.replace("\n", ""))
                     else:
                         cursor.execute(c)
-                    self.comment('Success.')
+                    self._comment('Success.')
                 except Exception as e:
                     # cowardly bail on errors
                     conn.rollback()
@@ -425,7 +425,7 @@ class ColumnEncoder:
 
         return True
 
-    def reduce_column_length(self, col_type, column_name, table_name):
+    def _reduce_column_length(self, col_type, column_name, table_name):
         set_col_type = col_type
 
         # analyze the current size length for varchar columns and return early if they are below the threshold
@@ -441,9 +441,9 @@ class ColumnEncoder:
                 column_name, self.schema_name, table_name)
 
         if self.debug:
-            self.comment(col_len_statement)
+            self._comment(col_len_statement)
 
-        self.comment("Analyzing max length of column '%s' for table '%s.%s' " % (
+        self._comment("Analyzing max length of column '%s' for table '%s.%s' " % (
             column_name, self.schema_name, table_name))
 
         # run the analyze in a loop, because it could be locked by another process modifying rows
@@ -455,13 +455,13 @@ class ColumnEncoder:
 
         while col_len_attempt_count < col_len_retry and col_len_result is None:
             try:
-                col_len_result = self.execute_query(col_len_statement)
+                col_len_result = self._execute_query(col_len_statement)
                 col_max_len = col_len_result[0][0]
                 if col_max_len is None:
                     col_max_len = 0
             except KeyboardInterrupt:
                 # To handle Ctrl-C from user
-                self.cleanup(self.get_pg_conn())
+                self._cleanup(self._get_pg_conn())
                 return constants.TERMINATED_BY_USER
             except Exception as e:
                 print(e)
@@ -497,7 +497,7 @@ class ColumnEncoder:
                 return col_type
 
             if self.debug:
-                self.comment(
+                self._comment(
                     "Max width of character column '%s' for table '%s.%s' is %d. Current width is %d. Setting new size to %s" % (
                         column_name, self.schema_name, table_name, col_max_len,
                         curr_col_length, new_column_len))
@@ -527,7 +527,7 @@ class ColumnEncoder:
         table_unoptimised = False
         count_unoptimised = 0
         encodings_modified = False
-        output = self.get_count_raw_columns(schema_name, table_name)
+        output = self._get_count_raw_columns(schema_name, table_name)
 
         if output is None:
             print("Unable to determine potential RAW column encoding for %s" % table_name)
@@ -539,12 +539,12 @@ class ColumnEncoder:
                     count_unoptimised += row[0]
 
         if not table_unoptimised and not self.force:
-            self.comment("Table %s.%s does not require encoding optimisation" % (schema_name, table_name))
+            self._comment("Table %s.%s does not require encoding optimisation" % (schema_name, table_name))
             return constants.OK
         else:
-            self.comment("Table %s.%s contains %s unoptimised columns" % (schema_name, table_name, count_unoptimised))
+            self._comment("Table %s.%s contains %s unoptimised columns" % (schema_name, table_name, count_unoptimised))
             if self.force:
-                self.comment("Using Force Override Option")
+                self._comment("Using Force Override Option")
 
             statement = 'analyze compression %s."%s"' % (schema_name, table_name)
 
@@ -553,9 +553,9 @@ class ColumnEncoder:
 
             try:
                 if self.debug:
-                    self.comment(statement)
+                    self._comment(statement)
 
-                self.comment("Analyzing Table '%s.%s'" % (schema_name, table_name,))
+                self._comment("Analyzing Table '%s.%s'" % (schema_name, table_name,))
 
                 # run the analyze in a loop, because it could be locked by another process modifying rows and get a timeout
                 analyze_compression_result = None
@@ -564,15 +564,15 @@ class ColumnEncoder:
                 last_exception = None
                 while attempt_count < analyze_retry and analyze_compression_result is None:
                     try:
-                        analyze_compression_result = self.execute_query(statement)
+                        analyze_compression_result = self._execute_query(statement)
                         # Commiting otherwise anaylze keep an exclusive lock until a commit arrive which can be very long
-                        self.execute_query('commit;')
+                        self._execute_query('commit;')
                     except KeyboardInterrupt:
                         # To handle Ctrl-C from user
-                        self.cleanup(self.get_pg_conn())
+                        self._cleanup(self._get_pg_conn())
                         return constants.TERMINATED_BY_USER
                     except Exception as e:
-                        self.execute_query('rollback;')
+                        self._execute_query('rollback;')
                         print(e)
                         attempt_count += 1
                         last_exception = e
@@ -601,7 +601,7 @@ class ColumnEncoder:
                     schema_name, table_name, set_target_schema, target_table,)
 
                 # query the table column definition
-                descr = self.get_table_desc(schema_name, table_name)
+                descr = self._get_table_desc(schema_name, table_name)
 
                 encode_columns = []
                 statements = []
@@ -620,7 +620,7 @@ class ColumnEncoder:
                 # process each item given back by the analyze request
                 for row in analyze_compression_result:
                     if self.debug:
-                        self.comment("Analyzed Compression Row State: %s" % str(row))
+                        self._comment("Analyzed Compression Row State: %s" % str(row))
                     col = row[1]
                     row_sortkey = descr[col][4]
 
@@ -640,7 +640,7 @@ class ColumnEncoder:
 
                     # check whether columns are too wide
                     if self.analyze_col_width and ("varchar" in col_type or "int" in col_type):
-                        new_col_type = self.reduce_column_length(col_type, descr[col][0], table_name)
+                        new_col_type = self._reduce_column_length(col_type, descr[col][0], table_name)
                         if new_col_type != col_type:
                             col_type = new_col_type
                             encodings_modified = True
@@ -695,7 +695,7 @@ class ColumnEncoder:
                     # get default or identity syntax for this column
                     default_or_identity = descr[col][6]
                     if default_or_identity:
-                        ident_data = self.get_identity(default_or_identity)
+                        ident_data = self._get_identity(default_or_identity)
                         if ident_data is None:
                             default_value = 'default %s' % default_or_identity
                             non_identity_columns.append('"%s"' % col)
@@ -707,7 +707,7 @@ class ColumnEncoder:
                         non_identity_columns.append('"%s"' % col)
 
                     if self.debug:
-                        self.comment("Column %s will be encoded as %s (previous %s)" % (
+                        self._comment("Column %s will be encoded as %s (previous %s)" % (
                             col, compression, old_encoding))
 
                     # add the formatted column specification
@@ -717,23 +717,23 @@ class ColumnEncoder:
                 # abort if a new distkey was set but we couldn't find it in the set of all columns
                 if self.new_dist_key is not None and table_distkey is None:
                     msg = "Column '%s' not found when setting new Table Distribution Key" % self.new_dist_key
-                    self.comment(msg)
+                    self._comment(msg)
                     raise Exception(msg)
 
                 # abort if new sortkeys were set but we couldn't find them in the set of all columns
                 if self.new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
                     if self.debug:
-                        self.comment("Requested Sort Keys: %s" % new_sortkey_arr)
-                        self.comment("Resolved Sort Keys: %s" % table_sortkeys)
+                        self._comment("Requested Sort Keys: %s" % new_sortkey_arr)
+                        self._comment("Resolved Sort Keys: %s" % table_sortkeys)
                     msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sortkey_arr
-                    self.comment(msg)
+                    self._comment(msg)
                     raise Exception(msg)
 
                 # if this table's encodings have not changed, then don't do a modification, unless force options is set
                 if (not self.force) and (not encodings_modified):
-                    self.comment("Column Encoding resulted in an identical table - no changes will be made")
+                    self._comment("Column Encoding resulted in an identical table - no changes will be made")
                 else:
-                    self.comment("Column Encoding will be modified for %s.%s" % (schema_name, table_name))
+                    self._comment("Column Encoding will be modified for %s.%s" % (schema_name, table_name))
 
                     # add all the column encoding statements on to the create table statement, suppressing the leading
                     # comma on the first one
@@ -749,7 +749,7 @@ class ColumnEncoder:
                     # add sort key as a table block to accommodate multiple columns
                     if len(sortkeys) > 0:
                         if self.debug:
-                            self.comment("Adding Sortkeys: %s" % sortkeys)
+                            self._comment("Adding Sortkeys: %s" % sortkeys)
                         sortkey = '%sSORTKEY(' % ('INTERLEAVED ' if has_zindex_sortkeys else '')
 
                         for i in range(1, len(sortkeys) + 1):
@@ -767,7 +767,7 @@ class ColumnEncoder:
                     statements.extend([create_table])
 
                     # get the primary key statement
-                    statements.extend([self.get_primary_key(schema_name, set_target_schema, table_name, target_table)])
+                    statements.extend([self._get_primary_key(schema_name, set_target_schema, table_name, target_table)])
 
                     # set the table owner
                     statements.extend(['alter table %s."%s" owner to "%s";' % (set_target_schema, target_table, owner)])
@@ -821,17 +821,17 @@ class ColumnEncoder:
                         statements.extend([rename])
 
                     # add foreign keys
-                    fks = self.get_foreign_keys(schema_name, set_target_schema, table_name)
+                    fks = self._get_foreign_keys(schema_name, set_target_schema, table_name)
 
                     # add grants back
-                    grants = self.get_grants(schema_name, table_name, self.db_user)
+                    grants = self._get_grants(schema_name, table_name, self.db_user)
                     if grants is not None:
                         statements.extend(grants)
 
                     statements.extend(['commit;'])
 
                     if self.do_execute:
-                        if not self.run_commands(self.get_pg_conn(), statements):
+                        if not self._run_commands(self._get_pg_conn(), statements):
                             if not self.ignore_errors:
                                 if self.debug:
                                     print("Error running statements: %s" % (str(statements),))
@@ -846,15 +846,15 @@ class ColumnEncoder:
                             aws_utils.put_metric(self.cw, 'Redshift', 'ColumnEncodingModification', dimensions, None, 1,
                                                  'Count')
                             if self.debug:
-                                self.comment("Emitted Cloudwatch Metric for Column Encoded table")
+                                self._comment("Emitted Cloudwatch Metric for Column Encoded table")
                     else:
-                        self.comment("No encoding modifications run for %s.%s" % (schema_name, table_name))
+                        self._comment("No encoding modifications run for %s.%s" % (schema_name, table_name))
             except Exception as e:
                 print('Exception %s during analysis of %s' % (e, table_name))
                 print(traceback.format_exc())
                 return constants.ERROR
 
-            self.print_statements(statements)
+            self._print_statements(statements)
 
             return constants.OK, fks, encodings_modified
 
@@ -873,21 +873,21 @@ class ColumnEncoder:
                     setattr(self, argName, args.get(argName))
 
         # get a connection for the controlling processes
-        master_conn = self.get_pg_conn()
+        master_conn = self._get_pg_conn()
 
         if master_conn is None or master_conn == constants.ERROR:
             return constants.NO_CONNECTION
 
-        self.comment("Connected to %s:%s:%s as %s" % (self.db_host, self.db_port, self.db, self.db_user))
+        self._comment("Connected to %s:%s:%s as %s" % (self.db_host, self.db_port, self.db, self.db_user))
         if self.table_name is not None:
             snippet = "Table '%s'" % self.table_name
         else:
             snippet = "Schema '%s'" % self.schema_name
 
-        self.comment("Analyzing %s for Columnar Encoding Optimisations with %s Threads..." % (snippet, self.threads))
+        self._comment("Analyzing %s for Columnar Encoding Optimisations with %s Threads..." % (snippet, self.threads))
 
         if self.do_execute:
-            if self.drop_old_data:
+            if self.drop_old_data and not self.force:
                 really_go = getpass.getpass(
                     "This will make irreversible changes to your database, and cannot be undone. Type 'Yes' to continue: ")
 
@@ -895,7 +895,7 @@ class ColumnEncoder:
                     print("Terminating on User Request")
                     return constants.TERMINATED_BY_USER
 
-            self.comment("Recommended encoding changes will be applied automatically...")
+            self._comment("Recommended encoding changes will be applied automatically...")
         else:
             pass
 
@@ -923,7 +923,7 @@ class ColumnEncoder:
             ''' % (self.schema_name, tables)
         else:
             # query for all tables in the schema ordered by size descending
-            self.comment("Extracting Candidate Table List...")
+            self._comment("Extracting Candidate Table List...")
 
             statement = '''select pgn.nspname::text as schema, trim(a.name) as table, b.mbytes, a.rows, decode(pgc.reldiststyle,0,'EVEN',1,'KEY',8,'ALL') dist_style, TRIM(pgu.usename) "owner", pgd.description
     from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_id, id, name) as a
@@ -939,22 +939,22 @@ class ColumnEncoder:
             ''' % (self.schema_name,)
 
         if self.debug:
-            self.comment(statement)
+            self._comment(statement)
 
-        query_result = self.execute_query(statement)
+        query_result = self._execute_query(statement)
 
         if query_result is None:
-            self.comment("Unable to issue table query - aborting")
+            self._comment("Unable to issue table query - aborting")
             return constants.ERROR
 
         table_names = []
         for row in query_result:
             table_names.append(row)
 
-        self.comment("Analyzing %s table(s) which contain allocated data blocks" % (len(table_names)))
+        self._comment("Analyzing %s table(s) which contain allocated data blocks" % (len(table_names)))
 
         if self.debug:
-            [self.comment(str(x)) for x in table_names]
+            [self._comment(str(x)) for x in table_names]
 
         result = []
 
@@ -971,13 +971,13 @@ class ColumnEncoder:
                     # To handle Ctrl-C from user
                     p.close()
                     p.terminate()
-                    self.cleanup(master_conn)
+                    self._cleanup(master_conn)
                     return constants.TERMINATED_BY_USER
                 except:
                     print(traceback.format_exc())
                     p.close()
                     p.terminate()
-                    self.cleanup(master_conn)
+                    self._cleanup(master_conn)
                     return constants.ERROR
 
                 p.terminate()
@@ -985,7 +985,7 @@ class ColumnEncoder:
                 for t in table_names:
                     result.append(self.analyze(t))
         else:
-            self.comment("No Tables Found to Analyze")
+            self._comment("No Tables Found to Analyze")
 
         # return any non-zero worker output statuses
         modified_tables = 0
@@ -999,10 +999,10 @@ class ColumnEncoder:
                 fk_commands = None
 
             if fk_commands is not None and len(fk_commands) > 0:
-                self.print_statements(fk_commands)
+                self._print_statements(fk_commands)
 
                 if self.do_execute:
-                    if not self.run_commands(master_conn, fk_commands):
+                    if not self._run_commands(master_conn, fk_commands):
                         if not self.ignore_errors:
                             print("Error running commands %s" % (fk_commands,))
                             return constants.ERROR
@@ -1011,13 +1011,13 @@ class ColumnEncoder:
                 print("Error in worker thread: return code %d. Exiting." % (return_code,))
                 return return_code
 
-        self.comment("Performed modification of %s tables" % modified_tables)
+        self._comment("Performed modification of %s tables" % modified_tables)
 
         if self.do_execute:
             if not master_conn.commit():
                 return constants.ERROR
 
-        self.comment('Processing Complete')
-        self.cleanup(master_conn)
+        self._comment('Processing Complete')
+        self._cleanup(master_conn)
 
         return constants.OK
