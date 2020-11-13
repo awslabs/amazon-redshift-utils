@@ -7,6 +7,13 @@ TABLE_PERSISTENCE = "SystemTablePersistence"
 WLM_SCHEDULER = "WlmScheduler"
 LOCAL_CONFIG = "config.json"
 
+OK = 0
+ERROR = 1
+INVALID_ARGS = 2
+NO_WORK = 3
+TERMINATED_BY_USER = 4
+NO_CONNECTION = 5
+
 DB_NAME = "db"
 DB_HOST = "db_host"
 DB_PORT = "db_port"
