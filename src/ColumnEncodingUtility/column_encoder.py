@@ -599,23 +599,29 @@ class ColumnEncoder:
                 else:
                     set_target_schema = target_schema
 
-                if FORCE_LEGACY_REORG is True or new_dist_key is not None or new_sort_keys is not None:
-                    statements = self._get_physical_reorg_process(source_schema,
-                                                                  table_name,
-                                                                  dist_style,
-                                                                  owner,
-                                                                  table_comment, set_target_schema,
-                                                                  analyze_compression_result, new_dist_key,
-                                                                  new_sort_keys)
+                # TODO add support for changing distkey and diststyle, and setting sortkey auto within the alter table process
+                # also consider whether we want to continue to offer the old table reorg method at all
+                if FORCE_LEGACY_REORG is True or (
+                        new_sort_keys is not None and new_sort_keys.lower() not in ['auto', 'none']):
+                    statements = self._get_physical_reorg_process(schema_name=source_schema,
+                                                                  table_name=table_name,
+                                                                  dist_style=dist_style,
+                                                                  owner=owner,
+                                                                  table_comment=table_comment,
+                                                                  set_target_schema=set_target_schema,
+                                                                  analyze_compression_result=analyze_compression_result,
+                                                                  new_dist_key=new_dist_key,
+                                                                  new_sort_keys=new_sort_keys)
                 else:
-                    statements = self._get_alter_table_update_process(source_schema,
-                                                                      table_name,
-                                                                      dist_style,
-                                                                      owner,
-                                                                      table_comment, set_target_schema,
-                                                                      analyze_compression_result)
+                    statements = self._get_alter_table_update_process(schema_name=source_schema,
+                                                                      table_name=table_name,
+                                                                      dist_style=dist_style,
+                                                                      analyze_compression_result=analyze_compression_result,
+                                                                      new_dist_key=new_dist_key,
+                                                                      new_sort_keys=new_sort_keys)
 
                 if statements is not None:
+                    # add a commit to free all locks
                     statements.extend(['commit;'])
 
                     self._print_statements(statements)
@@ -658,17 +664,20 @@ class ColumnEncoder:
                                         schema_name: str,
                                         table_name: str,
                                         dist_style: str,
-                                        owner: str,
-                                        table_comment: str,
-                                        set_target_schema: str,
-                                        analyze_compression_result):
+                                        analyze_compression_result,
+                                        new_dist_key: str,
+                                        new_sort_keys: str):
         # load the table description
         descr = self._get_table_desc(schema_name, table_name)
 
         alter_columns = []
 
+        def _add(statement):
+            alter_columns.append(
+                f'alter table "{schema_name}"."{table_name}" {statement};')
+
         for row in analyze_compression_result:
-            if self.debug:
+            if self.debug is True:
                 self._comment("Analyzed Compression Row State: %s" % str(row))
             col = row[1]
             row_sortkey = descr[col][4]
@@ -682,8 +691,21 @@ class ColumnEncoder:
             old_encoding = 'raw' if old_encoding == 'none' else old_encoding
             if new_encoding.lower() != 'raw' and new_encoding.lower() != old_encoding.lower():
                 # make sure this isn't the sort key
-                self._comment(f"Modifying column {col} encoding to {new_encoding} - will save projected {row[3]}% storage")
-                alter_columns.append(f'alter table "{schema_name}"."{table_name}" alter column "{col}" encode {new_encoding};')
+                self._comment(
+                    f"Modifying column {col} encoding to {new_encoding} - will save projected {row[3]}% storage")
+                _add(
+                    f'alter column "{col}" encode {new_encoding}')
+
+        # apply distkey changes after encoding, as they should take less time when target sizes are lower
+        if new_dist_key is not None:
+            if new_dist_key.lower() in ['even', 'auto', 'all']:
+                _add(
+                    f'alter diststyle {new_dist_key}')
+            else:
+                # key based distribution
+                _add(
+                    f'alter diststyle key distkey "{new_dist_key}"')
+        
 
         return alter_columns
 
@@ -694,8 +716,8 @@ class ColumnEncoder:
                                     table_comment: str,
                                     set_target_schema: str,
                                     analyze_compression_result,
-                                    new_dist_key: str,
-                                    new_sort_keys: str):
+                                    new_dist_key: str = None,
+                                    new_sort_keys: str = None):
         if set_target_schema == schema_name:
             target_table = '%s_$mig' % table_name
         else:
