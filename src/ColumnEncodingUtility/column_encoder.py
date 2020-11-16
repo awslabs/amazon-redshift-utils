@@ -704,8 +704,11 @@ class ColumnEncoder:
             else:
                 # key based distribution
                 _add(
-                    f'alter diststyle key distkey "{new_dist_key}"')
-        
+                    f'alter distkey "{new_dist_key}"')
+
+        # apply sortkey changes - this will only include changes to sortkey NONE or sortkey AUTO
+        if new_sort_keys is not None and new_sort_keys.lower() in ['none', 'auto']:
+            _add(f'alter sortkey {new_sort_keys}')
 
         return alter_columns
 
@@ -718,6 +721,8 @@ class ColumnEncoder:
                                     analyze_compression_result,
                                     new_dist_key: str = None,
                                     new_sort_keys: str = None):
+        self._comment("Defaulting to legacy physical reorg due to force override or application of new named sort key")
+
         if set_target_schema == schema_name:
             target_table = '%s_$mig' % table_name
         else:
