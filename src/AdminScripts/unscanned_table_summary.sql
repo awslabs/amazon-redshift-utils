@@ -16,20 +16,29 @@ truely unscanned over longer periods of time.
 
 History:
 2016-01-18 chriz-bigdata created
+2020-11-17 marynap chnaged storage calculation 
 **********************************************************************************************/
+
 WITH
-    nodes AS (SELECT COUNT(DISTINCT node) nodenum FROM stv_slices),
-    slices AS (SELECT COUNT(DISTINCT slice) slices FROM stv_slices s WHERE node=0),
-    disks AS (SELECT COUNT(p.owner) disks FROM stv_partitions p WHERE p.owner=0),
-    storage AS (
-        SELECT 
-            nodes.nodenum * (CASE 
-                WHEN slices.slices = 32 THEN 2.56
-                WHEN slices.slices = 16 THEN 16.00
-                WHEN disks.disks > 2 THEN 2
-                ELSE 0.16 END) AS total_storage
-        FROM 
-            nodes, slices, disks), 
+	nodes AS (SELECT COUNT(DISTINCT node) nodenum FROM stv_slices WHERE TYPE = 'D'),
+	storage as (SELECT  nodes.nodenum * ( CASE 
+			WHEN capacity IN (381407, 190633, 361859)
+				THEN 160 / 1024
+			WHEN capacity IN (380319, 760956)
+				THEN 2.56 
+			WHEN capacity IN (1906314, 952455)
+				THEN 2 
+			WHEN capacity = 945026
+				THEN 16 
+			WHEN capacity = 3339176
+				THEN 64 
+			ELSE NULL
+			END::float ) AS total_storage
+	FROM stv_partitions, nodes
+	WHERE part_begin = 0
+		AND failed = 0 
+		group by 1
+		), 
     table_scans AS (
         SELECT 
             database, 
@@ -67,4 +76,3 @@ SELECT
     num_unscanned_tables || ' unscanned tables @ ' || size_unscanned_tables || 'TB / ' || total_storage || 'TB (' || ROUND(100*(size_unscanned_tables::float/total_storage::float),1) || '%)' AS unscanned_table_storage
 FROM
     scan_aggs;
-
