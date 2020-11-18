@@ -38,6 +38,7 @@ Srinikri Amazon Web Services (2015)
 '''
 import os
 import sys
+import argparse
 
 # add the lib directory to the sys path
 try:
@@ -50,7 +51,7 @@ import getopt
 import analyze_vacuum
 import config_constants
 
-__version__ = ".9.1.5"
+__version__ = ".9.2.1"
 
 OK = 0
 ERROR = 1
@@ -59,176 +60,72 @@ NO_WORK = 3
 TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
-
-def get_env_var(name, default_val):
-    return os.environ[name] if name in os.environ else default_val
-
-
-def usage(with_message=None):
-    print('Usage: analyze-vacuum-schema.py')
-    print('       Runs vacuum AND/OR analyze on table(s) in a schema\n')
-
-    if with_message is not None:
-        print(with_message + "\n")
-
-    print('Arguments: --db                 - The Database to Use')
-    print('           --db-user            - The Database User to connect to')
-    print('           --db-pwd             - The Password for the Database User to connect to')
-    print('           --db-host            - The Cluster endpoint')
-    print('           --db-port            - The Cluster endpoint port : Default = 5439')
-    print('           --db-conn-opts       - Additional connection options. "name1=opt1[ name2=opt2].."')
-    print('           --require-ssl        - Does the connection require SSL? (True | False)')
-    print('           --schema-name        - The Schema to be Analyzed or Vacuumed : Default = public')
-    print('           --table-name         - A specific table to be Analyzed or Vacuumed, if --analyze-schema is not desired')
-    print('           --blacklisted-tables - The tables we do not want to Vacuum')
-    print('           --output-file        - The full path to the output file to be generated')
-    print('           --debug              - Generate Debug Output including SQL Statements being run')
-    print('           --slot-count         - Modify the wlm_query_slot_count : Default = 1')
-    print('           --ignore-errors      - Ignore errors raised when running and continue processing')
-    print('           --query_group        - Set the query_group for all queries')
-    print('           --analyze-flag       - Flag to turn ON/OFF ANALYZE functionality (True or False) : Default = True ')
-    print('           --vacuum-flag        - Flag to turn ON/OFF VACUUM functionality (True or False) :  Default = True')
-    print('           --vacuum-parameter   - Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL')
-    print('           --min-unsorted-pct   - Minimum unsorted percentage(%) to consider a table for vacuum : Default = 5%')
-    print('           --max-unsorted-pct   - Maximum unsorted percentage(%) to consider a table for vacuum : Default = 50%')
-    print('           --stats-off-pct      - Minimum stats off percentage(%) to consider a table for analyze : Default = 10%')
-    print('           --predicate-cols     - Analyze predicate columns only')
-    print('           --max-table-size-mb  - Maximum table size in MB : Default = 700*1024 MB')
-    print('           --min-interleaved-skew   - Minimum index skew to consider a table for vacuum reindex: Default = 1.4')
-    print('           --min-interleaved-cnt   - Minimum stv_interleaved_counts records to consider a table for vacuum reindex: Default = 0')
-    print('           --suppress-cloudwatch   - Don\'t emit CloudWatch metrics for analyze or vacuum when set to True')
-
-    sys.exit(INVALID_ARGS)
+# setup cli args
+parser = argparse.ArgumentParser()
+parser.add_argument("--analyze-flag", dest="analyze_flag", default=True, type=bool,
+                    help="Flag to turn ON/OFF ANALYZE functionality (True or False : Default = True ")
+parser.add_argument("--max-unsorted-pct", dest="max_unsorted_pct",
+                    help="Maximum unsorted percentage(% to consider a table for vacuum : Default = 50%")
+parser.add_argument("--min-interleaved-cnt", dest="min_interleaved_cnt", type=int,
+                    help="Minimum stv_interleaved_counts records to consider a table for vacuum reindex: Default = 0")
+parser.add_argument("--min-interleaved-skew", dest="min_interleaved_skew",
+                    help="Minimum index skew to consider a table for vacuum reindex: Default = 1.4")
+parser.add_argument("--min-unsorted-pct", dest="min_unsorted_pct",
+                    help="Minimum unsorted percentage(% to consider a table for vacuum : Default = 5%")
+parser.add_argument("--stats-off-pct ", dest="stats_off_pct",
+                    help="Minimum stats off percentage(% to consider a table for analyze : Default = 10%")
+parser.add_argument("--table-name", dest="table_name",
+                    help="A specific table to be Analyzed or Vacuumed if analyze-schema is not desired")
+parser.add_argument("--vacuum-flag", dest="vacuum_flag", default=True, type=bool,
+                    help="Flag to turn ON/OFF VACUUM functionality (True or False :  Default = True")
+parser.add_argument("--vacuum-parameter", dest="vacuum_parameter",
+                    help="Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL")
+parser.add_argument("--blacklisted-tables", dest="blacklisted_tables", help="The tables we do not want to Vacuum")
+parser.add_argument("--db-conn-opts", dest="db_conn_opts",
+                    help="Additional connection options. name1=opt1[ name2=opt2]..")
+parser.add_argument("--db-host", dest="db_host", required=True, help="The Cluster endpoint")
+parser.add_argument("--db-port", dest="db_port", type=int, required=True,
+                    help="The Cluster endpoint port : Default = 5439")
+parser.add_argument("--db-pwd", dest="db_pwd", help="The Password for the Database User to connect to")
+parser.add_argument("--db-user", dest="db_user", required=True, help="The Database User to connect to")
+parser.add_argument("--debug ", dest="debug", default=False,
+                    help="Generate Debug Output including SQL Statements being run")
+parser.add_argument("--ignore-errors", dest="ignore_errors", default=True,
+                    help="Ignore errors raised when running and continue processing")
+parser.add_argument("--max-table-size-mb", dest="max_table_size_mb", type=int,
+                    help="Maximum table size in MB : Default = 700*1024 MB")
+parser.add_argument("--output-file", dest="output_file", help="The full path to the output file to be generated")
+parser.add_argument("--predicate-cols", dest="predicate_cols", help="Analyze predicate columns only")
+parser.add_argument("--query-group", dest="query_group", help="Set the query_group for all queries")
+parser.add_argument("--require-ssl", dest="require_ssl", default=False,
+                    help="Does the connection require SSL? (True | False")
+parser.add_argument("--schema-name", dest="schema_name",
+                    help="The Schema to be Analyzed or Vacuumed (REGEX: Default = public")
+parser.add_argument("--slot-count", dest="slot_count", help="Modify the wlm_query_slot_count : Default = 1")
+parser.add_argument("--suppress-cloudwatch", dest="suppress_cw",
+                    help="Don't emit CloudWatch metrics for analyze or vacuum when set to True")
+parser.add_argument("--db", dest="db", help="The Database to Use")
+full_args = parser.parse_args()
+parse_args = {}
+# remove args that end up as None
+for k, v in vars(full_args).items():
+    if v is not None:
+        parse_args[k] = v
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= schema-name= table-name= blacklisted-tables= suppress-cloudwatch= require-ssl= debug= output-file= slot-count= ignore-errors= query_group= analyze-flag= vacuum-flag= vacuum-parameter= min-unsorted-pct= max-unsorted-pct= stats-off-pct= predicate-cols= max-table-size-mb= min-interleaved-skew= min-interleaved-cnt="""
+    # get environmental args
+    args = {config_constants.DB_NAME: os.environ.get('PGDATABASE', None),
+            config_constants.DB_USER: os.environ.get('PGUSER', None),
+            config_constants.DB_PASSWORD: os.environ.get('PGPASSWORD', None),
+            config_constants.DB_HOST: os.environ.get('PGHOST', None),
+            config_constants.DB_PORT: os.environ.get('PGPORT', 5439)}
 
-    # extract the command line arguments
-    try:
-        optlist, remaining = getopt.getopt(argv[1:], "", supported_args.split())
-    except getopt.GetoptError as err:
-        print(str(err))
-        usage()
+    # add argparse args
+    args.update(parse_args)
 
-    args = {config_constants.DB_NAME: get_env_var('PGDATABASE', None),
-            config_constants.DB_USER: get_env_var('PGUSER', None),
-            config_constants.DB_PASSWORD: get_env_var('PGPASSWORD', None),
-            config_constants.DB_HOST: get_env_var('PGHOST', None),
-            config_constants.DB_PORT: get_env_var('PGPORT', 5439)}
-
-    # parse command line arguments
-    for arg, value in optlist:
-        if arg == "--db":
-            if value == '':
-                usage()
-            else:
-                args['db'] = value
-        elif arg == "--db-user":
-            if value == '':
-                usage()
-            else:
-                args[config_constants.DB_USER] = value
-        elif arg == "--db-pwd":
-            if value == '':
-                usage()
-            else:
-                args[config_constants.DB_PASSWORD] = value
-        elif arg == "--db-host":
-            if value != '':
-                args[config_constants.DB_HOST] = value
-        elif arg == "--db-port":
-            if value != '' and value is not None:
-                args[config_constants.DB_PORT] = int(value)
-        elif arg == "--require-ssl":
-            if value != '' and value is not None:
-                if value.upper() == 'TRUE' or value == '1':
-                    args[config_constants.SSL] = True
-                else:
-                    args[config_constants.SSL] = False
-        elif arg == "--schema-name":
-            if value != '' and value is not None:
-                args[config_constants.SCHEMA_NAME] = value
-        elif arg == "--table-name":
-            if value != '' and value is not None:
-                args[config_constants.TABLE_NAME] = value
-        elif arg == "--blacklisted-tables":
-            if value != '' and value is not None:
-                args[config_constants.BLACKLISTED_TABLES] = value
-        elif arg == "--debug":
-            if value.upper() == 'TRUE' or value == '1':
-                args[config_constants.DEBUG] = True
-        elif arg == "--output-file":
-            # open the supplied file path and bind it to stdout
-            sys.stdout = open(value, 'w')
-        elif arg == "--ignore-errors":
-            if value.upper() == 'TRUE' or value == '1':
-                args[config_constants.IGNORE_ERRORS] = True
-        elif arg == "--slot-count":
-            args[config_constants.QUERY_SLOT_COUNT] = int(value)
-        elif arg == "--query_group":
-            if value != '' and value is not None:
-                args[config_constants.QUERY_GROUP] = value
-        elif arg == "--vacuum-flag":
-            if value.upper() == 'TRUE' or value == '1':
-                args[config_constants.DO_VACUUM] = True
-            else:
-                args[config_constants.DO_VACUUM] = False
-        elif arg == "--analyze-flag":
-            if value.upper() == 'TRUE' or value == '1':
-                args[config_constants.DO_ANALYZE] = True
-            else:
-                args[config_constants.DO_ANALYZE] = False
-        elif arg == "--vacuum-parameter":
-            if value.upper() == 'SORT ONLY' or value.upper() == 'DELETE ONLY' or value.upper() == 'REINDEX':
-                args[config_constants.VACUUM_PARAMETER] = value
-            else:
-                args['vacuum_parameter'] = 'FULL'
-        elif arg == "--min-unsorted-pct":
-            if value != '' and value is not None:
-                args[config_constants.MIN_UNSORTED_PCT] = value
-        elif arg == "--max-unsorted-pct":
-            if value != '' and value is not None:
-                args[config_constants.MAX_UNSORTED_PCT] = value
-        elif arg == "--stats-off-pct":
-            if value != '' and value is not None:
-                args[config_constants.STATS_OFF_PCT] = value
-        elif arg == "--predicate-cols":
-            if value.upper() == 'TRUE' or value == '1':
-                args[config_constants.PREDICATE_COLS] = True
-            else:
-                args[config_constants.PREDICATE_COLS] = False
-        elif arg == "--suppress-cloudwatch":
-            if value.upper() == 'TRUE' or value == '1':
-                args[config_constants.SUPPRESS_CLOUDWATCH] = True
-            else:
-                args[config_constants.SUPPRESS_CLOUDWATCH] = False
-        elif arg == "--max-table-size-mb":
-            if value != '' and value is not None:
-                args[config_constants.MAX_TBL_SIZE_MB] = value
-        elif arg == "--min-interleaved-skew":
-            if value != '' and value is not None:
-                args[config_constants.MIN_INTERLEAVED_SKEW] = value
-        elif arg == "--min-interleaved-cnt":
-            if value != '' and value is not None:
-                args[config_constants.MIN_INTERLEAVED_COUNT] = value
-        else:
-            usage("Unsupported Argument " + arg)
-
-    # Validate that we've got all the args needed
-    if config_constants.DB_NAME not in args:
-        usage("Missing Parameter 'db'")
-    if config_constants.DB_USER not in args:
-        usage("Missing Parameter 'db-user'")
-    if config_constants.DB_PASSWORD not in args:
-        usage("Missing Parameter 'db-pwd'")
-    if config_constants.DB_HOST not in args:
-        usage("Missing Parameter 'db-host'")
-    if config_constants.DB_PORT not in args:
-        usage("Missing Parameter 'db-port'")
-
-    if config_constants.OUTPUT_FILE in args:
-        sys.stdout = open(args['output_file'], 'w')
+    if args.get(config_constants.OUTPUT_FILE) is not None:
+        sys.stdout = open(args.get(config_constants.OUTPUT_FILE), 'w')
 
     # invoke the main method of the utility
     result = analyze_vacuum.run_analyze_vacuum(**args)

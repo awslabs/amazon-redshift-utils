@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 echo "Running analyze-vacuum utility"
 
 # Required
@@ -25,7 +27,7 @@ MIN_UNSORTED_PCT=${MIN_UNSORTED_PCT:-5}
 MAX_UNSORTED_PCT=${MAX_UNSORTED_PCT:-50}
 STATS_OFF_PCT=${STATS_OFF_PCT:-10}
 PREDICATE_COLS=${PREDICATE_COLS:-false}
-MAX_TABLE_SIZE_MB=${MAX_TABLE_SIZE_MB:-(700*1024)}
+MAX_TABLE_SIZE_MB=${MAX_TABLE_SIZE_MB:-$((700*1024))}
 MIN_INTERLEAVED_SKEW=${MIN_INTERLEAVED_SKEW:-1.4}
 MIN_INTERLEAVED_CNT=${MIN_INTERLEAVED_CNT:-0}
 SUPPRESS_CLOUDWATCH=${SUPPRESS_CLOUDWATCH:-false}
@@ -37,10 +39,10 @@ BLACKLISTED_TABLES=${BLACKLISTED_TABLES:-}
 OUTPUT_FILE=${OUTPUT_FILE:-}
 QUERY_GROUP=${QUERY_GROUP:-}
 
-if [ "${DB}" == "" ]; then echo "Environment Var 'DB' must be defined"
-elif [ "${DB_USER}" == "" ]; then echo "Environment Var 'DB_USER' must be defined"
-elif [ "${DB_PWD}" == "" ]; then echo "Environment Var 'DB_PWD' must be defined"
-elif [ "${DB_HOST}" == "" ]; then echo "Environment Var 'DB_HOST' must be defined"
+if [ "${DB}" == "" ]; then echo "Environment Var 'DB' must be defined"; exit 1
+elif [ "${DB_USER}" == "" ]; then echo "Environment Var 'DB_USER' must be defined"; exit 1
+elif [ "${DB_PWD}" == "" ]; then echo "Environment Var 'DB_PWD' must be defined"; exit 1
+elif [ "${DB_HOST}" == "" ]; then echo "Environment Var 'DB_HOST' must be defined"; exit 1
 else
     if [ "${DB_CONN_OPTS}" != "" ]; then DB_CONN_OPTS_CMD="--db-conn-opts ${DB_CONN_OPTS}"; fi
     if [ "${TABLE_NAME}" != "" ]; then TABLE_NAME_CMD="--table-name ${TABLE_NAME}"; fi

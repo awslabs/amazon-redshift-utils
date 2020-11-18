@@ -12,7 +12,7 @@ from pg import connect
 
 options = "keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=6 connect_timeout=10"
 
-set_timeout_stmt = "set statement_timeout = 1200000"
+set_timeout_stmt = "set statement_timeout = 0"
 
 
 class RedshiftClusterFactory:

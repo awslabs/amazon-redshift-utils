@@ -16,7 +16,7 @@ analyze-schema-compression.py
 * express or implied. See the License for the specific language governing
 * permissions and limitations under the License.
 
-Analyses all tables in a Redshift Cluster Schema, and outputs a SQL script to 
+Analyses all tables in a Redshift Cluster Schema, and outputs a SQL script to
 migrate database tables with sub-optimal column encodings to optimal column
 encodings as recommended by the database engine.
 
@@ -58,7 +58,7 @@ try:
 except:
     pass
 
-import aws_utils
+import redshift_utils_helper as aws_utils
 import config_constants
 
 thismodule = sys.modules[__name__]
@@ -103,6 +103,7 @@ new_sort_keys = None
 debug = False
 threads = 1
 analyze_col_width = False
+new_varchar_min = None
 do_execute = False
 query_slot_count = 1
 ignore_errors = False
@@ -197,7 +198,7 @@ def get_pg_conn():
             cleanup(conn)
             return ERROR
 
-        aws_utils.set_search_paths(conn, schema_name, target_schema)
+        aws_utils.set_search_paths(conn, schema_name, target_schema, exclude_external_schemas=True)
 
         if query_group is not None:
             set_query_group = 'set query_group to %s' % query_group
@@ -230,13 +231,6 @@ def get_pg_conn():
 
         run_commands(conn, [set_name])
 
-        # Set search_path
-        set_searchpath = "set search_path to '$user', public, %s;" % schema_name
-        if debug:
-            comment(set_searchpath)
-
-        run_commands(conn, [set_searchpath])
-
         # turn off autocommit for the rest of the executions
         conn.autocommit = False
 
@@ -260,13 +254,40 @@ def get_identity(adsrc):
 
 def get_grants(schema_name, table_name, current_user):
     sql = '''
-        SELECT table_schema, table_name, privilege_type, g.groname is not null as is_group, grantee 
-        FROM information_schema.table_privileges tp 
-        LEFT OUTER JOIN pg_group g ON g.groname = tp.grantee
-        where table_schema = '%s'
-          and table_name = '%s'
-        and grantee not in ('%s','rdsdb')
-    ''' % (schema_name, table_name, current_user)
+        WITH priviledge AS
+        (
+            SELECT 'SELECT'::varchar(10) as "grant"
+            UNION ALL
+            SELECT 'DELETE'::varchar(10)
+            UNION ALL
+            SELECT 'INSERT'::varchar(10)
+            UNION ALL
+            SELECT 'UPDATE'::varchar(10)
+            UNION ALL
+            SELECT 'REFERENCES'::varchar(10)
+        ),
+        usr AS
+        (
+            SELECT usesysid, 0 as grosysid, usename, false as is_group
+            FROM pg_user
+            WHERE usename != 'rdsdb'
+            UNION ALL
+            SELECT 0, grosysid, groname, true
+            FROM pg_group
+        )
+        SELECT nc.nspname AS table_schema, c.relname AS table_name, priviledge."grant" AS privilege_type, usr.is_group, usr.usename AS grantee
+        FROM pg_class c
+        JOIN pg_namespace nc ON (c.relnamespace = nc.oid)
+        CROSS JOIN usr
+        CROSS JOIN priviledge
+        JOIN pg_user ON pg_user.usename not in ('rdsdb')
+        WHERE  (c.relkind = 'r'::"char" OR c.relkind = 'v'::"char")
+        AND aclcontains(c.relacl, makeaclitem(usr.usesysid, usr.grosysid, pg_user.usesysid, priviledge."grant", false))
+        AND c.relname = '%s'
+        AND nc.nspname = '%s'
+        and grantee != '%s'
+        ;
+    ''' % (table_name, schema_name, current_user)
 
     if debug:
         comment(sql)
@@ -278,9 +299,10 @@ def get_grants(schema_name, table_name, current_user):
     for grant in grants:
         if grant[3] == True:
             grant_statements.append(
-                "grant %s on %s.%s to group %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
+                "grant %s on %s.%s to group \"%s\";" % (grant[2].lower(), schema_name, table_name, grant[4]))
         else:
-            grant_statements.append("grant %s on %s.%s to %s;" % (grant[2].lower(), schema_name, table_name, grant[4]))
+            grant_statements.append(
+                "grant %s on %s.%s to \"%s\";" % (grant[2].lower(), schema_name, table_name, grant[4]))
 
     if len(grant_statements) > 0:
         return grant_statements
@@ -296,12 +318,9 @@ def get_foreign_keys(schema_name, set_target_schema, table_name):
     fk_statement = '''SELECT /* fetching foreign key relations */ conname,
   pg_catalog.pg_get_constraintdef(cons.oid, true) as condef
  FROM pg_catalog.pg_constraint cons,
- pg_namespace pgn,
  pg_class pgc
  WHERE cons.conrelid = pgc.oid
- and pgn.nspname = '%s'
- and pgc.relnamespace = pgn.oid
- and pgc.oid = '%s'::regclass
+ and pgc.oid = '%s."%s"'::regclass
  AND cons.contype = 'f'
  ORDER BY 1
 ''' % (schema_name, table_name)
@@ -329,20 +348,18 @@ def get_primary_key(schema_name, set_target_schema, original_table, new_table):
     has_pks = False
 
     # get the primary key columns
-    statement = '''SELECT /* fetch primary key information */   
+    statement = '''SELECT /* fetch primary key information */
   att.attname
-FROM pg_index ind, pg_class cl, pg_attribute att, pg_namespace pgn
-WHERE 
-  cl.oid = '%s'::regclass 
-  AND ind.indrelid = cl.oid 
+FROM pg_index ind, pg_class cl, pg_attribute att
+WHERE
+  cl.oid = '%s."%s"'::regclass
+  AND ind.indrelid = cl.oid
   AND att.attrelid = cl.oid
-  and cl.relnamespace = pgn.oid
-  and pgn.nspname = '%s'
   and att.attnum = ANY(string_to_array(textin(int2vectorout(ind.indkey)), ' '))
   and attnum > 0
   AND ind.indisprimary
 order by att.attnum;
-''' % (original_table, schema_name)
+''' % (schema_name, original_table)
 
     if debug:
         comment(statement)
@@ -388,10 +405,10 @@ def get_table_desc(schema_name, table_name):
 def get_count_raw_columns(schema_name, table_name):
     # count the number of raw encoded columns which are not the sortkey, from the dictionary
     statement = '''select /* getting count of raw columns in table */ count(9) count_raw_columns
-      from pg_table_def 
+      from pg_table_def
       where schemaname = '%s'
-        and lower(encoding) in ('raw','none') 
-        and sortkey != 1        
+        and lower(encoding) in ('raw','none')
+        and sortkey != 1
         and tablename = '%s'
 ''' % (schema_name, table_name)
 
@@ -490,6 +507,11 @@ def reduce_column_length(col_type, column_name, table_name):
         # if the new length would be greater than varchar(max) then return the current value - no changes
         if new_column_len > 65535:
             return col_type
+
+        # if the new length would be smaller than the specified new varchar minimum then set to varchar minimum
+        if new_column_len < new_varchar_min:
+            new_column_len = new_varchar_min
+
         # if the new length would be 0 then return the current value - no changes
         if new_column_len == 0:
             return col_type
@@ -564,11 +586,14 @@ def analyze(table_info):
             while attempt_count < analyze_retry and analyze_compression_result is None:
                 try:
                     analyze_compression_result = execute_query(statement)
+                    # Commiting otherwise anaylze keep an exclusive lock until a commit arrive which can be very long
+                    execute_query('commit;')
                 except KeyboardInterrupt:
                     # To handle Ctrl-C from user
                     cleanup(get_pg_conn())
                     return TERMINATED_BY_USER
                 except Exception as e:
+                    execute_query('rollback;')
                     print(e)
                     attempt_count += 1
                     last_exception = e
@@ -617,18 +642,18 @@ def analyze(table_info):
                 if debug:
                     comment("Analyzed Compression Row State: %s" % str(row))
                 col = row[1]
+                row_sortkey = descr[col][4]
 
                 # compare the previous encoding to the new encoding
+                # don't use new encoding for first sortkey
+                datatype = descr[col][1]
                 new_encoding = row[2]
+                new_encoding = new_encoding if not abs(row_sortkey) == 1 else 'raw'
                 old_encoding = descr[col][2]
                 old_encoding = 'raw' if old_encoding == 'none' else old_encoding
                 if new_encoding != old_encoding:
                     encodings_modified = True
                     count_optimized += 1
-
-                    if debug:
-                        comment("Column %s will be modified from %s encoding to %s encoding" % (
-                            col, old_encoding, new_encoding))
 
                 # fix datatypes from the description type to the create type
                 col_type = descr[col][1].replace('character varying', 'varchar').replace('without time zone', '')
@@ -658,7 +683,6 @@ def analyze(table_info):
                         distkey = ''
 
                 # link in the existing sort keys, or set the new ones
-                row_sortkey = descr[col][4]
                 if table_name is not None and len(new_sortkey_arr) > 0:
                     if col in new_sortkey_arr:
                         sortkeys[new_sortkey_arr.index(col) + 1] = col
@@ -672,13 +696,15 @@ def analyze(table_info):
                         if row_sortkey < 0:
                             has_zindex_sortkeys = True
 
-                # don't compress first sort key
-                if abs(row_sortkey) == 1:
+                # don't compress first sort key column. This will be set on the basis of the existing sort key not
+                # being modified, or on the assignment of the new first sortkey
+                if (abs(row_sortkey) == 1 and len(new_sortkey_arr) == 0) or (
+                        col in table_sortkeys and table_sortkeys.index(col) == 0):
                     compression = 'RAW'
                 else:
-                    compression = row[2]
+                    compression = new_encoding
 
-                # extract null/not null setting            
+                # extract null/not null setting
                 col_null = descr[col][5]
 
                 if str(col_null).upper() == 'TRUE':
@@ -692,13 +718,17 @@ def analyze(table_info):
                     ident_data = get_identity(default_or_identity)
                     if ident_data is None:
                         default_value = 'default %s' % default_or_identity
-                        non_identity_columns.append(col)
+                        non_identity_columns.append('"%s"' % col)
                     else:
                         default_value = 'identity (%s, %s)' % ident_data
                         has_identity = True
                 else:
                     default_value = ''
-                    non_identity_columns.append(col)
+                    non_identity_columns.append('"%s"' % col)
+
+                if debug:
+                    comment("Column %s will be encoded as %s (previous %s)" % (
+                        col, compression, old_encoding))
 
                 # add the formatted column specification
                 encode_columns.extend(['"%s" %s %s %s encode %s %s'
@@ -713,9 +743,9 @@ def analyze(table_info):
             # abort if new sortkeys were set but we couldn't find them in the set of all columns
             if new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
                 if debug:
-                    comment("Requested Sort Keys: %s" % new_sort_keys)
+                    comment("Requested Sort Keys: %s" % new_sortkey_arr)
                     comment("Resolved Sort Keys: %s" % table_sortkeys)
-                msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sort_keys
+                msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sortkey_arr
                 comment(msg)
                 raise Exception(msg)
 
@@ -760,7 +790,7 @@ def analyze(table_info):
                 statements.extend([get_primary_key(schema_name, set_target_schema, table_name, target_table)])
 
                 # set the table owner
-                statements.extend(['alter table %s."%s" owner to %s;' % (set_target_schema, target_table, owner)])
+                statements.extend(['alter table %s."%s" owner to "%s";' % (set_target_schema, target_table, owner)])
 
                 if table_comment is not None:
                     statements.extend(
@@ -782,7 +812,7 @@ def analyze(table_info):
                                                                             schema_name,
                                                                             table_name)
                 if len(table_sortkeys) > 0:
-                    insert = "%s order by %s;" % (insert, ",".join(table_sortkeys))
+                    insert = "%s order by \"%s\";" % (insert, ",".join(table_sortkeys).replace(',', '\",\"'))
                 else:
                     insert = "%s;" % (insert)
 
@@ -862,6 +892,7 @@ def usage(with_message):
     print('           --analyze-schema      - The Schema to be Analyzed (default public)')
     print('           --analyze-table       - A specific table to be Analyzed, if --analyze-schema is not desired')
     print('           --analyze-cols        - Analyze column width and reduce the column width if needed')
+    print('           --new-varchar-min     - Set minimum varchar length for new width (to be used with --analyze-cols)')
     print('           --new-dist-key        - Set a new Distribution Key (only used if --analyze-table is specified)')
     print(
         '           --new-sort-keys       - Set a new Sort Key using these comma separated columns (Compound Sort key only , and only used if --analyze-table is specified)')
@@ -879,7 +910,7 @@ def usage(with_message):
     print('           --comprows            - Set the number of rows to use for Compression Encoding Analysis')
     print('           --query_group         - Set the query_group for all queries')
     print('           --ssl-option          - Set SSL to True or False (default False)')
-    print('           --statement_timeout   - Set the runtime statement timeout in milliseconds (default 1200000)')
+    print('           --statement-timeout   - Set the runtime statement timeout in milliseconds (default 1200000)')
     print(
         '           --suppress-cloudwatch - Set to True to suppress CloudWatch Metrics being created when --do-execute is True')
     sys.exit(INVALID_ARGS)
@@ -899,6 +930,7 @@ def configure(**kwargs):
     global new_dist_key
     global new_sort_keys
     global analyze_col_width
+    global new_varchar_min
     global target_schema
     global debug
     global do_execute
@@ -999,7 +1031,7 @@ join pg_namespace as pgn on pgn.oid = pgc.relnamespace
 join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-and pgn.nspname::text = '%s' and pgc.relname in (%s)
+and pgn.nspname::text ~ '%s' and pgc.relname in (%s)
         ''' % (schema_name, tables)
     else:
         # query for all tables in the schema ordered by size descending
@@ -1010,10 +1042,10 @@ from (select db_id, id, name, sum(rows) as rows from stv_tbl_perm a group by db_
 join pg_class as pgc on pgc.oid = a.id
 left outer join pg_description pgd ON pgd.objoid = pgc.oid and pgd.objsubid = 0
 join pg_namespace as pgn on pgn.oid = pgc.relnamespace
-join pg_user pgu on pgu.usesysid = pgc.relowner 
+join pg_user pgu on pgu.usesysid = pgc.relowner
 join (select tbl, count(*) as mbytes
 from stv_blocklist group by tbl) b on a.id=b.tbl
-where pgn.nspname::text = '%s'
+where pgn.nspname::text  ~ '%s'
   and a.name::text SIMILAR TO '[A-Za-z0-9_]*'
 order by 2;
         ''' % (schema_name,)
@@ -1039,7 +1071,7 @@ order by 2;
     result = []
 
     if table_names is not None:
-        # we'll use a Pool to process all the tables with multiple threads, or just sequentially if 1 thread is requested         
+        # we'll use a Pool to process all the tables with multiple threads, or just sequentially if 1 thread is requested
         if threads > 1:
             # setup executor pool
             p = Pool(threads)
@@ -1104,7 +1136,7 @@ order by 2;
 
 
 def main(argv):
-    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch= statement-timeout="""
+    supported_args = """db= db-user= db-pwd= db-host= db-port= target-schema= analyze-schema= analyze-table= new-dist-key= new-sort-keys= analyze-cols= new-varchar-min= threads= debug= output-file= do-execute= slot-count= ignore-errors= force= drop-old-data= comprows= query_group= ssl-option= suppress-cloudwatch= statement-timeout="""
 
     # extract the command line arguments
     try:
@@ -1152,6 +1184,9 @@ def main(argv):
         elif arg == "--analyze-cols":
             if value != '' and value is not None:
                 args['analyze_col_width'] = value
+        elif arg == "--new-varchar-min":
+            if value != '' and value is not None:
+                args['new_varchar_min'] = int(value)
         elif arg == "--target-schema":
             if value != '' and value is not None:
                 args[config_constants.TARGET_SCHEMA] = value

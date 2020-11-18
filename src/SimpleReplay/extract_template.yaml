@@ -1,0 +1,14 @@
+workload_location: "s3://mybucketname/myworkload" # Required. Where to save the extracted workload. Either S3 location or local directory.
+source_cluster_endpoint: "endpoint:port/dbname" # Optional. Providing this enables automatic log retrieval from S3 and system table information retrieval (which allows query start and end times to be extracted, rather than just record times)
+master_username: "awsuser" # Required only if source_cluster_endpoint is given.
+
+odbc_driver: "" # Required only if extraction using ODBC is preferred and installed. Otherwise psql is used.
+
+start_time: "" # Optional - Suggested. Start time of the workload to be extracted, e.g. 2020-06-14T21:41:16+00:00
+end_time: "" # Optional - Suggested. End time of the workload to be extracted, e.g. 2020-06-14T21:41:16+00:00
+
+log_location: "" # Leave blank to automatically retrieve audit logs from the source cluster. Otherwise, an S3 or local location containing the audit logs is required.
+
+unload_system_table_queries: "unload_system_tables.sql" # Location of the SQL file containing queries to unload system tables
+source_cluster_system_table_unload_location: "" # If unspecified, system tables will be unloaded to workload_location
+source_cluster_system_table_unload_iam_role: "" # If an IAM role is provided, UNLOAD will occur. If this is blank, UNLOAD of system tables will not occur.

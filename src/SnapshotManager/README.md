@@ -1,10 +1,34 @@
 # Amazon Redshift Snapshot Manager
 
+__Please NOTE that this utility is now deprecated, and you should use the [native Redshift Snapshot Scheduler](https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-snapshots.html#working-with-snapshot-scheduling) instead.__
+
 Amazon Redshift is a fast, fully managed, petabyte-scale data warehouse that makes it simple and cost-effective to analyze all your data using your existing business intelligence tools. A Redshift cluster is automatically backed up to Amazon S3 by default, and 3 automatic snapshots of the cluster are retained for 24 hours. You can also convert these automatic snapshots to 'manual', which means they are kept forever. You can restore manual snapshots into new clusters at any time, or you can use them to do table restores, without having to use any third-party backup/recovery software. Snapshots are incremental, which means they only store the changes made since the last snapshot was taken, and are very space efficient.
 
 This module gives you the ability to coordinate the Automatic Snapshot mechanism in your Amazon Redshift Clusters so that you can meet fine grained backup requirements. You don't have to write any code or manage any servers; all execution is done within [AWS Lambda](https://aws.amazon.com/lambda), and scheduled with [Amazon CloudWatch Events](http://docs.aws.amazon.com/AmazonCloudWatch/latest/DeveloperGuide/WhatIsCloudWatchEvents.html).
 
 ![Architecture Diagram](Diagram.png)
+
+_This codebase is now deprecated in favour of using native Redshift Snapshot Schedules. We will continue to maintain this code and fix bugs, but would highly recommend you consider using the following native API's:_
+
+* __CreateSnapshotSchedule__: https://docs.aws.amazon.com/redshift/latest/APIReference/API_CreateSnapshotSchedule.html  
+* __DescribeSnapshotSchedules__: https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeSnapshotSchedules.html
+* __ModifyClusterSnapshotSchedule__: https://docs.aws.amazon.com/redshift/latest/APIReference/API_ModifyClusterSnapshotSchedule.html
+* __DescribeStorage__: https://docs.aws.amazon.com/redshift/latest/APIReference/API_DescribeStorage.html
+
+For example, using the [aws-cli](https://aws.amazon.com/cli), you can create a schedule that creates snapshots every 4 hours:
+
+```
+aws redshift create-snapshot-schedule --schedule-definitions "rate(4 hours)" --schedule-identifier every-4-hours --schedule-description "4 hour snapshots"
+aws redshift modify-cluster-snapshot-schedule --schedule-identifier every-4-hours --cluster-id <my-cluster-id>
+```
+
+You could then delete old snapshots with:
+
+```
+for snap in `aws redshift describe-cluster-snapshots --cluster-identifier <my-cluster-id> --start-time <begin-retetion-period> --end-time <end-retetion-period> --query Snapshots[*].SnapshotIdentifier --output text` ; do
+    aws redshift delete-cluster-snapshot --snapshot-identifier $snap
+done
+```
 
 ## Addressing your Disaster Recovery requirements
 
@@ -45,7 +69,7 @@ You can deploy this AWS Lambda function by hand using the AWS Console or Command
 |ap-southeast-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-ap-southeast-1.amazonaws.com/awslabs-code-ap-southeast-1/RedshiftSnapshotManager/deploy.yaml) |
 |ap-southeast-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=ap-southeast-2#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-ap-southeast-2.amazonaws.com/awslabs-code-ap-southeast-2/RedshiftSnapshotManager/deploy.yaml) |
 |eu-central-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=eu-central-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-eu-central-1.amazonaws.com/awslabs-code-eu-central-1/RedshiftSnapshotManager/deploy.yaml) |
-|us-east-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-us-east-1.amazonaws.com/awslabs-code-us-east-1/RedshiftSnapshotManager/deploy.yaml) |
+|us-east-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3.amazonaws.com/awslabs-code-us-east-1/RedshiftSnapshotManager/deploy.yaml) |
 |us-east-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-east-2#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-us-east-2.amazonaws.com/awslabs-code-us-east-2/RedshiftSnapshotManager/deploy.yaml) |
 |us-west-1 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-1#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-us-west-1.amazonaws.com/awslabs-code-us-west-1/RedshiftSnapshotManager/deploy.yaml) |
 |us-west-2 |  [<img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png">](https://console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/new?stackName=RedshiftSnapshotManager&templateURL=https://s3-us-west-2.amazonaws.com/awslabs-code-us-west-2/RedshiftSnapshotManager/deploy.yaml) |
@@ -84,6 +108,17 @@ Once running, you will see that existing automatic snapshots, or new manual snap
 
 
 __Only snapshots which are tagged using this scheme will be deleted by this utility - other snapshots are not affected.__ You can review the Lambda function's CloudWatch Log Streams for execution details, which include output about what the function is doing.
+
+## Networking
+
+This utility only connects to the Redshift service on your behalf, and doesn't require any access to your Redshift clusters. You therefore have 2 options for networking this function in your account:
+
+1. Run outside of VPC: in this model, your Lambda functions will run in your account, not using VPC, and will connect to AWS public services directly
+2. Run inside of VPC: in this model, your Lambda functions must run in a private Subnet which route to the internet via a NAT Gateway. [This article](https://aws.amazon.com/premiumsupport/knowledge-center/internet-access-lambda-function) gives you step-by-step instructions to set up this configuration.
+
+If you misconfigure the networking for your deployment, then you will observe that the functions try to run, but never end up returning from a call to the Redshift services. This is because while the function may be able to talk to the Redshift endpoints, the return traffic cannot be routed to your container without a NAT in front. For more information, please consult [this reference architecture](https://github.com/aws-samples/aws-dbs-refarch-edw/tree/master/src/lambda-connections).
+
+![Networking](networking.png)
 
 ## Making Changes
 

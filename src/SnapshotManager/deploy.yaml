@@ -39,7 +39,6 @@ Parameters:
     Description: Interval between Snapshots
     Type: Number
     MinValue: 1
-    MaxValue: 8
   TargetClusterName:
     Default: mycluster
     Description: Target Cluster Name (for example 'mycluster' in 'mycluster.XXXXXX.region.redshift.amazonaws.com')
@@ -89,7 +88,7 @@ Resources:
       Runtime: nodejs8.10
       CodeUri:
         Bucket: !Sub awslabs-code-${AWS::Region}
-        Key: RedshiftSnapshotManager/RedshiftSnapshotManager-1.1.1.zip
+        Key: RedshiftSnapshotManager/RedshiftSnapshotManager-1.2.0.zip
       MemorySize: 192
       Timeout: 300
       Tags:

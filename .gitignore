@@ -59,14 +59,9 @@ target/
 # Virtual environments
 venv/
 .venv/
-src/AdminViews/.DS_Store
-src/.DS_Store
-src/metadatatransfer/.DS_Store
-src/metadatatransfer/.idea/metadatatransfer.iml
-src/metadatatransfer/.idea/misc.xml
-*.xml
-.DS_Store
 
-*.iml
-Redshift_DBA_Commands.pptx
-src/metadatatransfer/dbconstring.py
+# IDE's
+.project
+.idea
+.DS_Store
+src/.DS_Store
