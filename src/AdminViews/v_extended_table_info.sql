@@ -26,6 +26,7 @@ last_scan: last time the table was scanned
 Notes:
 History:
 2016-09-12 chriz-bigdata created
+2020-11-18 maryna-popova added case for auto distkeys 
 **********************************************************************************************/
 
 CREATE OR REPLACE VIEW admin.v_extended_table_info AS
@@ -130,7 +131,7 @@ stp AS
 ),
 cluster_info AS
 (
-  SELECT COUNT(DISTINCT node) node_count FROM stv_slices
+  SELECT COUNT(DISTINCT node) node_count FROM stv_slices where type = 'D'
 )
 SELECT ti.database,
        ti.table_id,
@@ -140,10 +141,10 @@ SELECT ti.database,
        pcon.fk,
        ti.max_varchar,
        CASE
-         WHEN ti.diststyle NOT IN ('EVEN','ALL') THEN ti.diststyle || ': ' || ti.skew_rows
+         WHEN ti.diststyle NOT IN ('EVEN','ALL', 'AUTO(EVEN)', 'AUTO(ALL)') THEN ti.diststyle || ': ' || ti.skew_rows
          ELSE ti.diststyle
        END AS diststyle,
-       CASE
+      CASE
          WHEN ti.sortkey1 IS NOT NULL AND ti.sortkey1_enc IS NOT NULL THEN ti.sortkey1 || '(' || nvl (skew_sortkey1,0) || ')'
          WHEN ti.sortkey1 IS NOT NULL THEN ti.sortkey1
          ELSE NULL
@@ -151,16 +152,16 @@ SELECT ti.database,
        ti.size || '/' || CASE
          WHEN stp.sum_r = stp.sum_sr OR stp.sum_sr = 0 THEN
            CASE
-             WHEN ("diststyle" = 'EVEN' OR "diststyle"='AUTO(EVEN)') THEN (stp.pop_slices*(colenc.cols + 3))
+             WHEN "diststyle" in ('EVEN', 'AUTO(EVEN)')  THEN (stp.pop_slices*(colenc.cols + 3))
              WHEN SUBSTRING("diststyle",1,3) = 'KEY' THEN (stp.pop_slices*(colenc.cols + 3))
-             WHEN ("diststyle" = 'ALL'  OR "diststyle"='AUTO(ALL)') THEN (cluster_info.node_count*(colenc.cols + 3))           
-            END 
+             WHEN "diststyle" in ('AUTO(ALL)', 'ALL')  THEN (cluster_info.node_count*(colenc.cols + 3))
+           END 
          ELSE
            CASE
-             WHEN ( "diststyle" = 'EVEN' OR "diststyle"='AUTO(EVEN)')  THEN (stp.pop_slices*(colenc.cols + 3)*2)
+             WHEN "diststyle" in ('EVEN', 'AUTO(EVEN)')  THEN (stp.pop_slices*(colenc.cols + 3)*2)
              WHEN SUBSTRING("diststyle",1,3) = 'KEY' THEN (stp.pop_slices*(colenc.cols + 3)*2)
-             WHEN ( "diststyle" = 'ALL' OR "diststyle"='AUTO(ALL)') THEN (cluster_info.node_count*(colenc.cols + 3)*2)           
-            END 
+             WHEN "diststyle" in ('AUTO(ALL)', 'ALL') THEN (cluster_info.node_count*(colenc.cols + 3)*2)
+           END 
          END|| ' (' || ti.pct_used || ')' AS size,
          ti.tbl_rows,
          ti.unsorted,
@@ -176,3 +177,4 @@ LEFT JOIN scan_alerts ON scan_alerts.table = ti.table_id
 CROSS JOIN cluster_info 
 WHERE ti.SCHEMA NOT IN ('pg_internal') 
 ORDER BY ti.pct_used DESC;
+                                                                                      

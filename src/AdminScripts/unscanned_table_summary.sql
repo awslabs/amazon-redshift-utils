@@ -16,55 +16,64 @@ truely unscanned over longer periods of time.
 
 History:
 2016-01-18 chriz-bigdata created
+2020-11-17 marynap chnaged storage calculation, showing data per cluster  
 **********************************************************************************************/
+
 WITH
-    nodes AS (SELECT COUNT(DISTINCT node) nodenum FROM stv_slices),
-    slices AS (SELECT COUNT(DISTINCT slice) slices FROM stv_slices s WHERE node=0),
-    disks AS (SELECT COUNT(p.owner) disks FROM stv_partitions p WHERE p.owner=0),
-    storage AS (
-        SELECT 
-            nodes.nodenum * (CASE 
-                WHEN slices.slices = 32 THEN 2.56
-                WHEN slices.slices = 16 THEN 16.00
-                WHEN disks.disks > 2 THEN 2
-                ELSE 0.16 END) AS total_storage
-        FROM 
-            nodes, slices, disks), 
+        nodes AS (SELECT COUNT(DISTINCT node) nodenum FROM stv_slices WHERE TYPE = 'D'), 
+        storage as (SELECT  nodes.nodenum * ( CASE 
+            WHEN capacity IN (381407, 190633, 361859)
+                THEN 160.0 / 1024
+            WHEN capacity IN (380319, 760956)
+                THEN 2.56 
+            WHEN capacity IN (1906314, 952455)
+                THEN 2 
+            WHEN capacity = 945026
+                THEN 16 
+            WHEN capacity = 3339176
+                THEN 64 
+            ELSE NULL
+            END::decimal(7,2)) AS total_storage
+    FROM stv_partitions, nodes
+    WHERE part_begin = 0
+        AND failed = 0 
+        group by 1
+        ), 
     table_scans AS (
         SELECT 
-            database, 
-            schema, 
-            table_id, 
-            "table", 
-            ROUND(size::float/(1024*1024)::float,2) AS size, 
-            sortkey1, 
-            NVL(s.num_qs,0) num_qs
-        FROM svv_table_info t
-        LEFT JOIN (
-            SELECT
-                tbl, 
-                perm_table_name,
-                COUNT(DISTINCT query) num_qs
-            FROM
-                stl_scan s
-            WHERE 
-                s.userid > 1
-                AND s.perm_table_name NOT IN ('Internal Worktable','S3')
-            GROUP BY 
-                tbl, perm_table_name) s ON s.tbl = t.table_id
-	WHERE t."schema" NOT IN ('pg_internal')),
+            tbl,
+            COUNT(DISTINCT query) num_qs 
+        FROM 
+            stl_scan s 
+        WHERE 
+            s.userid > 1 
+            AND s.type = 2 
+        GROUP BY 
+            tbl),
+    table_sizes AS (
+        SELECT 
+            tbl,
+            count(*)/1024.0/1024.0 AS size 
+        FROM stv_blocklist 
+        GROUP BY 
+            tbl
+        ),
     scan_aggs AS (
         SELECT 
-            sum(size) AS total_table_size,
-            count(*) AS total_table_num,
-            SUM(CASE WHEN num_qs = 0 THEN 1 ELSE 0 END) AS num_unscanned_tables,
-            SUM(CASE WHEN num_qs = 0 THEN size ELSE 0 END) AS size_unscanned_tables,
-            storage.total_storage
-        FROM
-            table_scans, storage GROUP BY total_storage)
+            ROUND(SUM(tz.size),2) total_table_size,
+            COUNT(stvp.id) AS total_table_num,
+            SUM(NVL2(ts.num_qs, 0, 1)) AS num_unscanned_tables,
+            ROUND(SUM(NVL2(ts.num_qs, 0, tz.size)),2) AS size_unscanned_tables 
+        FROM 
+        (SELECT 
+            id 
+        FROM stv_tbl_perm 
+        GROUP BY 
+            id) stvp
+        LEFT JOIN table_sizes tz ON stvp.id = tz.tbl
+        LEFT JOIN table_scans ts ON stvp.id = ts.tbl)
 SELECT
-    total_table_num || ' total tables @ ' || total_table_size || 'TB / ' || total_storage || 'TB (' || ROUND(100*(total_table_size::float/total_storage::float),1) || '%)' AS total_table_storage,
-    num_unscanned_tables || ' unscanned tables @ ' || size_unscanned_tables || 'TB / ' || total_storage || 'TB (' || ROUND(100*(size_unscanned_tables::float/total_storage::float),1) || '%)' AS unscanned_table_storage
+    total_table_num || ' total tables @ ' || total_table_size || 'TB / ' || total_storage || 'TB (' || ROUND(100.0*total_table_size/total_storage,2) || '%)' AS total_table_storage,
+    num_unscanned_tables || ' unscanned tables @ ' || size_unscanned_tables || 'TB / ' || total_storage || 'TB (' || ROUND(100.0*size_unscanned_tables/total_storage,2) || '%)' AS unscanned_table_storage
 FROM
-    scan_aggs;
-
+    scan_aggs,storage;

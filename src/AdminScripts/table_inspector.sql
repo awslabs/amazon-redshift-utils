@@ -1,4 +1,4 @@
-/*
+/***********************************************************************************************
 
 Table Skew Inspector. Please see http://docs.aws.amazon.com/redshift/latest/dg/c_analyzing-table-design.html
 for more information.
@@ -9,14 +9,14 @@ Notes:
 History:
 2015-11-26 meyersi created
 2016-09-13 chriz-bigdata rewrote to simplify and align with documentation
-
-*/
+2020-11-18 maryna-popova changed distkey to take 'AUTO' into account
+***********************************************************************************************/
 SELECT SCHEMA schemaname,
        "table" tablename,
        table_id tableid,
        size size_in_mb,
        CASE
-         WHEN diststyle NOT IN ('EVEN','ALL') THEN 1
+         WHEN diststyle ilike 'KEY%' THEN 1
          ELSE 0
        END has_dist_key,
        CASE
@@ -28,7 +28,7 @@ SELECT SCHEMA schemaname,
          ELSE 0
        END has_col_encoding,
        ROUND(100*CAST(max_blocks_per_slice - min_blocks_per_slice AS FLOAT) / GREATEST(NVL (min_blocks_per_slice,0)::int,1),2) ratio_skew_across_slices,
-       ROUND(CAST(100*dist_slice AS FLOAT) /(SELECT COUNT(DISTINCT slice) FROM stv_slices),2) pct_slices_populated
+       ROUND(CAST(100*dist_slice AS FLOAT) /(SELECT COUNT(DISTINCT slice) FROM stv_slices where type = 'D'),2) pct_slices_populated
 FROM svv_table_info ti
   JOIN (SELECT tbl,
                MIN(c) min_blocks_per_slice,
