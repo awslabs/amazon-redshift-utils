@@ -12,7 +12,7 @@ select /* TPC-DS query15.tpl 0.57 */  ca_zip
  	      or ca_state in ('CA','WA','GA')
  	      or cs_sales_price > 500)
  	and cs_sold_date_sk = d_date_sk
- 	and d_qoy = 1 and d_year = 2002
+ 	and d_qoy = 1 and d_year = 2000
  group by ca_zip
  order by ca_zip
  limit 100;
@@ -32,13 +32,13 @@ with /* TPC-DS query60.tpl 0.29 */ ss as (
   i_item_id
 from
  item
-where i_category in ('Shoes'))
+where i_category in ('Men'))
  and     ss_item_sk              = i_item_sk
  and     ss_sold_date_sk         = d_date_sk
- and     d_year                  = 1998
- and     d_moy                   = 9
+ and     d_year                  = 2001
+ and     d_moy                   = 10
  and     ss_addr_sk              = ca_address_sk
- and     ca_gmt_offset           = -6 
+ and     ca_gmt_offset           = -5 
  group by i_item_id),
  cs as (
  select
@@ -53,13 +53,13 @@ where i_category in ('Shoes'))
   i_item_id
 from
  item
-where i_category in ('Shoes'))
+where i_category in ('Men'))
  and     cs_item_sk              = i_item_sk
  and     cs_sold_date_sk         = d_date_sk
- and     d_year                  = 1998
- and     d_moy                   = 9
+ and     d_year                  = 2001
+ and     d_moy                   = 10
  and     cs_bill_addr_sk         = ca_address_sk
- and     ca_gmt_offset           = -6 
+ and     ca_gmt_offset           = -5 
  group by i_item_id),
  ws as (
  select
@@ -74,13 +74,13 @@ where i_category in ('Shoes'))
   i_item_id
 from
  item
-where i_category in ('Shoes'))
+where i_category in ('Men'))
  and     ws_item_sk              = i_item_sk
  and     ws_sold_date_sk         = d_date_sk
- and     d_year                  = 1998
- and     d_moy                   = 9
+ and     d_year                  = 2001
+ and     d_moy                   = 10
  and     ws_bill_addr_sk         = ca_address_sk
- and     ca_gmt_offset           = -6
+ and     ca_gmt_offset           = -5
  group by i_item_id)
   select   
   i_item_id
@@ -116,7 +116,7 @@ from
   ,web_site
   ,date_dim
 where
-    d_month_seq between 1182 and 1182 + 11
+    d_month_seq between 1217 and 1217 + 11
 and ws_ship_date_sk   = d_date_sk
 and ws_warehouse_sk   = w_warehouse_sk
 and ws_ship_mode_sk   = sm_ship_mode_sk
@@ -137,14 +137,14 @@ with /* TPC-DS query74.tpl 0.76 */ year_total as (
        ,c_first_name customer_first_name
        ,c_last_name customer_last_name
        ,d_year as year
-       ,sum(ss_net_paid) year_total
+       ,avg(ss_net_paid) year_total
        ,'s' sale_type
  from customer
      ,store_sales
      ,date_dim
  where c_customer_sk = ss_customer_sk
    and ss_sold_date_sk = d_date_sk
-   and d_year in (2001,2001+1)
+   and d_year in (2000,2000+1)
  group by c_customer_id
          ,c_first_name
          ,c_last_name
@@ -154,14 +154,14 @@ with /* TPC-DS query74.tpl 0.76 */ year_total as (
        ,c_first_name customer_first_name
        ,c_last_name customer_last_name
        ,d_year as year
-       ,sum(ws_net_paid) year_total
+       ,avg(ws_net_paid) year_total
        ,'w' sale_type
  from customer
      ,web_sales
      ,date_dim
  where c_customer_sk = ws_bill_customer_sk
    and ws_sold_date_sk = d_date_sk
-   and d_year in (2001,2001+1)
+   and d_year in (2000,2000+1)
  group by c_customer_id
          ,c_first_name
          ,c_last_name
@@ -180,15 +180,15 @@ with /* TPC-DS query74.tpl 0.76 */ year_total as (
          and t_w_firstyear.sale_type = 'w'
          and t_s_secyear.sale_type = 's'
          and t_w_secyear.sale_type = 'w'
-         and t_s_firstyear.year = 2001
-         and t_s_secyear.year = 2001+1
-         and t_w_firstyear.year = 2001
-         and t_w_secyear.year = 2001+1
+         and t_s_firstyear.year = 2000
+         and t_s_secyear.year = 2000+1
+         and t_w_firstyear.year = 2000
+         and t_w_secyear.year = 2000+1
          and t_s_firstyear.year_total > 0
          and t_w_firstyear.year_total > 0
          and case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else null end
            > case when t_s_firstyear.year_total > 0 then t_s_secyear.year_total / t_s_firstyear.year_total else null end
- order by 1,2,3
+ order by 2,3,1
 limit 100;
 
 -- end template query74.tpl query 4 in stream 9
@@ -201,7 +201,7 @@ with /* TPC-DS query81.tpl 0.37 */ customer_total_return as
      ,date_dim
      ,customer_address
  where cr_returned_date_sk = d_date_sk 
-   and d_year =1998
+   and d_year =2002
    and cr_returning_addr_sk = ca_address_sk 
  group by cr_returning_customer_sk
          ,ca_state )
@@ -215,7 +215,7 @@ with /* TPC-DS query81.tpl 0.37 */ customer_total_return as
  			  from customer_total_return ctr2 
                   	  where ctr1.ctr_state = ctr2.ctr_state)
        and ca_address_sk = c_current_addr_sk
-       and ca_state = 'AK'
+       and ca_state = 'TX'
        and ctr1.ctr_customer_sk = c_customer_sk
  order by c_customer_id,c_salutation,c_first_name,c_last_name,ca_street_number,ca_street_name
                    ,ca_street_type,ca_suite_number,ca_city,ca_county,ca_state,ca_zip,ca_country,ca_gmt_offset
@@ -233,9 +233,9 @@ from
      and ss_store_sk = s_store_sk
      and time_dim.t_hour = 8
      and time_dim.t_minute >= 30
-     and ((household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
-          (household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2)) 
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2)) 
      and store.s_store_name = 'ese') s1,
  (select count(*) h9_to_9_30 
  from store_sales, household_demographics , time_dim, store
@@ -244,9 +244,9 @@ from
      and ss_store_sk = s_store_sk 
      and time_dim.t_hour = 9 
      and time_dim.t_minute < 30
-     and ((household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
-          (household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2))
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
      and store.s_store_name = 'ese') s2,
  (select count(*) h9_30_to_10 
  from store_sales, household_demographics , time_dim, store
@@ -255,9 +255,9 @@ from
      and ss_store_sk = s_store_sk
      and time_dim.t_hour = 9
      and time_dim.t_minute >= 30
-     and ((household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
-          (household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2))
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
      and store.s_store_name = 'ese') s3,
  (select count(*) h10_to_10_30
  from store_sales, household_demographics , time_dim, store
@@ -266,9 +266,9 @@ from
      and ss_store_sk = s_store_sk
      and time_dim.t_hour = 10 
      and time_dim.t_minute < 30
-     and ((household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
-          (household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2))
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
      and store.s_store_name = 'ese') s4,
  (select count(*) h10_30_to_11
  from store_sales, household_demographics , time_dim, store
@@ -277,9 +277,9 @@ from
      and ss_store_sk = s_store_sk
      and time_dim.t_hour = 10 
      and time_dim.t_minute >= 30
-     and ((household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
-          (household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2))
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
      and store.s_store_name = 'ese') s5,
  (select count(*) h11_to_11_30
  from store_sales, household_demographics , time_dim, store
@@ -288,9 +288,9 @@ from
      and ss_store_sk = s_store_sk 
      and time_dim.t_hour = 11
      and time_dim.t_minute < 30
-     and ((household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
-          (household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2))
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
      and store.s_store_name = 'ese') s6,
  (select count(*) h11_30_to_12
  from store_sales, household_demographics , time_dim, store
@@ -299,9 +299,9 @@ from
      and ss_store_sk = s_store_sk
      and time_dim.t_hour = 11
      and time_dim.t_minute >= 30
-     and ((household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
-          (household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2))
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
      and store.s_store_name = 'ese') s7,
  (select count(*) h12_to_12_30
  from store_sales, household_demographics , time_dim, store
@@ -310,9 +310,9 @@ from
      and ss_store_sk = s_store_sk
      and time_dim.t_hour = 12
      and time_dim.t_minute < 30
-     and ((household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2) or
-          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
-          (household_demographics.hd_dep_count = 4 and household_demographics.hd_vehicle_count<=4+2))
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
      and store.s_store_name = 'ese') s8
 ;
 
@@ -345,7 +345,7 @@ from
   ,date_dim d2
 where
     d2.d_year = 2000
-and d2.d_moy  = 8
+and d2.d_moy  = 9
 and ss_ticket_number = sr_ticket_number
 and ss_item_sk = sr_item_sk
 and ss_sold_date_sk   = d1.d_date_sk
@@ -403,8 +403,8 @@ with /* TPC-DS query5a.tpl 0.98 */ ssr as
      date_dim,
      store
  where date_sk = d_date_sk
-       and d_date between cast('2002-08-22' as date) 
-                  and dateadd(day,14,cast('2002-08-22' as date))
+       and d_date between cast('2001-08-26' as date) 
+                  and dateadd(day,14,cast('2001-08-26' as date))
        and store_sk = s_store_sk
  group by s_store_id)
  ,
@@ -434,8 +434,8 @@ with /* TPC-DS query5a.tpl 0.98 */ ssr as
      date_dim,
      catalog_page
  where date_sk = d_date_sk
-       and d_date between cast('2002-08-22' as date)
-                  and dateadd(day,14,cast('2002-08-22' as date))
+       and d_date between cast('2001-08-26' as date)
+                  and dateadd(day,14,cast('2001-08-26' as date))
        and page_sk = cp_catalog_page_sk
  group by cp_catalog_page_id)
  ,
@@ -467,8 +467,8 @@ with /* TPC-DS query5a.tpl 0.98 */ ssr as
      date_dim,
      web_site
  where date_sk = d_date_sk
-       and d_date between cast('2002-08-22' as date)
-                  and dateadd(day,14,cast('2002-08-22' as date))
+       and d_date between cast('2001-08-26' as date)
+                  and dateadd(day,14,cast('2001-08-26' as date))
        and wsr_web_site_sk = web_site_sk
  group by web_site_id)
  ,
@@ -520,10 +520,10 @@ select /* TPC-DS query84.tpl 0.80 */  c_customer_id as customer_id
      ,household_demographics
      ,income_band
      ,store_returns
- where ca_city	        =  'Union Hill'
+ where ca_city	        =  'Liberty'
    and c_current_addr_sk = ca_address_sk
-   and ib_lower_bound   >=  26731
-   and ib_upper_bound   <=  26731 + 50000
+   and ib_lower_bound   >=  15765
+   and ib_upper_bound   <=  15765 + 50000
    and ib_income_band_sk = hd_income_band_sk
    and cd_demo_sk = c_current_cdemo_sk
    and hd_demo_sk = c_current_hdemo_sk
@@ -540,7 +540,7 @@ with /* TPC-DS query1.tpl 0.12 */ customer_total_return as
 from store_returns
 ,date_dim
 where sr_returned_date_sk = d_date_sk
-and d_year =1999
+and d_year =2001
 group by sr_customer_sk
 ,sr_store_sk)
  select  c_customer_id
@@ -551,7 +551,7 @@ where ctr1.ctr_total_return > (select avg(ctr_total_return)*1.2
 from customer_total_return ctr2
 where ctr1.ctr_store_sk = ctr2.ctr_store_sk)
 and s_store_sk = ctr1.ctr_store_sk
-and s_state = 'OH'
+and s_state = 'ME'
 and ctr1.ctr_customer_sk = c_customer_sk
 order by c_customer_id
 limit 100;
@@ -568,8 +568,8 @@ select /* TPC-DS query52.tpl 0.59 */  dt.d_year
  where dt.d_date_sk = store_sales.ss_sold_date_sk
     and store_sales.ss_item_sk = item.i_item_sk
     and item.i_manager_id = 1
-    and dt.d_moy=11
-    and dt.d_year=1999
+    and dt.d_moy=12
+    and dt.d_year=2000
  group by dt.d_year
  	,item.i_brand
  	,item.i_brand_id
@@ -598,14 +598,14 @@ with /* TPC-DS query57.tpl 0.70 */ v1 as(
        cs_sold_date_sk = d_date_sk and
        cc_call_center_sk= cs_call_center_sk and
        (
-         d_year = 2000 or
-         ( d_year = 2000-1 and d_moy =12) or
-         ( d_year = 2000+1 and d_moy =1)
+         d_year = 1999 or
+         ( d_year = 1999-1 and d_moy =12) or
+         ( d_year = 1999+1 and d_moy =1)
        )
  group by i_category, i_brand,
           cc_name , d_year, d_moy),
  v2 as(
- select v1.cc_name
+ select v1.i_brand
         ,v1.d_year
         ,v1.avg_monthly_sales
         ,v1.sum_sales, v1_lag.sum_sales psum, v1_lead.sum_sales nsum
@@ -620,10 +620,10 @@ with /* TPC-DS query57.tpl 0.70 */ v1 as(
        v1.rn = v1_lead.rn - 1)
   select  *
  from v2
- where  d_year = 2000 and
+ where  d_year = 1999 and
         avg_monthly_sales > 0 and
         case when avg_monthly_sales > 0 then abs(sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
- order by sum_sales - avg_monthly_sales, psum
+ order by sum_sales - avg_monthly_sales, sum_sales
  limit 100;
 
 -- end template query57.tpl query 12 in stream 9
@@ -642,38 +642,38 @@ select /* TPC-DS query13.tpl 0.91 */ avg(ss_quantity)
  and  ss_sold_date_sk = d_date_sk and d_year = 2001
  and((ss_hdemo_sk=hd_demo_sk
   and cd_demo_sk = ss_cdemo_sk
-  and cd_marital_status = 'M'
-  and cd_education_status = 'Primary'
+  and cd_marital_status = 'D'
+  and cd_education_status = 'Unknown'
   and ss_sales_price between 100.00 and 150.00
   and hd_dep_count = 3   
      )or
      (ss_hdemo_sk=hd_demo_sk
   and cd_demo_sk = ss_cdemo_sk
-  and cd_marital_status = 'W'
+  and cd_marital_status = 'U'
   and cd_education_status = 'Secondary'
   and ss_sales_price between 50.00 and 100.00   
   and hd_dep_count = 1
      ) or 
      (ss_hdemo_sk=hd_demo_sk
   and cd_demo_sk = ss_cdemo_sk
-  and cd_marital_status = 'S'
+  and cd_marital_status = 'M'
   and cd_education_status = 'Advanced Degree'
   and ss_sales_price between 150.00 and 200.00 
   and hd_dep_count = 1  
      ))
  and((ss_addr_sk = ca_address_sk
   and ca_country = 'United States'
-  and ca_state in ('FL', 'AL', 'KS')
+  and ca_state in ('WV', 'MD', 'IA')
   and ss_net_profit between 100 and 200  
      ) or
      (ss_addr_sk = ca_address_sk
   and ca_country = 'United States'
-  and ca_state in ('LA', 'VT', 'MT')
+  and ca_state in ('NH', 'IN', 'AZ')
   and ss_net_profit between 150 and 300  
      ) or
      (ss_addr_sk = ca_address_sk
   and ca_country = 'United States'
-  and ca_state in ('WV', 'OH', 'TX')
+  and ca_state in ('TX', 'GA', 'MN')
   and ss_net_profit between 50 and 250  
      ))
 ;
@@ -691,7 +691,7 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
      ,date_dim d1
  where ss_item_sk = iss.i_item_sk
    and ss_sold_date_sk = d1.d_date_sk
-   and d1.d_year between 2000 AND 2000 + 2
+   and d1.d_year between 1999 AND 1999 + 2
  intersect 
  select ics.i_brand_id
      ,ics.i_class_id
@@ -701,7 +701,7 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
      ,date_dim d2
  where cs_item_sk = ics.i_item_sk
    and cs_sold_date_sk = d2.d_date_sk
-   and d2.d_year between 2000 AND 2000 + 2
+   and d2.d_year between 1999 AND 1999 + 2
  intersect
  select iws.i_brand_id
      ,iws.i_class_id
@@ -711,7 +711,7 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
      ,date_dim d3
  where ws_item_sk = iws.i_item_sk
    and ws_sold_date_sk = d3.d_date_sk
-   and d3.d_year between 2000 AND 2000 + 2) x
+   and d3.d_year between 1999 AND 1999 + 2) x
  where i_brand_id = brand_id
       and i_class_id = class_id
       and i_category_id = category_id
@@ -723,21 +723,21 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
        from store_sales
            ,date_dim
        where ss_sold_date_sk = d_date_sk
-         and d_year between 2000 and 2000 + 2 
+         and d_year between 1999 and 1999 + 2 
        union all 
        select cs_quantity quantity 
              ,cs_list_price list_price
        from catalog_sales
            ,date_dim
        where cs_sold_date_sk = d_date_sk
-         and d_year between 2000 and 2000 + 2 
+         and d_year between 1999 and 1999 + 2 
        union all
        select ws_quantity quantity
              ,ws_list_price list_price
        from web_sales
            ,date_dim
        where ws_sold_date_sk = d_date_sk
-         and d_year between 2000 and 2000 + 2) x)
+         and d_year between 1999 and 1999 + 2) x)
 ,
   results AS
 (select channel, i_brand_id, i_class_id, i_category_id, sum(sales) sum_sales, sum(number_sales) number_sales
@@ -751,7 +751,7 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
        where ss_item_sk in (select ss_item_sk from cross_items)
          and ss_item_sk = i_item_sk
          and ss_sold_date_sk = d_date_sk
-         and d_year = 2000+2 
+         and d_year = 1999+2 
          and d_moy = 11
        group by i_brand_id,i_class_id,i_category_id
        having sum(ss_quantity*ss_list_price) > (select average_sales from avg_sales)
@@ -763,7 +763,7 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
        where cs_item_sk in (select ss_item_sk from cross_items)
          and cs_item_sk = i_item_sk
          and cs_sold_date_sk = d_date_sk
-         and d_year = 2000+2 
+         and d_year = 1999+2 
          and d_moy = 11
        group by i_brand_id,i_class_id,i_category_id
        having sum(cs_quantity*cs_list_price) > (select average_sales from avg_sales)
@@ -775,7 +775,7 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
        where ws_item_sk in (select ss_item_sk from cross_items)
          and ws_item_sk = i_item_sk
          and ws_sold_date_sk = d_date_sk
-         and d_year = 2000+2
+         and d_year = 1999+2
          and d_moy = 11
        group by i_brand_id,i_class_id,i_category_id
        having sum(ws_quantity*ws_list_price) > (select average_sales from avg_sales)
@@ -809,7 +809,7 @@ with  /* TPC-DS query14a.tpl 0.69 part2 */ cross_items as
      ,date_dim d1
  where ss_item_sk = iss.i_item_sk
    and ss_sold_date_sk = d1.d_date_sk
-   and d1.d_year between 2000 AND 2000 + 2
+   and d1.d_year between 1999 AND 1999 + 2
  intersect
  select ics.i_brand_id
      ,ics.i_class_id
@@ -819,7 +819,7 @@ with  /* TPC-DS query14a.tpl 0.69 part2 */ cross_items as
      ,date_dim d2
  where cs_item_sk = ics.i_item_sk
    and cs_sold_date_sk = d2.d_date_sk
-   and d2.d_year between 2000 AND 2000 + 2
+   and d2.d_year between 1999 AND 1999 + 2
  intersect
  select iws.i_brand_id
      ,iws.i_class_id
@@ -829,7 +829,7 @@ with  /* TPC-DS query14a.tpl 0.69 part2 */ cross_items as
      ,date_dim d3
  where ws_item_sk = iws.i_item_sk
    and ws_sold_date_sk = d3.d_date_sk
-   and d3.d_year between 2000 AND 2000 + 2) x
+   and d3.d_year between 1999 AND 1999 + 2) x
  where i_brand_id = brand_id
       and i_class_id = class_id
       and i_category_id = category_id
@@ -841,21 +841,21 @@ with  /* TPC-DS query14a.tpl 0.69 part2 */ cross_items as
        from store_sales
            ,date_dim
        where ss_sold_date_sk = d_date_sk
-         and d_year between 2000 and 2000 + 2
+         and d_year between 1999 and 1999 + 2
        union all
        select cs_quantity quantity
              ,cs_list_price list_price
        from catalog_sales
            ,date_dim
        where cs_sold_date_sk = d_date_sk
-         and d_year between 2000 and 2000 + 2
+         and d_year between 1999 and 1999 + 2
        union all
        select ws_quantity quantity
              ,ws_list_price list_price
        from web_sales
            ,date_dim
        where ws_sold_date_sk = d_date_sk
-         and d_year between 2000 and 2000 + 2) x)
+         and d_year between 1999 and 1999 + 2) x)
   select  this_year.channel ty_channel
                            ,this_year.i_brand_id ty_brand
                            ,this_year.i_class_id ty_class
@@ -879,9 +879,9 @@ from
    and ss_sold_date_sk = d_date_sk
    and d_week_seq = (select d_week_seq
                      from date_dim
-                     where d_year = 2000 + 1
+                     where d_year = 1999 + 1
                        and d_moy = 12
-                       and d_dom = 6)
+                       and d_dom = 8)
  group by i_brand_id,i_class_id,i_category_id
  having sum(ss_quantity*ss_list_price) > (select average_sales from avg_sales)) this_year,
  (select 'store' channel, i_brand_id,i_class_id
@@ -894,9 +894,9 @@ from
    and ss_sold_date_sk = d_date_sk
    and d_week_seq = (select d_week_seq
                      from date_dim
-                     where d_year = 2000
+                     where d_year = 1999
                        and d_moy = 12
-                       and d_dom = 6)
+                       and d_dom = 8)
  group by i_brand_id,i_class_id,i_category_id
  having sum(ss_quantity*ss_list_price) > (select average_sales from avg_sales)) last_year
  where this_year.i_brand_id= last_year.i_brand_id
@@ -913,16 +913,16 @@ select /* TPC-DS query90.tpl 0.40 */  cast(amc as decimal(15,4))/cast(pmc as dec
        where ws_sold_time_sk = time_dim.t_time_sk
          and ws_ship_hdemo_sk = household_demographics.hd_demo_sk
          and ws_web_page_sk = web_page.wp_web_page_sk
-         and time_dim.t_hour between 7 and 7+1
-         and household_demographics.hd_dep_count = 2
+         and time_dim.t_hour between 9 and 9+1
+         and household_demographics.hd_dep_count = 7
          and web_page.wp_char_count between 5000 and 5200) at,
       ( select count(*) pmc
        from web_sales, household_demographics , time_dim, web_page
        where ws_sold_time_sk = time_dim.t_time_sk
          and ws_ship_hdemo_sk = household_demographics.hd_demo_sk
          and ws_web_page_sk = web_page.wp_web_page_sk
-         and time_dim.t_hour between 15 and 15+1
-         and household_demographics.hd_dep_count = 2
+         and time_dim.t_hour between 16 and 16+1
+         and household_demographics.hd_dep_count = 7
          and web_page.wp_char_count between 5000 and 5200) pt
  order by am_pm_ratio
  limit 100;
@@ -940,10 +940,10 @@ select /* TPC-DS query7.tpl 0.2 */  i_item_id,
        ss_cdemo_sk = cd_demo_sk and
        ss_promo_sk = p_promo_sk and
        cd_gender = 'M' and 
-       cd_marital_status = 'S' and
-       cd_education_status = 'Advanced Degree' and
+       cd_marital_status = 'M' and
+       cd_education_status = 'Secondary' and
        (p_channel_email = 'N' or p_channel_event = 'N') and
-       d_year = 2002 
+       d_year = 1999 
  group by i_item_id
  order by i_item_id
  limit 100;
@@ -962,11 +962,11 @@ with /* TPC-DS query27a.tpl 0.16 */ results as
        ss_item_sk = i_item_sk and
        ss_store_sk = s_store_sk and
        ss_cdemo_sk = cd_demo_sk and
-       cd_gender = 'F' and
-       cd_marital_status = 'M' and
-       cd_education_status = 'Primary' and
-       d_year = 2000 and
-       s_state in ('TN','SC', 'IN', 'MN', 'KY', 'TX')
+       cd_gender = 'M' and
+       cd_marital_status = 'W' and
+       cd_education_status = '4 yr Degree' and
+       d_year = 2001 and
+       s_state in ('TN','MN', 'WV', 'IA', 'TX', 'TX')
  )
 
   select  i_item_id,
@@ -994,10 +994,10 @@ from
    ,item 
    ,date_dim
 where
-i_manufact_id = 404
+i_manufact_id = 514
 and i_item_sk = ws_item_sk 
-and d_date between '1998-01-30' and 
-        dateadd(day,90,cast('1998-01-30' as date))
+and d_date between '2001-02-06' and 
+        dateadd(day,90,cast('2001-02-06' as date))
 and d_date_sk = ws_sold_date_sk 
 and ws_ext_discount_amt  
      > ( 
@@ -1008,8 +1008,8 @@ and ws_ext_discount_amt
            ,date_dim
          WHERE 
               ws_item_sk = i_item_sk 
-          and d_date between '1998-01-30' and
-                             dateadd(day,90,cast('1998-01-30' as date))
+          and d_date between '2001-02-06' and
+                             dateadd(day,90,cast('2001-02-06' as date))
           and d_date_sk = ws_sold_date_sk 
       ) 
 order by sum(ws_ext_discount_amt)
@@ -1037,8 +1037,8 @@ select inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy,inv1.mean, inv1.cov
 from inv inv1,inv inv2
 where inv1.i_item_sk = inv2.i_item_sk
   and inv1.w_warehouse_sk =  inv2.w_warehouse_sk
-  and inv1.d_moy=2
-  and inv2.d_moy=2+1
+  and inv1.d_moy=1
+  and inv2.d_moy=1+1
 order by inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy,inv1.mean,inv1.cov
         ,inv2.d_moy,inv2.mean, inv2.cov
 ;
@@ -1062,8 +1062,8 @@ select inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy,inv1.mean, inv1.cov
 from inv inv1,inv inv2
 where inv1.i_item_sk = inv2.i_item_sk
   and inv1.w_warehouse_sk =  inv2.w_warehouse_sk
-  and inv1.d_moy=2
-  and inv2.d_moy=2+1
+  and inv1.d_moy=1
+  and inv2.d_moy=1+1
   and inv1.cov > 1.5
 order by inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy,inv1.mean,inv1.cov
         ,inv2.d_moy,inv2.mean, inv2.cov
@@ -1085,16 +1085,16 @@ select /* TPC-DS query34.tpl 0.73 */ c_last_name
     and store_sales.ss_store_sk = store.s_store_sk  
     and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
     and (date_dim.d_dom between 1 and 3 or date_dim.d_dom between 25 and 28)
-    and (household_demographics.hd_buy_potential = '501-1000' or
-         household_demographics.hd_buy_potential = 'Unknown')
+    and (household_demographics.hd_buy_potential = '1001-5000' or
+         household_demographics.hd_buy_potential = '5001-10000')
     and household_demographics.hd_vehicle_count > 0
     and (case when household_demographics.hd_vehicle_count > 0 
 	then household_demographics.hd_dep_count/ household_demographics.hd_vehicle_count 
 	else null 
 	end)  > 1.2
     and date_dim.d_year in (2000,2000+1,2000+2)
-    and store.s_county in ('Luce County','Anderson County','Maverick County','Morgan County',
-                           'Camden County','Mercer County','Lea County','San Miguel County')
+    and store.s_county in ('Knox County','Suffolk County','Red River Parish','Carter County',
+                           'Murray County','Oglethorpe County','Coal County','Lincoln County')
     group by ss_ticket_number,ss_customer_sk) dn,customer
     where ss_customer_sk = c_customer_sk
       and cnt between 15 and 20
@@ -1105,10 +1105,10 @@ select /* TPC-DS query34.tpl 0.73 */ c_last_name
 select /* TPC-DS query21.tpl 0.14 */  *
  from(select w_warehouse_name
             ,i_item_id
-            ,sum(case when (cast(d_date as date) < cast ('1999-05-28' as date))
+            ,sum(case when (cast(d_date as date) < cast ('2001-05-28' as date))
 	                then inv_quantity_on_hand 
                       else 0 end) as inv_before
-            ,sum(case when (cast(d_date as date) >= cast ('1999-05-28' as date))
+            ,sum(case when (cast(d_date as date) >= cast ('2001-05-28' as date))
                       then inv_quantity_on_hand 
                       else 0 end) as inv_after
    from inventory
@@ -1119,8 +1119,8 @@ select /* TPC-DS query21.tpl 0.14 */  *
      and i_item_sk          = inv_item_sk
      and inv_warehouse_sk   = w_warehouse_sk
      and inv_date_sk    = d_date_sk
-     and d_date between dateadd(day,-30,cast ('1999-05-28' as date))
-                    and dateadd(day,30,cast ('1999-05-28' as date))
+     and d_date between dateadd(day,-30,cast ('2001-05-28' as date))
+                    and dateadd(day,30,cast ('2001-05-28' as date))
    group by w_warehouse_name, i_item_id) x
  where (case when inv_before > 0 
              then inv_after / inv_before 
@@ -1145,12 +1145,12 @@ select /* TPC-DS query65.tpl 0.71 */
  	    (select  ss_store_sk, ss_item_sk, 
  		     sum(ss_sales_price) as revenue
  		from store_sales, date_dim
- 		where ss_sold_date_sk = d_date_sk and d_month_seq between 1224 and 1224+11
+ 		where ss_sold_date_sk = d_date_sk and d_month_seq between 1207 and 1207+11
  		group by ss_store_sk, ss_item_sk) sa
  	group by ss_store_sk) sb,
      (select  ss_store_sk, ss_item_sk, sum(ss_sales_price) as revenue
  	from store_sales, date_dim
- 	where ss_sold_date_sk = d_date_sk and d_month_seq between 1224 and 1224+11
+ 	where ss_sold_date_sk = d_date_sk and d_month_seq between 1207 and 1207+11
  	group by ss_store_sk, ss_item_sk) sc
  where sb.ss_store_sk = sc.ss_store_sk and 
        sc.revenue <= 0.1 * sb.ave and
@@ -1180,7 +1180,7 @@ WITH /* TPC-DS query75.tpl 0.3 */ all_sales AS (
                           JOIN date_dim ON d_date_sk=cs_sold_date_sk
                           LEFT JOIN catalog_returns ON (cs_order_number=cr_order_number 
                                                     AND cs_item_sk=cr_item_sk)
-       WHERE i_category='Books'
+       WHERE i_category='Sports'
        UNION
        SELECT d_year
              ,i_brand_id
@@ -1193,7 +1193,7 @@ WITH /* TPC-DS query75.tpl 0.3 */ all_sales AS (
                         JOIN date_dim ON d_date_sk=ss_sold_date_sk
                         LEFT JOIN store_returns ON (ss_ticket_number=sr_ticket_number 
                                                 AND ss_item_sk=sr_item_sk)
-       WHERE i_category='Books'
+       WHERE i_category='Sports'
        UNION
        SELECT d_year
              ,i_brand_id
@@ -1206,7 +1206,7 @@ WITH /* TPC-DS query75.tpl 0.3 */ all_sales AS (
                       JOIN date_dim ON d_date_sk=ws_sold_date_sk
                       LEFT JOIN web_returns ON (ws_order_number=wr_order_number 
                                             AND ws_item_sk=wr_item_sk)
-       WHERE i_category='Books') sales_detail
+       WHERE i_category='Sports') sales_detail
  GROUP BY d_year, i_brand_id, i_class_id, i_category_id, i_manufact_id)
  SELECT  prev_yr.d_year AS prev_year
                           ,curr_yr.d_year AS year
@@ -1233,47 +1233,47 @@ WITH /* TPC-DS query75.tpl 0.3 */ all_sales AS (
 -- start template query9.tpl query 24 in stream 9
 select /* TPC-DS query9.tpl 0.49 */ case when (select count(*) 
                   from store_sales 
-                  where ss_quantity between 1 and 20) > 1309008429
-            then (select avg(ss_ext_sales_price) 
+                  where ss_quantity between 1 and 20) > 411084957
+            then (select avg(ss_ext_list_price) 
                   from store_sales 
                   where ss_quantity between 1 and 20) 
-            else (select avg(ss_net_paid)
+            else (select avg(ss_net_paid_inc_tax)
                   from store_sales
                   where ss_quantity between 1 and 20) end bucket1 ,
        case when (select count(*)
                   from store_sales
-                  where ss_quantity between 21 and 40) > 37949019
-            then (select avg(ss_ext_sales_price)
+                  where ss_quantity between 21 and 40) > 3033686132
+            then (select avg(ss_ext_list_price)
                   from store_sales
                   where ss_quantity between 21 and 40) 
-            else (select avg(ss_net_paid)
+            else (select avg(ss_net_paid_inc_tax)
                   from store_sales
                   where ss_quantity between 21 and 40) end bucket2,
        case when (select count(*)
                   from store_sales
-                  where ss_quantity between 41 and 60) > 1307977573
-            then (select avg(ss_ext_sales_price)
+                  where ss_quantity between 41 and 60) > 1107973670
+            then (select avg(ss_ext_list_price)
                   from store_sales
                   where ss_quantity between 41 and 60)
-            else (select avg(ss_net_paid)
+            else (select avg(ss_net_paid_inc_tax)
                   from store_sales
                   where ss_quantity between 41 and 60) end bucket3,
        case when (select count(*)
                   from store_sales
-                  where ss_quantity between 61 and 80) > 140610725
-            then (select avg(ss_ext_sales_price)
+                  where ss_quantity between 61 and 80) > 4050818901
+            then (select avg(ss_ext_list_price)
                   from store_sales
                   where ss_quantity between 61 and 80)
-            else (select avg(ss_net_paid)
+            else (select avg(ss_net_paid_inc_tax)
                   from store_sales
                   where ss_quantity between 61 and 80) end bucket4,
        case when (select count(*)
                   from store_sales
-                  where ss_quantity between 81 and 100) > 1081275073
-            then (select avg(ss_ext_sales_price)
+                  where ss_quantity between 81 and 100) > 596507312
+            then (select avg(ss_ext_list_price)
                   from store_sales
                   where ss_quantity between 81 and 100)
-            else (select avg(ss_net_paid)
+            else (select avg(ss_net_paid_inc_tax)
                   from store_sales
                   where ss_quantity between 81 and 100) end bucket5
 from reason
@@ -1356,10 +1356,10 @@ from
     	,date_dim
 where 
 	ws_item_sk = i_item_sk 
-  	and i_category in ('Children', 'Electronics', 'Men')
+  	and i_category in ('Shoes', 'Children', 'Home')
   	and ws_sold_date_sk = d_date_sk
-	and d_date between cast('2001-05-14' as date) 
-				and dateadd(day,30,cast('2001-05-14' as date))
+	and d_date between cast('2000-04-06' as date) 
+				and dateadd(day,30,cast('2000-04-06' as date))
 group by 
 	i_item_id
         ,i_item_desc 
@@ -1382,10 +1382,10 @@ from
    ,item 
    ,date_dim
 where
-i_manufact_id = 761
+i_manufact_id = 177
 and i_item_sk = cs_item_sk 
-and d_date between '2001-02-03' and 
-        dateadd(day,90,cast('2001-02-03' as date))
+and d_date between '2000-01-10' and 
+        dateadd(day,90,cast('2000-01-10' as date))
 and d_date_sk = cs_sold_date_sk 
 and cs_ext_discount_amt  
      > ( 
@@ -1396,8 +1396,8 @@ and cs_ext_discount_amt
            ,date_dim
          where 
               cs_item_sk = i_item_sk 
-          and d_date between '2001-02-03' and
-                             dateadd(day,90,cast('2001-02-03' as date))
+          and d_date between '2000-01-10' and
+                             dateadd(day,90,cast('2000-01-10' as date))
           and d_date_sk = cs_sold_date_sk 
       ) 
 limit 100;
@@ -1410,49 +1410,49 @@ from (select avg(ss_list_price) B1_LP
             ,count(distinct ss_list_price) B1_CNTD
       from store_sales
       where ss_quantity between 0 and 5
-        and (ss_list_price between 16 and 16+10 
-             or ss_coupon_amt between 6047 and 6047+1000
-             or ss_wholesale_cost between 70 and 70+20)) B1,
+        and (ss_list_price between 182 and 182+10 
+             or ss_coupon_amt between 818 and 818+1000
+             or ss_wholesale_cost between 27 and 27+20)) B1,
      (select avg(ss_list_price) B2_LP
             ,count(ss_list_price) B2_CNT
             ,count(distinct ss_list_price) B2_CNTD
       from store_sales
       where ss_quantity between 6 and 10
-        and (ss_list_price between 134 and 134+10
-          or ss_coupon_amt between 15962 and 15962+1000
-          or ss_wholesale_cost between 72 and 72+20)) B2,
+        and (ss_list_price between 12 and 12+10
+          or ss_coupon_amt between 5892 and 5892+1000
+          or ss_wholesale_cost between 51 and 51+20)) B2,
      (select avg(ss_list_price) B3_LP
             ,count(ss_list_price) B3_CNT
             ,count(distinct ss_list_price) B3_CNTD
       from store_sales
       where ss_quantity between 11 and 15
-        and (ss_list_price between 37 and 37+10
-          or ss_coupon_amt between 1892 and 1892+1000
-          or ss_wholesale_cost between 18 and 18+20)) B3,
+        and (ss_list_price between 155 and 155+10
+          or ss_coupon_amt between 3825 and 3825+1000
+          or ss_wholesale_cost between 36 and 36+20)) B3,
      (select avg(ss_list_price) B4_LP
             ,count(ss_list_price) B4_CNT
             ,count(distinct ss_list_price) B4_CNTD
       from store_sales
       where ss_quantity between 16 and 20
-        and (ss_list_price between 82 and 82+10
-          or ss_coupon_amt between 13556 and 13556+1000
-          or ss_wholesale_cost between 77 and 77+20)) B4,
+        and (ss_list_price between 1 and 1+10
+          or ss_coupon_amt between 15569 and 15569+1000
+          or ss_wholesale_cost between 30 and 30+20)) B4,
      (select avg(ss_list_price) B5_LP
             ,count(ss_list_price) B5_CNT
             ,count(distinct ss_list_price) B5_CNTD
       from store_sales
       where ss_quantity between 21 and 25
-        and (ss_list_price between 44 and 44+10
-          or ss_coupon_amt between 7541 and 7541+1000
-          or ss_wholesale_cost between 24 and 24+20)) B5,
+        and (ss_list_price between 83 and 83+10
+          or ss_coupon_amt between 5733 and 5733+1000
+          or ss_wholesale_cost between 35 and 35+20)) B5,
      (select avg(ss_list_price) B6_LP
             ,count(ss_list_price) B6_CNT
             ,count(distinct ss_list_price) B6_CNTD
       from store_sales
       where ss_quantity between 26 and 30
-        and (ss_list_price between 115 and 115+10
-          or ss_coupon_amt between 5391 and 5391+1000
-          or ss_wholesale_cost between 36 and 36+20)) B6
+        and (ss_list_price between 66 and 66+10
+          or ss_coupon_amt between 1834 and 1834+1000
+          or ss_wholesale_cost between 19 and 19+20)) B6
 limit 100;
 
 -- end template query28.tpl query 28 in stream 9
@@ -1467,8 +1467,8 @@ select /* TPC-DS query42.tpl 0.61 */  dt.d_year
  where dt.d_date_sk = store_sales.ss_sold_date_sk
  	and store_sales.ss_item_sk = item.i_item_sk
  	and item.i_manager_id = 1  	
- 	and dt.d_moy=11
- 	and dt.d_year=1999
+ 	and dt.d_moy=12
+ 	and dt.d_year=1998
  group by 	dt.d_year
  		,item.i_category_id
  		,item.i_category
@@ -1501,7 +1501,7 @@ select /* TPC-DS query17.tpl 0.41 */  i_item_id
      ,date_dim d3
      ,store
      ,item
- where d1.d_quarter_name = '2001Q1'
+ where d1.d_quarter_name = '1998Q1'
    and d1.d_date_sk = ss_sold_date_sk
    and i_item_sk = ss_item_sk
    and s_store_sk = ss_store_sk
@@ -1509,11 +1509,11 @@ select /* TPC-DS query17.tpl 0.41 */  i_item_id
    and ss_item_sk = sr_item_sk
    and ss_ticket_number = sr_ticket_number
    and sr_returned_date_sk = d2.d_date_sk
-   and d2.d_quarter_name in ('2001Q1','2001Q2','2001Q3')
+   and d2.d_quarter_name in ('1998Q1','1998Q2','1998Q3')
    and sr_customer_sk = cs_bill_customer_sk
    and sr_item_sk = cs_item_sk
    and cs_sold_date_sk = d3.d_date_sk
-   and d3.d_quarter_name in ('2001Q1','2001Q2','2001Q3')
+   and d3.d_quarter_name in ('1998Q1','1998Q2','1998Q3')
  group by i_item_id
          ,i_item_desc
          ,s_state
@@ -1531,7 +1531,7 @@ with /* TPC-DS query67a.tpl 0.35 */ results as
        where  ss_sold_date_sk=d_date_sk
           and ss_item_sk=i_item_sk
           and ss_store_sk = s_store_sk
-          and d_month_seq between 1190 and 1190 + 11
+          and d_month_seq between 1177 and 1177 + 11
        group by i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy,s_store_id)
  ,
  results_rollup as
@@ -1624,27 +1624,27 @@ with /* TPC-DS query31.tpl 0.50 */ ss as
        ,ws ws3
  where
     ss1.d_qoy = 1
-    and ss1.d_year = 1998
+    and ss1.d_year = 2000
     and ss1.ca_county = ss2.ca_county
     and ss2.d_qoy = 2
-    and ss2.d_year = 1998
+    and ss2.d_year = 2000
  and ss2.ca_county = ss3.ca_county
     and ss3.d_qoy = 3
-    and ss3.d_year = 1998
+    and ss3.d_year = 2000
     and ss1.ca_county = ws1.ca_county
     and ws1.d_qoy = 1
-    and ws1.d_year = 1998
+    and ws1.d_year = 2000
     and ws1.ca_county = ws2.ca_county
     and ws2.d_qoy = 2
-    and ws2.d_year = 1998
+    and ws2.d_year = 2000
     and ws1.ca_county = ws3.ca_county
     and ws3.d_qoy = 3
-    and ws3.d_year =1998
+    and ws3.d_year =2000
     and case when ws1.web_sales > 0 then ws2.web_sales/ws1.web_sales else null end 
        > case when ss1.store_sales > 0 then ss2.store_sales/ss1.store_sales else null end
     and case when ws2.web_sales > 0 then ws3.web_sales/ws2.web_sales else null end
        > case when ss2.store_sales > 0 then ss3.store_sales/ss2.store_sales else null end
- order by store_q2_q3_increase;
+ order by store_q1_q2_increase;
 
 -- end template query31.tpl query 32 in stream 9
 -- start template query20.tpl query 33 in stream 9
@@ -1660,10 +1660,10 @@ select /* TPC-DS query20.tpl 0.65 */  i_item_id
      ,item 
      ,date_dim
  where cs_item_sk = i_item_sk 
-   and i_category in ('Shoes', 'Music', 'Home')
+   and i_category in ('Electronics', 'Music', 'Jewelry')
    and cs_sold_date_sk = d_date_sk
- and d_date between cast('2002-05-16' as date) 
- 				and dateadd(day,30,cast('2002-05-16' as date))
+ and d_date between cast('2002-04-16' as date) 
+ 				and dateadd(day,30,cast('2002-04-16' as date))
  group by i_item_id
          ,i_item_desc 
          ,i_category
@@ -1731,7 +1731,7 @@ with /* TPC-DS query11.tpl 0.51 */ year_total as (
                   t_s_secyear.customer_id
                  ,t_s_secyear.customer_first_name
                  ,t_s_secyear.customer_last_name
-                 ,t_s_secyear.customer_birth_country
+                 ,t_s_secyear.customer_login
  from year_total t_s_firstyear
      ,year_total t_s_secyear
      ,year_total t_w_firstyear
@@ -1743,10 +1743,10 @@ with /* TPC-DS query11.tpl 0.51 */ year_total as (
          and t_w_firstyear.sale_type = 'w'
          and t_s_secyear.sale_type = 's'
          and t_w_secyear.sale_type = 'w'
-         and t_s_firstyear.dyear = 1998
-         and t_s_secyear.dyear = 1998+1
-         and t_w_firstyear.dyear = 1998
-         and t_w_secyear.dyear = 1998+1
+         and t_s_firstyear.dyear = 1999
+         and t_s_secyear.dyear = 1999+1
+         and t_w_firstyear.dyear = 1999
+         and t_w_secyear.dyear = 1999+1
          and t_s_firstyear.year_total > 0
          and t_w_firstyear.year_total > 0
          and case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else 0.0 end
@@ -1754,7 +1754,7 @@ with /* TPC-DS query11.tpl 0.51 */ year_total as (
  order by t_s_secyear.customer_id
          ,t_s_secyear.customer_first_name
          ,t_s_secyear.customer_last_name
-         ,t_s_secyear.customer_birth_country
+         ,t_s_secyear.customer_login
 limit 100;
 
 -- end template query11.tpl query 34 in stream 9
@@ -1767,8 +1767,8 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
       date_dim,
       store
  where ss_sold_date_sk = d_date_sk
-       and d_date between cast('1998-08-19' as date) 
-                  and dateadd(day,30,cast('1998-08-19' as date))  
+       and d_date between cast('2001-08-10' as date) 
+                  and dateadd(day,30,cast('2001-08-10' as date))  
        and ss_store_sk = s_store_sk
  group by s_store_sk)
  ,
@@ -1780,8 +1780,8 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
       date_dim,
       store
  where sr_returned_date_sk = d_date_sk
-       and d_date between cast('1998-08-19' as date)
-                  and dateadd(day,30,cast('1998-08-19' as date))  
+       and d_date between cast('2001-08-10' as date)
+                  and dateadd(day,30,cast('2001-08-10' as date))  
        and sr_store_sk = s_store_sk
  group by s_store_sk), 
  cs as
@@ -1791,8 +1791,8 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
  from catalog_sales,
       date_dim
  where cs_sold_date_sk = d_date_sk
-       and d_date between cast('1998-08-19' as date)
-                  and dateadd(day,30,cast('1998-08-19' as date))  
+       and d_date between cast('2001-08-10' as date)
+                  and dateadd(day,30,cast('2001-08-10' as date))  
  group by cs_call_center_sk 
  ), 
  cr as
@@ -1802,8 +1802,8 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
  from catalog_returns,
       date_dim
  where cr_returned_date_sk = d_date_sk
-       and d_date between cast('1998-08-19' as date)
-                  and dateadd(day,30,cast('1998-08-19' as date))  
+       and d_date between cast('2001-08-10' as date)
+                  and dateadd(day,30,cast('2001-08-10' as date))  
  group by cr_call_center_sk), 
  ws as
  ( select wp_web_page_sk,
@@ -1813,8 +1813,8 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
       date_dim,
       web_page
  where ws_sold_date_sk = d_date_sk
-       and d_date between cast('1998-08-19' as date)
-                  and dateadd(day,30,cast('1998-08-19' as date))  
+       and d_date between cast('2001-08-10' as date)
+                  and dateadd(day,30,cast('2001-08-10' as date))  
        and ws_web_page_sk = wp_web_page_sk
  group by wp_web_page_sk), 
  wr as
@@ -1825,8 +1825,8 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
       date_dim,
       web_page
  where wr_returned_date_sk = d_date_sk
-       and d_date between cast('1998-08-19' as date)
-                  and dateadd(day,30,cast('1998-08-19' as date))  
+       and d_date between cast('2001-08-10' as date)
+                  and dateadd(day,30,cast('2001-08-10' as date))  
        and wr_web_page_sk = wp_web_page_sk
  group by wp_web_page_sk)
  ,
@@ -1889,12 +1889,12 @@ with /* TPC-DS query36a.tpl 0.21 */ results as
    ,item
    ,store
  where
-    d1.d_year = 1999 
+    d1.d_year = 1998 
     and d1.d_date_sk = ss_sold_date_sk
     and i_item_sk  = ss_item_sk 
     and s_store_sk  = ss_store_sk
-    and s_state in ('LA','OK','KS','SC',
-                 'NY','WA','AL','VT')
+    and s_state in ('WA','MI','PA','IA',
+                 'KS','GA','NC','OH')
  group by i_category,i_class)
  ,
  results_rollup as
@@ -1922,11 +1922,11 @@ select /* TPC-DS query82.tpl 0.67 */  i_item_id
        ,i_item_desc
        ,i_current_price
  from item, inventory, date_dim, store_sales
- where i_current_price between 39 and 39+30
+ where i_current_price between 12 and 12+30
  and inv_item_sk = i_item_sk
  and d_date_sk=inv_date_sk
- and d_date between cast('2001-05-09' as date) and dateadd(day,60,cast('2001-05-09' as date))
- and i_manufact_id in (437,24,777,446)
+ and d_date between cast('2001-06-07' as date) and dateadd(day,60,cast('2001-06-07' as date))
+ and i_manufact_id in (410,239,78,315)
  and inv_quantity_on_hand between 100 and 500
  and ss_item_sk = i_item_sk
  group by i_item_id,i_item_desc,i_current_price
@@ -1948,11 +1948,11 @@ with /* TPC-DS query33.tpl 0.22 */ ss as (
   i_manufact_id
 from
  item
-where i_category in ('Books'))
+where i_category in ('Home'))
  and     ss_item_sk              = i_item_sk
  and     ss_sold_date_sk         = d_date_sk
- and     d_year                  = 2000
- and     d_moy                   = 4
+ and     d_year                  = 2002
+ and     d_moy                   = 1
  and     ss_addr_sk              = ca_address_sk
  and     ca_gmt_offset           = -5 
  group by i_manufact_id),
@@ -1969,11 +1969,11 @@ where i_category in ('Books'))
   i_manufact_id
 from
  item
-where i_category in ('Books'))
+where i_category in ('Home'))
  and     cs_item_sk              = i_item_sk
  and     cs_sold_date_sk         = d_date_sk
- and     d_year                  = 2000
- and     d_moy                   = 4
+ and     d_year                  = 2002
+ and     d_moy                   = 1
  and     cs_bill_addr_sk         = ca_address_sk
  and     ca_gmt_offset           = -5 
  group by i_manufact_id),
@@ -1990,11 +1990,11 @@ where i_category in ('Books'))
   i_manufact_id
 from
  item
-where i_category in ('Books'))
+where i_category in ('Home'))
  and     ws_item_sk              = i_item_sk
  and     ws_sold_date_sk         = d_date_sk
- and     d_year                  = 2000
- and     d_moy                   = 4
+ and     d_year                  = 2002
+ and     d_moy                   = 1
  and     ws_bill_addr_sk         = ca_address_sk
  and     ca_gmt_offset           = -5
  group by i_manufact_id)
@@ -2029,11 +2029,11 @@ with /* TPC-DS query54.tpl 0.81 */ my_customers as (
          customer
  where   sold_date_sk = d_date_sk
          and item_sk = i_item_sk
-         and i_category = 'Women'
-         and i_class = 'dresses'
+         and i_category = 'Books'
+         and i_class = 'cooking'
          and c_customer_sk = cs_or_ws_sales.customer_sk
-         and d_moy = 6
-         and d_year = 1999
+         and d_moy = 1
+         and d_year = 2002
  )
  , my_revenue as (
  select c_customer_sk,
@@ -2049,9 +2049,9 @@ with /* TPC-DS query54.tpl 0.81 */ my_customers as (
         and ss_sold_date_sk = d_date_sk
         and c_customer_sk = ss_customer_sk
         and d_month_seq between (select distinct d_month_seq+1
-                                 from   date_dim where d_year = 1999 and d_moy = 6)
+                                 from   date_dim where d_year = 2002 and d_moy = 1)
                            and  (select distinct d_month_seq+3
-                                 from   date_dim where d_year = 1999 and d_moy = 6)
+                                 from   date_dim where d_year = 2002 and d_moy = 1)
  group by c_customer_sk
  )
  , segments as
@@ -2143,7 +2143,7 @@ union all
                   t_s_secyear.customer_id
                  ,t_s_secyear.customer_first_name
                  ,t_s_secyear.customer_last_name
-                 ,t_s_secyear.customer_login
+                 ,t_s_secyear.customer_birth_country
  from year_total t_s_firstyear
      ,year_total t_s_secyear
      ,year_total t_c_firstyear
@@ -2161,12 +2161,12 @@ union all
    and t_s_secyear.sale_type = 's'
    and t_c_secyear.sale_type = 'c'
    and t_w_secyear.sale_type = 'w'
-   and t_s_firstyear.dyear =  1999
-   and t_s_secyear.dyear = 1999+1
-   and t_c_firstyear.dyear =  1999
-   and t_c_secyear.dyear =  1999+1
-   and t_w_firstyear.dyear = 1999
-   and t_w_secyear.dyear = 1999+1
+   and t_s_firstyear.dyear =  2000
+   and t_s_secyear.dyear = 2000+1
+   and t_c_firstyear.dyear =  2000
+   and t_c_secyear.dyear =  2000+1
+   and t_w_firstyear.dyear = 2000
+   and t_w_secyear.dyear = 2000+1
    and t_s_firstyear.year_total > 0
    and t_c_firstyear.year_total > 0
    and t_w_firstyear.year_total > 0
@@ -2177,7 +2177,7 @@ union all
  order by t_s_secyear.customer_id
          ,t_s_secyear.customer_first_name
          ,t_s_secyear.customer_last_name
-         ,t_s_secyear.customer_login
+         ,t_s_secyear.customer_birth_country
 limit 100;
 
 -- end template query4.tpl query 40 in stream 9
@@ -2192,14 +2192,14 @@ from
   ,customer_address
   ,call_center
 where
-    d_date between '1999-5-01' and 
-           dateadd(day, 60, cast('1999-5-01' as date))
+    d_date between '1999-4-01' and 
+           dateadd(day, 60, cast('1999-4-01' as date))
 and cs1.cs_ship_date_sk = d_date_sk
 and cs1.cs_ship_addr_sk = ca_address_sk
-and ca_state = 'CA'
+and ca_state = 'NE'
 and cs1.cs_call_center_sk = cc_call_center_sk
-and cc_county in ('San Miguel County','Gage County','Daviess County','Maverick County',
-                  'Williamson County'
+and cc_county in ('Fairfield County','Sumner County','San Miguel County','Jefferson Davis Parish',
+                  'Raleigh County'
 )
 and exists (select *
             from catalog_sales cs2
@@ -2232,26 +2232,26 @@ select /* TPC-DS query10.tpl 0.26 */
   customer c,customer_address ca,customer_demographics
  where
   c.c_current_addr_sk = ca.ca_address_sk and
-  ca_county in ('New Hanover County','Humphreys County','Arenac County','Montour County','Mason County') and
+  ca_county in ('Ashtabula County','Traverse County','Centre County','Tuolumne County','Le Flore County') and
   cd_demo_sk = c.c_current_cdemo_sk and 
   exists (select *
           from store_sales,date_dim
           where c.c_customer_sk = ss_customer_sk and
                 ss_sold_date_sk = d_date_sk and
-                d_year = 1999 and
-                d_moy between 4 and 4+3) and
+                d_year = 2002 and
+                d_moy between 1 and 1+3) and
    (exists (select *
             from web_sales,date_dim
             where c.c_customer_sk = ws_bill_customer_sk and
                   ws_sold_date_sk = d_date_sk and
-                  d_year = 1999 and
-                  d_moy between 4 ANd 4+3) or 
+                  d_year = 2002 and
+                  d_moy between 1 ANd 1+3) or 
     exists (select * 
             from catalog_sales,date_dim
             where c.c_customer_sk = cs_ship_customer_sk and
                   cs_sold_date_sk = d_date_sk and
-                  d_year = 1999 and
-                  d_moy between 4 and 4+3))
+                  d_year = 2002 and
+                  d_moy between 1 and 1+3))
  group by cd_gender,
           cd_marital_status,
           cd_education_status,
@@ -2289,13 +2289,13 @@ with /* TPC-DS query18a.tpl 0.90 */ results as
        cs_item_sk = i_item_sk and
        cs_bill_cdemo_sk = cd1.cd_demo_sk and
        cs_bill_customer_sk = c_customer_sk and
-       cd1.cd_gender = 'M' and 
-       cd1.cd_education_status = 'College' and
+       cd1.cd_gender = 'F' and 
+       cd1.cd_education_status = 'Primary' and
        c_current_cdemo_sk = cd2.cd_demo_sk and
        c_current_addr_sk = ca_address_sk and
-       c_birth_month in (1,7,2,11,10,9) and
-       d_year = 2001 and
-       ca_state in ('VA','TX','AK','AZ','TN','MI','OK')
+       c_birth_month in (4,3,1,7,6,10) and
+       d_year = 1998 and
+       ca_state in ('AK','AR','TX','FL','NE','CO','WI')
  )
   select  i_item_id, ca_country, ca_state, ca_county, agg1, agg2, agg3, agg4, agg5, agg6, agg7
  from (
@@ -2331,7 +2331,7 @@ with /* TPC-DS query18a.tpl 0.90 */ results as
 select /* TPC-DS query48.tpl 0.74 */ sum (ss_quantity)
  from store_sales, store, customer_demographics, customer_address, date_dim
  where s_store_sk = ss_store_sk
- and  ss_sold_date_sk = d_date_sk and d_year = 2002
+ and  ss_sold_date_sk = d_date_sk and d_year = 2001
  and  
  (
   (
@@ -2339,7 +2339,7 @@ select /* TPC-DS query48.tpl 0.74 */ sum (ss_quantity)
    and 
    cd_marital_status = 'D'
    and 
-   cd_education_status = 'Primary'
+   cd_education_status = 'Unknown'
    and 
    ss_sales_price between 100.00 and 150.00  
    )
@@ -2347,7 +2347,7 @@ select /* TPC-DS query48.tpl 0.74 */ sum (ss_quantity)
   (
   cd_demo_sk = ss_cdemo_sk
    and 
-   cd_marital_status = 'W'
+   cd_marital_status = 'U'
    and 
    cd_education_status = '4 yr Degree'
    and 
@@ -2359,7 +2359,7 @@ select /* TPC-DS query48.tpl 0.74 */ sum (ss_quantity)
   and 
    cd_marital_status = 'S'
    and 
-   cd_education_status = 'Secondary'
+   cd_education_status = 'College'
    and 
    ss_sales_price between 150.00 and 200.00  
  )
@@ -2371,7 +2371,7 @@ select /* TPC-DS query48.tpl 0.74 */ sum (ss_quantity)
   and
   ca_country = 'United States'
   and
-  ca_state in ('AL', 'TX', 'MT')
+  ca_state in ('AL', 'KY', 'PA')
   and ss_net_profit between 0 and 2000  
   )
  or
@@ -2379,7 +2379,7 @@ select /* TPC-DS query48.tpl 0.74 */ sum (ss_quantity)
   and
   ca_country = 'United States'
   and
-  ca_state in ('TN', 'ME', 'NJ')
+  ca_state in ('OK', 'RI', 'FL')
   and ss_net_profit between 150 and 3000 
   )
  or
@@ -2387,7 +2387,7 @@ select /* TPC-DS query48.tpl 0.74 */ sum (ss_quantity)
   and
   ca_country = 'United States'
   and
-  ca_state in ('NE', 'KS', 'AR')
+  ca_state in ('ME', 'MT', 'LA')
   and ss_net_profit between 50 and 25000 
   )
  )
@@ -2406,7 +2406,7 @@ with /* TPC-DS query24.tpl 0.92 */ ssales as
       ,i_manager_id
       ,i_units
       ,i_size
-      ,sum(ss_net_profit) netpaid
+      ,sum(ss_ext_sales_price) netpaid
 from store_sales
     ,store_returns
     ,store
@@ -2421,7 +2421,7 @@ where ss_ticket_number = sr_ticket_number
   and c_current_addr_sk = ca_address_sk
   and c_birth_country <> upper(ca_country)
   and s_zip = ca_zip
-and s_market_id=5
+and s_market_id=8
 group by c_last_name
         ,c_first_name
         ,s_store_name
@@ -2437,7 +2437,7 @@ select c_last_name
       ,s_store_name
       ,sum(netpaid) paid
 from ssales
-where i_color = 'violet'
+where i_color = 'powder'
 group by c_last_name
         ,c_first_name
         ,s_store_name
@@ -2458,7 +2458,7 @@ with /* TPC-DS query24.tpl 0.92 part2 */ ssales as
       ,i_manager_id
       ,i_units
       ,i_size
-      ,sum(ss_net_profit) netpaid
+      ,sum(ss_ext_sales_price) netpaid
 from store_sales
     ,store_returns
     ,store
@@ -2473,7 +2473,7 @@ where ss_ticket_number = sr_ticket_number
   and c_current_addr_sk = ca_address_sk
   and c_birth_country <> upper(ca_country)
   and s_zip = ca_zip
-  and s_market_id = 5
+  and s_market_id = 8
 group by c_last_name
         ,c_first_name
         ,s_store_name
@@ -2489,7 +2489,7 @@ select c_last_name
       ,s_store_name
       ,sum(netpaid) paid
 from ssales
-where i_color = 'deep'
+where i_color = 'almond'
 group by c_last_name
         ,c_first_name
         ,s_store_name
@@ -2510,7 +2510,7 @@ with /* TPC-DS query30.tpl 0.75 */ customer_total_return as
      ,date_dim
      ,customer_address
  where wr_returned_date_sk = d_date_sk 
-   and d_year =2000
+   and d_year =1999
    and wr_returning_addr_sk = ca_address_sk 
  group by wr_returning_customer_sk
          ,ca_state)
@@ -2524,7 +2524,7 @@ with /* TPC-DS query30.tpl 0.75 */ customer_total_return as
  			  from customer_total_return ctr2 
                   	  where ctr1.ctr_state = ctr2.ctr_state)
        and ca_address_sk = c_current_addr_sk
-       and ca_state = 'ME'
+       and ca_state = 'GA'
        and ctr1.ctr_customer_sk = c_customer_sk
  order by c_customer_id,c_salutation,c_first_name,c_last_name,c_preferred_cust_flag
                   ,c_birth_day,c_birth_month,c_birth_year,c_birth_country,c_login,c_email_address
@@ -2605,7 +2605,7 @@ select /* TPC-DS query6.tpl 0.58 */  a.ca_state state, count(*) cnt
  	     (select distinct (d_month_seq)
  	      from date_dim
                where d_year = 2002
- 	        and d_moy = 7 )
+ 	        and d_moy = 4 )
  	and i.i_current_price > 1.2 * 
              (select avg(j.i_current_price) 
  	     from item j 
@@ -2629,8 +2629,8 @@ with /* TPC-DS query80a.tpl 0.6 */ ssr as
      item,
      promotion
  where ss_sold_date_sk = d_date_sk
-       and d_date between cast('1998-08-07' as date) 
-                  and dateadd(day,30,cast('1998-08-07' as date)) 
+       and d_date between cast('2000-08-20' as date) 
+                  and dateadd(day,30,cast('2000-08-20' as date)) 
        and ss_store_sk = s_store_sk
        and ss_item_sk = i_item_sk
        and i_current_price > 50
@@ -2650,8 +2650,8 @@ with /* TPC-DS query80a.tpl 0.6 */ ssr as
      item,
      promotion
  where cs_sold_date_sk = d_date_sk
-       and d_date between cast('1998-08-07' as date)
-                  and dateadd(day,30,cast('1998-08-07' as date))
+       and d_date between cast('2000-08-20' as date)
+                  and dateadd(day,30,cast('2000-08-20' as date))
         and cs_catalog_page_sk = cp_catalog_page_sk
        and cs_item_sk = i_item_sk
        and i_current_price > 50
@@ -2671,8 +2671,8 @@ group by cp_catalog_page_id)
      item,
      promotion
  where ws_sold_date_sk = d_date_sk
-       and d_date between cast('1998-08-07' as date)
-                  and dateadd(day,30,cast('1998-08-07' as date))
+       and d_date between cast('2000-08-20' as date)
+                  and dateadd(day,30,cast('2000-08-20' as date))
         and ws_web_site_sk = web_site_sk
        and ws_item_sk = i_item_sk
        and i_current_price > 50
@@ -2733,19 +2733,19 @@ select /* TPC-DS query35a.tpl 0.47 */
   cd_marital_status,
   cd_dep_count,
   count(*) cnt1,
+  max(cd_dep_count),
   min(cd_dep_count),
-  max(cd_dep_count),
-  max(cd_dep_count),
+  stddev_samp(cd_dep_count),
   cd_dep_employed_count,
   count(*) cnt2,
+  max(cd_dep_employed_count),
   min(cd_dep_employed_count),
-  max(cd_dep_employed_count),
-  max(cd_dep_employed_count),
+  stddev_samp(cd_dep_employed_count),
   cd_dep_college_count,
   count(*) cnt3,
-  min(cd_dep_college_count),
   max(cd_dep_college_count),
-  max(cd_dep_college_count)
+  min(cd_dep_college_count),
+  stddev_samp(cd_dep_college_count)
  from
   customer c,customer_address ca,customer_demographics
  where
@@ -2755,21 +2755,21 @@ select /* TPC-DS query35a.tpl 0.47 */
           from store_sales,date_dim
           where c.c_customer_sk = ss_customer_sk and
                 ss_sold_date_sk = d_date_sk and
-                d_year = 2001 and
+                d_year = 2002 and
                 d_qoy < 4) and
    exists (select * from
 	   (select ws_bill_customer_sk customsk
             from web_sales,date_dim
             where 
                   ws_sold_date_sk = d_date_sk and
-                  d_year = 2001 and
+                  d_year = 2002 and
                   d_qoy < 4
 	    union all 
     	    select cs_ship_customer_sk customsk
             from catalog_sales,date_dim
             where 
                   cs_sold_date_sk = d_date_sk and
-                  d_year = 2001 and
+                  d_year = 2002 and
                   d_qoy < 4)x 
            where x.customsk = c.c_customer_sk)
  group by ca_state,
@@ -2815,7 +2815,7 @@ with /* TPC-DS query59.tpl 0.30 */ wss as
   from wss,store,date_dim d
   where d.d_week_seq = wss.d_week_seq and
         ss_store_sk = s_store_sk and 
-        d_month_seq between 1212 and 1212 + 11) y,
+        d_month_seq between 1178 and 1178 + 11) y,
  (select s_store_name s_store_name2,wss.d_week_seq d_week_seq2
         ,s_store_id s_store_id2,sun_sales sun_sales2
         ,mon_sales mon_sales2,tue_sales tue_sales2
@@ -2824,7 +2824,7 @@ with /* TPC-DS query59.tpl 0.30 */ wss as
   from wss,store,date_dim d
   where d.d_week_seq = wss.d_week_seq and
         ss_store_sk = s_store_sk and 
-        d_month_seq between 1212+ 12 and 1212 + 23) x
+        d_month_seq between 1178+ 12 and 1178 + 23) x
  where s_store_id1=s_store_id2
    and d_week_seq1=d_week_seq2-52
  order by s_store_name1,s_store_id1,d_week_seq1
@@ -2867,7 +2867,7 @@ limit 100;
 
 -- end template query99.tpl query 52 in stream 9
 -- start template query61.tpl query 53 in stream 9
-select /* TPC-DS query61.tpl 0.97 */  promotions,total,cast(promotions as decimal(15,4))/cast(total as decimal(15,4))*100
+select /* TPC-DS query61.tpl 0.97 */  promotions,total,cast(promotions as decimal(16,4))/cast(total as decimal(16,4))*100
 from
   (select sum(ss_ext_sales_price) promotions
    from  store_sales
@@ -2884,10 +2884,10 @@ from
    and   ca_address_sk = c_current_addr_sk
    and   ss_item_sk = i_item_sk 
    and   ca_gmt_offset = -6
-   and   i_category = 'Sports'
+   and   i_category = 'Home'
    and   (p_channel_dmail = 'Y' or p_channel_email = 'Y' or p_channel_tv = 'Y')
    and   s_gmt_offset = -6
-   and   d_year = 2000
+   and   d_year = 1999
    and   d_moy  = 12) promotional_sales,
   (select sum(ss_ext_sales_price) total
    from  store_sales
@@ -2902,9 +2902,9 @@ from
    and   ca_address_sk = c_current_addr_sk
    and   ss_item_sk = i_item_sk
    and   ca_gmt_offset = -6
-   and   i_category = 'Sports'
+   and   i_category = 'Home'
    and   s_gmt_offset = -6
-   and   d_year = 2000
+   and   d_year = 1999
    and   d_moy  = 12) all_sales
 order by promotions, total
 limit 100;
@@ -2924,7 +2924,7 @@ with /* TPC-DS query22a.tpl 0.55 */ results as
        where  inv_date_sk=d_date_sk
               and inv_item_sk=i_item_sk
 --            and inv_warehouse_sk = w_warehouse_sk
-              and d_month_seq between 1184 and 1184 + 11
+              and d_month_seq between 1195 and 1195 + 11
        group by i_product_name,i_brand,i_class,i_category),
 results_rollup as 
 (select i_product_name, i_brand, i_class, i_category,avg(qoh) qoh 
@@ -2960,8 +2960,8 @@ select /* TPC-DS query71.tpl 0.72 */ i_brand_id brand_id, i_brand brand,t_hour,t
                         ws_sold_time_sk as time_sk  
                  from web_sales,date_dim
                  where d_date_sk = ws_sold_date_sk
-                   and d_moy=12
-                   and d_year=2000
+                   and d_moy=11
+                   and d_year=1999
                  union all
                  select cs_ext_sales_price as ext_price,
                         cs_sold_date_sk as sold_date_sk,
@@ -2969,8 +2969,8 @@ select /* TPC-DS query71.tpl 0.72 */ i_brand_id brand_id, i_brand brand,t_hour,t
                         cs_sold_time_sk as time_sk
                  from catalog_sales,date_dim
                  where d_date_sk = cs_sold_date_sk
-                   and d_moy=12
-                   and d_year=2000
+                   and d_moy=11
+                   and d_year=1999
                  union all
                  select ss_ext_sales_price as ext_price,
                         ss_sold_date_sk as sold_date_sk,
@@ -2978,8 +2978,8 @@ select /* TPC-DS query71.tpl 0.72 */ i_brand_id brand_id, i_brand brand,t_hour,t
                         ss_sold_time_sk as time_sk
                  from store_sales,date_dim
                  where d_date_sk = ss_sold_date_sk
-                   and d_moy=12
-                   and d_year=2000
+                   and d_moy=11
+                   and d_year=1999
                  ) tmp,time_dim
  where
    sold_item_sk = i_item_sk
@@ -3016,10 +3016,10 @@ select /* TPC-DS query68.tpl 0.95 */  c_last_name
         and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
         and store_sales.ss_addr_sk = customer_address.ca_address_sk
         and date_dim.d_dom between 1 and 2 
-        and (household_demographics.hd_dep_count = 7 or
-             household_demographics.hd_vehicle_count= 3)
-        and date_dim.d_year in (1999,1999+1,1999+2)
-        and store.s_city in ('Brownsville','Kingston')
+        and (household_demographics.hd_dep_count = 6 or
+             household_demographics.hd_vehicle_count= 4)
+        and date_dim.d_year in (1998,1998+1,1998+2)
+        and store.s_city in ('Waterville','White City')
        group by ss_ticket_number
                ,ss_customer_sk
                ,ss_addr_sk,ca_city) dn
@@ -3037,9 +3037,9 @@ select /* TPC-DS query68.tpl 0.95 */  c_last_name
 select /* TPC-DS query40.tpl 0.86 */  
    w_state
   ,i_item_id
-  ,sum(case when (cast(d_date as date) < cast ('1999-04-29' as date)) 
+  ,sum(case when (cast(d_date as date) < cast ('1999-02-07' as date)) 
  		then cs_sales_price - coalesce(cr_refunded_cash,0) else 0 end) as sales_before
-  ,sum(case when (cast(d_date as date) >= cast ('1999-04-29' as date)) 
+  ,sum(case when (cast(d_date as date) >= cast ('1999-02-07' as date)) 
  		then cs_sales_price - coalesce(cr_refunded_cash,0) else 0 end) as sales_after
  from
    catalog_sales left outer join catalog_returns on
@@ -3053,8 +3053,8 @@ select /* TPC-DS query40.tpl 0.86 */
  and i_item_sk          = cs_item_sk
  and cs_warehouse_sk    = w_warehouse_sk 
  and cs_sold_date_sk    = d_date_sk
- and d_date between dateadd(day,-30,cast ('1999-04-29' as date))
-                and dateadd(day,30,cast ('1999-04-29' as date))
+ and d_date between dateadd(day,-30,cast ('1999-02-07' as date))
+                and dateadd(day,30,cast ('1999-02-07' as date))
  group by
     w_state,i_item_id
  order by w_state,i_item_id
@@ -3115,7 +3115,7 @@ select /* TPC-DS query66.tpl 0.39 */
  	,w_county
  	,w_state
  	,w_country
- 	,'GREAT EASTERN' || ',' || 'USPS' as ship_carriers
+ 	,'USPS' || ',' || 'ZHOU' as ship_carriers
        ,d_year as year
  	,sum(case when d_moy = 1 
  		then ws_ext_list_price* ws_quantity else 0 end) as jan_sales
@@ -3176,9 +3176,9 @@ select /* TPC-DS query66.tpl 0.39 */
         and ws_sold_date_sk = d_date_sk
         and ws_sold_time_sk = t_time_sk
  	and ws_ship_mode_sk = sm_ship_mode_sk
-        and d_year = 2002
- 	and t_time between 46895 and 46895+28800 
- 	and sm_carrier in ('GREAT EASTERN','USPS')
+        and d_year = 2000
+ 	and t_time between 41568 and 41568+28800 
+ 	and sm_carrier in ('USPS','ZHOU')
      group by 
         w_warehouse_name
  	,w_warehouse_sq_ft
@@ -3195,56 +3195,56 @@ select /* TPC-DS query66.tpl 0.39 */
  	,w_county
  	,w_state
  	,w_country
- 	,'GREAT EASTERN' || ',' || 'USPS' as ship_carriers
+ 	,'USPS' || ',' || 'ZHOU' as ship_carriers
        ,d_year as year
  	,sum(case when d_moy = 1 
- 		then cs_ext_sales_price* cs_quantity else 0 end) as jan_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as jan_sales
  	,sum(case when d_moy = 2 
- 		then cs_ext_sales_price* cs_quantity else 0 end) as feb_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as feb_sales
  	,sum(case when d_moy = 3 
- 		then cs_ext_sales_price* cs_quantity else 0 end) as mar_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as mar_sales
  	,sum(case when d_moy = 4 
- 		then cs_ext_sales_price* cs_quantity else 0 end) as apr_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as apr_sales
  	,sum(case when d_moy = 5 
- 		then cs_ext_sales_price* cs_quantity else 0 end) as may_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as may_sales
  	,sum(case when d_moy = 6 
- 		then cs_ext_sales_price* cs_quantity else 0 end) as jun_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as jun_sales
  	,sum(case when d_moy = 7 
- 		then cs_ext_sales_price* cs_quantity else 0 end) as jul_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as jul_sales
  	,sum(case when d_moy = 8 
- 		then cs_ext_sales_price* cs_quantity else 0 end) as aug_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as aug_sales
  	,sum(case when d_moy = 9 
- 		then cs_ext_sales_price* cs_quantity else 0 end) as sep_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as sep_sales
  	,sum(case when d_moy = 10 
- 		then cs_ext_sales_price* cs_quantity else 0 end) as oct_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as oct_sales
  	,sum(case when d_moy = 11
- 		then cs_ext_sales_price* cs_quantity else 0 end) as nov_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as nov_sales
  	,sum(case when d_moy = 12
- 		then cs_ext_sales_price* cs_quantity else 0 end) as dec_sales
+ 		then cs_sales_price* cs_quantity else 0 end) as dec_sales
  	,sum(case when d_moy = 1 
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as jan_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as jan_net
  	,sum(case when d_moy = 2 
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as feb_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as feb_net
  	,sum(case when d_moy = 3 
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as mar_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as mar_net
  	,sum(case when d_moy = 4 
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as apr_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as apr_net
  	,sum(case when d_moy = 5 
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as may_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as may_net
  	,sum(case when d_moy = 6 
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as jun_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as jun_net
  	,sum(case when d_moy = 7 
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as jul_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as jul_net
  	,sum(case when d_moy = 8 
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as aug_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as aug_net
  	,sum(case when d_moy = 9 
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as sep_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as sep_net
  	,sum(case when d_moy = 10 
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as oct_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as oct_net
  	,sum(case when d_moy = 11
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as nov_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as nov_net
  	,sum(case when d_moy = 12
- 		then cs_net_paid_inc_ship_tax * cs_quantity else 0 end) as dec_net
+ 		then cs_net_paid_inc_tax * cs_quantity else 0 end) as dec_net
      from
           catalog_sales
          ,warehouse
@@ -3256,9 +3256,9 @@ select /* TPC-DS query66.tpl 0.39 */
         and cs_sold_date_sk = d_date_sk
         and cs_sold_time_sk = t_time_sk
  	and cs_ship_mode_sk = sm_ship_mode_sk
-        and d_year = 2002
- 	and t_time between 46895 AND 46895+28800 
- 	and sm_carrier in ('GREAT EASTERN','USPS')
+        and d_year = 2000
+ 	and t_time between 41568 AND 41568+28800 
+ 	and sm_carrier in ('USPS','ZHOU')
      group by 
         w_warehouse_name
  	,w_warehouse_sq_ft
@@ -3296,7 +3296,7 @@ where
            dateadd(day,60,cast('2001-2-01' as date))
 and ws1.ws_ship_date_sk = d_date_sk
 and ws1.ws_ship_addr_sk = ca_address_sk
-and ca_state = 'MO'
+and ca_state = 'TX'
 and ws1.ws_web_site_sk = web_site_sk
 and web_company_name = 'pri'
 and exists (select *
@@ -3337,8 +3337,8 @@ with /* TPC-DS query47.tpl 0.42 */ v1 as(
           s_store_name, s_company_name,
           d_year, d_moy),
  v2 as(
- select v1.i_category, v1.i_brand, v1.s_store_name, v1.s_company_name
-        ,v1.d_year
+ select v1.s_store_name, v1.s_company_name
+        ,v1.d_year, v1.d_moy
         ,v1.avg_monthly_sales
         ,v1.sum_sales, v1_lag.sum_sales psum, v1_lead.sum_sales nsum
  from v1, v1 v1_lag, v1 v1_lead
@@ -3357,7 +3357,7 @@ with /* TPC-DS query47.tpl 0.42 */ v1 as(
  where  d_year = 2000 and    
         avg_monthly_sales > 0 and
         case when avg_monthly_sales > 0 then abs(sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
- order by sum_sales - avg_monthly_sales, nsum
+ order by sum_sales - avg_monthly_sales, avg_monthly_sales
  limit 100;
 
 -- end template query47.tpl query 60 in stream 9
@@ -3372,11 +3372,11 @@ select /* TPC-DS query26.tpl 0.85 */  i_item_id,
        cs_item_sk = i_item_sk and
        cs_bill_cdemo_sk = cd_demo_sk and
        cs_promo_sk = p_promo_sk and
-       cd_gender = 'M' and 
-       cd_marital_status = 'U' and
-       cd_education_status = '4 yr Degree' and
+       cd_gender = 'F' and 
+       cd_marital_status = 'S' and
+       cd_education_status = 'Primary' and
        (p_channel_email = 'N' or p_channel_event = 'N') and
-       d_year = 2000 
+       d_year = 1998 
  group by i_item_id
  order by i_item_id
  limit 100;
@@ -3388,9 +3388,9 @@ select /* TPC-DS query25.tpl 0.9 */
  ,i_item_desc
  ,s_store_id
  ,s_store_name
- ,avg(ss_net_profit) as store_sales_profit
- ,avg(sr_net_loss) as store_returns_loss
- ,avg(cs_net_profit) as catalog_sales_profit
+ ,max(ss_net_profit) as store_sales_profit
+ ,max(sr_net_loss) as store_returns_loss
+ ,max(cs_net_profit) as catalog_sales_profit
  from
  store_sales
  ,store_returns
@@ -3402,7 +3402,7 @@ select /* TPC-DS query25.tpl 0.9 */
  ,item
  where
  d1.d_moy = 4
- and d1.d_year = 2001
+ and d1.d_year = 1998
  and d1.d_date_sk = ss_sold_date_sk
  and i_item_sk = ss_item_sk
  and s_store_sk = ss_store_sk
@@ -3411,12 +3411,12 @@ select /* TPC-DS query25.tpl 0.9 */
  and ss_ticket_number = sr_ticket_number
  and sr_returned_date_sk = d2.d_date_sk
  and d2.d_moy               between 4 and  10
- and d2.d_year              = 2001
+ and d2.d_year              = 1998
  and sr_customer_sk = cs_bill_customer_sk
  and sr_item_sk = cs_item_sk
  and cs_sold_date_sk = d3.d_date_sk
  and d3.d_moy               between 4 and  10 
- and d3.d_year              = 2001
+ and d3.d_year              = 1998
  group by
  i_item_id
  ,i_item_desc
@@ -3445,10 +3445,10 @@ from
     	,date_dim
 where 
 	ss_item_sk = i_item_sk 
-  	and i_category in ('Shoes', 'Music', 'Women')
+  	and i_category in ('Home', 'Children', 'Women')
   	and ss_sold_date_sk = d_date_sk
-	and d_date between cast('2002-06-26' as date) 
-				and dateadd(day,30,cast('2002-06-26' as date))
+	and d_date between cast('1999-06-10' as date) 
+				and dateadd(day,30,cast('1999-06-10' as date))
 group by 
 	i_item_id
         ,i_item_desc 
@@ -3472,7 +3472,7 @@ with /* TPC-DS query70a.tpl 0.34 */ results as
   ,date_dim      d1
   ,store
  where
-    d1.d_month_seq between 1214 and 1214 + 11
+    d1.d_month_seq between 1191 and 1191 + 11
  and d1.d_date_sk = ss_sold_date_sk
  and s_store_sk  = ss_store_sk
  and s_state in
@@ -3480,7 +3480,7 @@ with /* TPC-DS query70a.tpl 0.34 */ results as
               from  (select s_state as s_state,
                  rank() over ( partition by s_state order by sum(ss_net_profit) desc) as ranking
                       from  store_sales, store, date_dim
-                      where d_month_seq between 1214 and 1214 + 11
+                      where d_month_seq between 1191 and 1191 + 11
                  and d_date_sk = ss_sold_date_sk
                  and s_store_sk  = ss_store_sk
                       group by s_state
@@ -3521,13 +3521,13 @@ select /* TPC-DS query73.tpl 0.79 */ c_last_name
     and store_sales.ss_store_sk = store.s_store_sk  
     and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
     and date_dim.d_dom between 1 and 2 
-    and (household_demographics.hd_buy_potential = '1001-5000' or
-         household_demographics.hd_buy_potential = '5001-10000')
+    and (household_demographics.hd_buy_potential = '>10000' or
+         household_demographics.hd_buy_potential = '0-500')
     and household_demographics.hd_vehicle_count > 0
     and case when household_demographics.hd_vehicle_count > 0 then 
              household_demographics.hd_dep_count/ household_demographics.hd_vehicle_count else null end > 1
-    and date_dim.d_year in (2000,2000+1,2000+2)
-    and store.s_county in ('Appomattox County','Harding County','Conecuh County','Hoke County')
+    and date_dim.d_year in (1999,1999+1,1999+2)
+    and store.s_county in ('Conecuh County','Dade County','Clayton County','Gogebic County')
     group by ss_ticket_number,ss_customer_sk) dj,customer
     where ss_customer_sk = c_customer_sk
       and cnt between 1 and 5
@@ -3540,19 +3540,19 @@ select /* TPC-DS query38.tpl 0.54 */  count(*) from (
     from store_sales, date_dim, customer
           where store_sales.ss_sold_date_sk = date_dim.d_date_sk
       and store_sales.ss_customer_sk = customer.c_customer_sk
-      and d_month_seq between 1214 and 1214 + 11
+      and d_month_seq between 1213 and 1213 + 11
   intersect
     select distinct c_last_name, c_first_name, d_date
     from catalog_sales, date_dim, customer
           where catalog_sales.cs_sold_date_sk = date_dim.d_date_sk
       and catalog_sales.cs_bill_customer_sk = customer.c_customer_sk
-      and d_month_seq between 1214 and 1214 + 11
+      and d_month_seq between 1213 and 1213 + 11
   intersect
     select distinct c_last_name, c_first_name, d_date
     from web_sales, date_dim, customer
           where web_sales.ws_sold_date_sk = date_dim.d_date_sk
       and web_sales.ws_bill_customer_sk = customer.c_customer_sk
-      and d_month_seq between 1214 and 1214 + 11
+      and d_month_seq between 1213 and 1213 + 11
 ) hot_cust
 limit 100;
 
@@ -3563,19 +3563,19 @@ from ((select distinct c_last_name, c_first_name, d_date
        from store_sales, date_dim, customer
        where store_sales.ss_sold_date_sk = date_dim.d_date_sk
          and store_sales.ss_customer_sk = customer.c_customer_sk
-         and d_month_seq between 1217 and 1217+11)
+         and d_month_seq between 1206 and 1206+11)
        except
       (select distinct c_last_name, c_first_name, d_date
        from catalog_sales, date_dim, customer
        where catalog_sales.cs_sold_date_sk = date_dim.d_date_sk
          and catalog_sales.cs_bill_customer_sk = customer.c_customer_sk
-         and d_month_seq between 1217 and 1217+11)
+         and d_month_seq between 1206 and 1206+11)
        except
       (select distinct c_last_name, c_first_name, d_date
        from web_sales, date_dim, customer
        where web_sales.ws_sold_date_sk = date_dim.d_date_sk
          and web_sales.ws_bill_customer_sk = customer.c_customer_sk
-         and d_month_seq between 1217 and 1217+11)
+         and d_month_seq between 1206 and 1206+11)
 ) cool_cust
 ;
 
@@ -3584,13 +3584,13 @@ from ((select distinct c_last_name, c_first_name, d_date
 select /* TPC-DS query3.tpl 0.45 */  dt.d_year 
        ,item.i_brand_id brand_id 
        ,item.i_brand brand
-       ,sum(ss_ext_discount_amt) sum_agg
+       ,sum(ss_ext_sales_price) sum_agg
  from  date_dim dt 
       ,store_sales
       ,item
  where dt.d_date_sk = store_sales.ss_sold_date_sk
    and store_sales.ss_item_sk = item.i_item_sk
-   and item.i_manufact_id = 822
+   and item.i_manufact_id = 803
    and dt.d_moy=11
  group by dt.d_year
       ,item.i_brand
@@ -3615,26 +3615,26 @@ select /* TPC-DS query69.tpl 0.28 */
   customer c,customer_address ca,customer_demographics
  where
   c.c_current_addr_sk = ca.ca_address_sk and
-  ca_state in ('VA','NC','PA') and
+  ca_state in ('MN','NM','NC') and
   cd_demo_sk = c.c_current_cdemo_sk and 
   exists (select *
           from store_sales,date_dim
           where c.c_customer_sk = ss_customer_sk and
                 ss_sold_date_sk = d_date_sk and
-                d_year = 1999 and
-                d_moy between 1 and 1+2) and
+                d_year = 2004 and
+                d_moy between 2 and 2+2) and
    (not exists (select *
             from web_sales,date_dim
             where c.c_customer_sk = ws_bill_customer_sk and
                   ws_sold_date_sk = d_date_sk and
-                  d_year = 1999 and
-                  d_moy between 1 and 1+2) and
+                  d_year = 2004 and
+                  d_moy between 2 and 2+2) and
     not exists (select * 
             from catalog_sales,date_dim
             where c.c_customer_sk = cs_ship_customer_sk and
                   cs_sold_date_sk = d_date_sk and
-                  d_year = 1999 and
-                  d_moy between 1 and 1+2))
+                  d_year = 2004 and
+                  d_moy between 2 and 2+2))
  group by cd_gender,
           cd_marital_status,
           cd_education_status,
@@ -3656,7 +3656,7 @@ with /* TPC-DS query86a.tpl 0.11 */ results as
    ,date_dim       d1
    ,item
  where
-    d1.d_month_seq between 1215 and 1215+11
+    d1.d_month_seq between 1184 and 1184+11
  and d1.d_date_sk = ws_sold_date_sk
  and i_item_sk  = ws_item_sk
  group by i_category,i_class
@@ -3696,9 +3696,9 @@ select /* TPC-DS query79.tpl 0.89 */
     where store_sales.ss_sold_date_sk = date_dim.d_date_sk
     and store_sales.ss_store_sk = store.s_store_sk  
     and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
-    and (household_demographics.hd_dep_count = 6 or household_demographics.hd_vehicle_count > 1)
+    and (household_demographics.hd_dep_count = 3 or household_demographics.hd_vehicle_count > -1)
     and date_dim.d_dow = 1
-    and date_dim.d_year in (2000,2000+1,2000+2) 
+    and date_dim.d_year in (1999,1999+1,1999+2) 
     and store.s_number_employees between 200 and 295
     group by ss_ticket_number,ss_customer_sk,ss_addr_sk,store.s_city) ms,customer
     where ss_customer_sk = c_customer_sk
@@ -3720,12 +3720,12 @@ from item, store_sales, date_dim, store
 where ss_item_sk = i_item_sk and
       ss_sold_date_sk = d_date_sk and
       ss_store_sk = s_store_sk and
-      d_year in (2002) and
-        ((i_category in ('Books','Men','Sports') and
-          i_class in ('mystery','pants','hockey')
+      d_year in (1999) and
+        ((i_category in ('Women','Shoes','Sports') and
+          i_class in ('dresses','kids','hockey')
          )
-      or (i_category in ('Electronics','Children','Jewelry') and
-          i_class in ('automotive','newborn','custom') 
+      or (i_category in ('Children','Electronics','Music') and
+          i_class in ('school-uniforms','dvd/vcr players','country') 
         ))
 group by i_category, i_class, i_brand,
          s_store_name, s_company_name, d_moy) tmp1
@@ -3743,7 +3743,7 @@ select
 from web_sales
     ,date_dim
 where ws_sold_date_sk=d_date_sk
-  and d_month_seq between 1200 and 1200+11
+  and d_month_seq between 1224 and 1224+11
   and ws_item_sk is not NULL
 group by ws_item_sk, d_date),
 store_v1 as (
@@ -3754,7 +3754,7 @@ select
 from store_sales
     ,date_dim
 where ss_sold_date_sk=d_date_sk
-  and d_month_seq between 1200 and 1200+11
+  and d_month_seq between 1224 and 1224+11
   and ss_item_sk is not NULL
 group by ss_item_sk, d_date)
  select  *
@@ -3791,7 +3791,7 @@ with /* TPC-DS query58.tpl 0.19 */ ss_items as
                   from date_dim
                   where d_week_seq = (select d_week_seq 
                                       from date_dim
-                                      where d_date = '2002-01-14'))
+                                      where d_date = '1998-05-27'))
    and ss_sold_date_sk   = d_date_sk
  group by i_item_id),
  cs_items as
@@ -3805,7 +3805,7 @@ with /* TPC-DS query58.tpl 0.19 */ ss_items as
                   from date_dim
                   where d_week_seq = (select d_week_seq 
                                       from date_dim
-                                      where d_date = '2002-01-14'))
+                                      where d_date = '1998-05-27'))
   and  cs_sold_date_sk = d_date_sk
  group by i_item_id),
  ws_items as
@@ -3819,7 +3819,7 @@ with /* TPC-DS query58.tpl 0.19 */ ss_items as
                   from date_dim
                   where d_week_seq =(select d_week_seq 
                                      from date_dim
-                                     where d_date = '2002-01-14'))
+                                     where d_date = '1998-05-27'))
   and ws_sold_date_sk   = d_date_sk
  group by i_item_id)
   select  ss_items.item_id
@@ -3847,50 +3847,50 @@ with /* TPC-DS query58.tpl 0.19 */ ss_items as
 -- start template query41.tpl query 75 in stream 9
 select /* TPC-DS query41.tpl 0.62 */  distinct(i_product_name)
  from item i1
- where i_manufact_id between 949 and 949+40 
+ where i_manufact_id between 806 and 806+40 
    and (select count(*) as item_cnt
         from item
         where (i_manufact = i1.i_manufact and
         ((i_category = 'Women' and 
-        (i_color = 'rosy' or i_color = 'gainsboro') and 
-        (i_units = 'Bundle' or i_units = 'Gross') and
-        (i_size = 'large' or i_size = 'medium')
+        (i_color = 'tan' or i_color = 'spring') and 
+        (i_units = 'Pound' or i_units = 'Tbl') and
+        (i_size = 'small' or i_size = 'petite')
         ) or
         (i_category = 'Women' and
-        (i_color = 'khaki' or i_color = 'drab') and
-        (i_units = 'Dozen' or i_units = 'Lb') and
-        (i_size = 'petite' or i_size = 'extra large')
+        (i_color = 'cornflower' or i_color = 'sienna') and
+        (i_units = 'Case' or i_units = 'Gram') and
+        (i_size = 'extra large' or i_size = 'N/A')
         ) or
         (i_category = 'Men' and
-        (i_color = 'slate' or i_color = 'saddle') and
-        (i_units = 'Pound' or i_units = 'N/A') and
-        (i_size = 'economy' or i_size = 'N/A')
+        (i_color = 'rosy' or i_color = 'powder') and
+        (i_units = 'Gross' or i_units = 'Ton') and
+        (i_size = 'economy' or i_size = 'medium')
         ) or
         (i_category = 'Men' and
-        (i_color = 'pink' or i_color = 'green') and
-        (i_units = 'Bunch' or i_units = 'Ounce') and
-        (i_size = 'large' or i_size = 'medium')
+        (i_color = 'papaya' or i_color = 'orchid') and
+        (i_units = 'Carton' or i_units = 'Pallet') and
+        (i_size = 'small' or i_size = 'petite')
         ))) or
        (i_manufact = i1.i_manufact and
         ((i_category = 'Women' and 
-        (i_color = 'moccasin' or i_color = 'lavender') and 
+        (i_color = 'azure' or i_color = 'chocolate') and 
         (i_units = 'Each' or i_units = 'Unknown') and
-        (i_size = 'large' or i_size = 'medium')
+        (i_size = 'small' or i_size = 'petite')
         ) or
         (i_category = 'Women' and
-        (i_color = 'smoke' or i_color = 'light') and
-        (i_units = 'Oz' or i_units = 'Dram') and
-        (i_size = 'petite' or i_size = 'extra large')
+        (i_color = 'light' or i_color = 'frosted') and
+        (i_units = 'Box' or i_units = 'Oz') and
+        (i_size = 'extra large' or i_size = 'N/A')
         ) or
         (i_category = 'Men' and
-        (i_color = 'papaya' or i_color = 'ghost') and
-        (i_units = 'Ton' or i_units = 'Tbl') and
-        (i_size = 'economy' or i_size = 'N/A')
+        (i_color = 'firebrick' or i_color = 'grey') and
+        (i_units = 'Bunch' or i_units = 'Tsp') and
+        (i_size = 'economy' or i_size = 'medium')
         ) or
         (i_category = 'Men' and
-        (i_color = 'goldenrod' or i_color = 'chiffon') and
-        (i_units = 'Gram' or i_units = 'Box') and
-        (i_size = 'large' or i_size = 'medium')
+        (i_color = 'honeydew' or i_color = 'cornsilk') and
+        (i_units = 'Dozen' or i_units = 'Dram') and
+        (i_size = 'small' or i_size = 'petite')
         )))) > 0
  order by i_product_name
  limit 100;
@@ -3902,9 +3902,9 @@ select /* TPC-DS query19.tpl 0.8 */  i_brand_id brand_id, i_brand brand, i_manuf
  from date_dim, store_sales, item,customer,customer_address,store
  where d_date_sk = ss_sold_date_sk
    and ss_item_sk = i_item_sk
-   and i_manager_id=71
-   and d_moy=11
-   and d_year=2001
+   and i_manager_id=53
+   and d_moy=12
+   and d_year=1998
    and ss_customer_sk = c_customer_sk 
    and c_current_addr_sk = ca_address_sk
    and substring(ca_zip,1,5) <> substring(s_zip,1,5) 
@@ -3935,7 +3935,7 @@ with /* TPC-DS query83.tpl 0.96 */ sr_items as
 	where d_week_seq in 
 		(select d_week_seq
 		from date_dim
-	  where d_date in ('2002-03-28','2002-09-21','2002-11-21')))
+	  where d_date in ('2001-01-16','2001-09-01','2001-11-05')))
  and   sr_returned_date_sk   = d_date_sk
  group by i_item_id),
  cr_items as
@@ -3951,7 +3951,7 @@ with /* TPC-DS query83.tpl 0.96 */ sr_items as
 	where d_week_seq in 
 		(select d_week_seq
 		from date_dim
-	  where d_date in ('2002-03-28','2002-09-21','2002-11-21')))
+	  where d_date in ('2001-01-16','2001-09-01','2001-11-05')))
  and   cr_returned_date_sk   = d_date_sk
  group by i_item_id),
  wr_items as
@@ -3967,7 +3967,7 @@ with /* TPC-DS query83.tpl 0.96 */ sr_items as
 	where d_week_seq in 
 		(select d_week_seq
 		from date_dim
-		where d_date in ('2002-03-28','2002-09-21','2002-11-21')))
+		where d_date in ('2001-01-16','2001-09-01','2001-11-05')))
  and   wr_returned_date_sk   = d_date_sk
  group by i_item_id)
   select  sr_items.item_id
@@ -3996,9 +3996,9 @@ from store_sales
 where ss_sold_time_sk = time_dim.t_time_sk   
     and ss_hdemo_sk = household_demographics.hd_demo_sk 
     and ss_store_sk = s_store_sk
-    and time_dim.t_hour = 8
+    and time_dim.t_hour = 15
     and time_dim.t_minute >= 30
-    and household_demographics.hd_dep_count = 4
+    and household_demographics.hd_dep_count = 7
     and store.s_store_name = 'ese'
 order by count(*)
 limit 100;
@@ -4022,11 +4022,11 @@ select /* TPC-DS query46.tpl 0.23 */  c_last_name
     and store_sales.ss_store_sk = store.s_store_sk  
     and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
     and store_sales.ss_addr_sk = customer_address.ca_address_sk
-    and (household_demographics.hd_dep_count = 4 or
-         household_demographics.hd_vehicle_count= 3)
+    and (household_demographics.hd_dep_count = 5 or
+         household_demographics.hd_vehicle_count= 4)
     and date_dim.d_dow in (6,0)
-    and date_dim.d_year in (1999,1999+1,1999+2) 
-    and store.s_city in ('Grandview','Trenton','Ebenezer','Cottonwood','Five Forks') 
+    and date_dim.d_year in (1998,1998+1,1998+2) 
+    and store.s_city in ('Russell','Lexington','Cairo','Cloverdale','Sherwood Forest') 
     group by ss_ticket_number,ss_customer_sk,ss_addr_sk,ca_city) dn,customer,customer_address current_addr
     where ss_customer_sk = c_customer_sk
       and customer.c_current_addr_sk = current_addr.ca_address_sk
@@ -4048,7 +4048,7 @@ from item, store_sales, date_dim, store
 where ss_item_sk = i_item_sk and
 ss_sold_date_sk = d_date_sk and
 ss_store_sk = s_store_sk and
-d_month_seq in (1182,1182+1,1182+2,1182+3,1182+4,1182+5,1182+6,1182+7,1182+8,1182+9,1182+10,1182+11) and
+d_month_seq in (1185,1185+1,1185+2,1185+3,1185+4,1185+5,1185+6,1185+7,1185+8,1185+9,1185+10,1185+11) and
 ((i_category in ('Books','Children','Electronics') and
 i_class in ('personal','portable','reference','self-help') and
 i_brand in ('scholaramalgamalg #14','scholaramalgamalg #7',
@@ -4073,9 +4073,9 @@ select /* TPC-DS query55.tpl 0.82 */  i_brand_id brand_id, i_brand brand,
  from date_dim, store_sales, item
  where d_date_sk = ss_sold_date_sk
  	and ss_item_sk = i_item_sk
- 	and i_manager_id=5
+ 	and i_manager_id=91
  	and d_moy=11
- 	and d_year=1998
+ 	and d_year=1999
  group by i_brand, i_brand_id
  order by ext_price desc, i_brand_id
 limit 100 ;
@@ -4102,9 +4102,9 @@ left outer join catalog_returns on (cr_item_sk = cs_item_sk and cr_order_number 
 where d1.d_week_seq = d2.d_week_seq
   and inv_quantity_on_hand < cs_quantity 
   and d3.d_date > d1.d_date + 5
-  and hd_buy_potential = '>10000'
+  and hd_buy_potential = '1001-5000'
   and d1.d_year = 2000
-  and cd_marital_status = 'M'
+  and cd_marital_status = 'W'
 group by i_item_desc,w_warehouse_name,d1.d_week_seq
 order by total_cnt desc, i_item_desc, w_warehouse_name, d_week_seq
 limit 100;
@@ -4126,11 +4126,11 @@ from
   ,customer_address
   ,web_site
 where
-    d_date between '2001-4-01' and 
-           dateadd(day,60,cast('2001-4-01' as date))
+    d_date between '2000-3-01' and 
+           dateadd(day,60,cast('2000-3-01' as date))
 and ws1.ws_ship_date_sk = d_date_sk
 and ws1.ws_ship_addr_sk = ca_address_sk
-and ca_state = 'MT'
+and ca_state = 'KS'
 and ws1.ws_web_site_sk = web_site_sk
 and web_company_name = 'pri'
 and ws1.ws_order_number in (select ws_order_number
@@ -4148,9 +4148,9 @@ select /* TPC-DS query29.tpl 0.53 */
     ,i_item_desc
     ,s_store_id
     ,s_store_name
-    ,max(ss_quantity)        as store_sales_quantity
-    ,max(sr_return_quantity) as store_returns_quantity
-    ,max(cs_quantity)        as catalog_sales_quantity
+    ,stddev_samp(ss_quantity)        as store_sales_quantity
+    ,stddev_samp(sr_return_quantity) as store_returns_quantity
+    ,stddev_samp(cs_quantity)        as catalog_sales_quantity
  from
     store_sales
    ,store_returns
@@ -4162,7 +4162,7 @@ select /* TPC-DS query29.tpl 0.53 */
    ,item
  where
      d1.d_moy               = 4 
- and d1.d_year              = 2000
+ and d1.d_year              = 1999
  and d1.d_date_sk           = ss_sold_date_sk
  and i_item_sk              = ss_item_sk
  and s_store_sk             = ss_store_sk
@@ -4171,11 +4171,11 @@ select /* TPC-DS query29.tpl 0.53 */
  and ss_ticket_number       = sr_ticket_number
  and sr_returned_date_sk    = d2.d_date_sk
  and d2.d_moy               between 4 and  4 + 3 
- and d2.d_year              = 2000
+ and d2.d_year              = 1999
  and sr_customer_sk         = cs_bill_customer_sk
  and sr_item_sk             = cs_item_sk
  and cs_sold_date_sk        = d3.d_date_sk     
- and d3.d_year              in (2000,2000+1,2000+2)
+ and d3.d_year              in (1999,1999+1,1999+2)
  group by
     i_item_id
    ,i_item_desc
@@ -4256,9 +4256,9 @@ cross_sales as
          hd1.hd_income_band_sk = ib1.ib_income_band_sk and
          hd2.hd_income_band_sk = ib2.ib_income_band_sk and
          cd1.cd_marital_status <> cd2.cd_marital_status and
-         i_color in ('lawn','dim','thistle','firebrick','dodger','brown') and
-         i_current_price between 65 and 65 + 10 and
-         i_current_price between 65 + 1 and 65 + 15
+         i_color in ('maroon','dodger','lime','pink','yellow','tomato') and
+         i_current_price between 52 and 52 + 10 and
+         i_current_price between 52 + 1 and 52 + 15
 group by i_product_name
        ,i_item_sk
        ,s_store_name
@@ -4298,8 +4298,8 @@ select cs1.product_name
      ,cs2.cnt
 from cross_sales cs1,cross_sales cs2
 where cs1.item_sk=cs2.item_sk and
-     cs1.syear = 2001 and
-     cs2.syear = 2001 + 1 and
+     cs1.syear = 2000 and
+     cs2.syear = 2000 + 1 and
      cs2.cnt <= cs1.cnt and
      cs1.store_name = cs2.store_name and
      cs1.store_zip = cs2.store_zip
@@ -4322,7 +4322,7 @@ select /* TPC-DS query93.tpl 0.52 */  ss_customer_sk
                                                                and sr_ticket_number = ss_ticket_number)
                 ,reason
             where sr_reason_sk = r_reason_sk
-              and r_reason_desc = 'reason 62') t
+              and r_reason_desc = 'reason 40') t
       group by ss_customer_sk
       order by sumsales, ss_customer_sk
 limit 100;
@@ -4339,13 +4339,13 @@ with /* TPC-DS query56.tpl 0.83 */ ss as (
  where i_item_id in (select
      i_item_id
 from item
-where i_color in ('turquoise','salmon','drab'))
+where i_color in ('bisque','chiffon','lawn'))
  and     ss_item_sk              = i_item_sk
  and     ss_sold_date_sk         = d_date_sk
- and     d_year                  = 1999
- and     d_moy                   = 6
+ and     d_year                  = 2001
+ and     d_moy                   = 3
  and     ss_addr_sk              = ca_address_sk
- and     ca_gmt_offset           = -8 
+ and     ca_gmt_offset           = -6 
  group by i_item_id),
  cs as (
  select i_item_id,sum(cs_ext_sales_price) total_sales
@@ -4358,13 +4358,13 @@ where i_color in ('turquoise','salmon','drab'))
          i_item_id               in (select
   i_item_id
 from item
-where i_color in ('turquoise','salmon','drab'))
+where i_color in ('bisque','chiffon','lawn'))
  and     cs_item_sk              = i_item_sk
  and     cs_sold_date_sk         = d_date_sk
- and     d_year                  = 1999
- and     d_moy                   = 6
+ and     d_year                  = 2001
+ and     d_moy                   = 3
  and     cs_bill_addr_sk         = ca_address_sk
- and     ca_gmt_offset           = -8 
+ and     ca_gmt_offset           = -6 
  group by i_item_id),
  ws as (
  select i_item_id,sum(ws_ext_sales_price) total_sales
@@ -4377,13 +4377,13 @@ where i_color in ('turquoise','salmon','drab'))
          i_item_id               in (select
   i_item_id
 from item
-where i_color in ('turquoise','salmon','drab'))
+where i_color in ('bisque','chiffon','lawn'))
  and     ws_item_sk              = i_item_sk
  and     ws_sold_date_sk         = d_date_sk
- and     d_year                  = 1999
- and     d_moy                   = 6
+ and     d_year                  = 2001
+ and     d_moy                   = 3
  and     ws_bill_addr_sk         = ca_address_sk
- and     ca_gmt_offset           = -8
+ and     ca_gmt_offset           = -6
  group by i_item_id)
   select  i_item_id ,sum(total_sales) total_sales
  from  (select * from ss 
@@ -4403,7 +4403,7 @@ select ss_customer_sk customer_sk
       ,ss_item_sk item_sk
 from store_sales,date_dim
 where ss_sold_date_sk = d_date_sk
-  and d_month_seq between 1205 and 1205 + 11
+  and d_month_seq between 1212 and 1212 + 11
 group by ss_customer_sk
         ,ss_item_sk),
 csci as(
@@ -4411,7 +4411,7 @@ csci as(
       ,cs_item_sk item_sk
 from catalog_sales,date_dim
 where cs_sold_date_sk = d_date_sk
-  and d_month_seq between 1205 and 1205 + 11
+  and d_month_seq between 1212 and 1212 + 11
 group by cs_bill_customer_sk
         ,cs_item_sk)
  select  sum(case when ssci.customer_sk is not null and csci.customer_sk is null then 1 else 0 end) store_only
@@ -4430,7 +4430,7 @@ with /* TPC-DS query23.tpl 0.68 */ frequent_ss_items as
       ,item
   where ss_sold_date_sk = d_date_sk
     and ss_item_sk = i_item_sk 
-    and d_year in (2000,2000+1,2000+2,2000+3)
+    and d_year in (1999,1999+1,1999+2,1999+3)
   group by substring(i_item_desc,1,30),i_item_sk,d_date
   having count(*) >4),
  max_store_sales as
@@ -4441,7 +4441,7 @@ with /* TPC-DS query23.tpl 0.68 */ frequent_ss_items as
             ,date_dim 
         where ss_customer_sk = c_customer_sk
          and ss_sold_date_sk = d_date_sk
-         and d_year in (2000,2000+1,2000+2,2000+3) 
+         and d_year in (1999,1999+1,1999+2,1999+3) 
         group by c_customer_sk)),
  best_ss_customer as
  (select c_customer_sk,sum(ss_quantity*ss_sales_price) ssales
@@ -4457,8 +4457,8 @@ from
  from (select cs_quantity*cs_list_price sales
        from catalog_sales
            ,date_dim 
-       where d_year = 2000 
-         and d_moy = 3 
+       where d_year = 1999 
+         and d_moy = 6 
          and cs_sold_date_sk = d_date_sk 
          and cs_item_sk in (select item_sk from frequent_ss_items)
          and cs_bill_customer_sk in (select c_customer_sk from best_ss_customer)
@@ -4466,8 +4466,8 @@ from
       select ws_quantity*ws_list_price sales
        from web_sales 
            ,date_dim 
-       where d_year = 2000 
-         and d_moy = 3 
+       where d_year = 1999 
+         and d_moy = 6 
          and ws_sold_date_sk = d_date_sk 
          and ws_item_sk in (select item_sk from frequent_ss_items)
          and ws_bill_customer_sk in (select c_customer_sk from best_ss_customer)) 
@@ -4479,7 +4479,7 @@ with /* TPC-DS query23.tpl 0.68 part2 */ frequent_ss_items as
       ,item
   where ss_sold_date_sk = d_date_sk
     and ss_item_sk = i_item_sk
-    and d_year in (2000,2000 + 1,2000 + 2,2000 + 3)
+    and d_year in (1999,1999 + 1,1999 + 2,1999 + 3)
   group by substring(i_item_desc,1,30),i_item_sk,d_date
   having count(*) >4),
  max_store_sales as
@@ -4490,7 +4490,7 @@ with /* TPC-DS query23.tpl 0.68 part2 */ frequent_ss_items as
             ,date_dim 
         where ss_customer_sk = c_customer_sk
          and ss_sold_date_sk = d_date_sk
-         and d_year in (2000,2000+1,2000+2,2000+3)
+         and d_year in (1999,1999+1,1999+2,1999+3)
         group by c_customer_sk)),
  best_ss_customer as
  (select c_customer_sk,sum(ss_quantity*ss_sales_price) ssales
@@ -4506,8 +4506,8 @@ with /* TPC-DS query23.tpl 0.68 part2 */ frequent_ss_items as
         from catalog_sales
             ,customer
             ,date_dim 
-        where d_year = 2000 
-         and d_moy = 3 
+        where d_year = 1999 
+         and d_moy = 6 
          and cs_sold_date_sk = d_date_sk 
          and cs_item_sk in (select item_sk from frequent_ss_items)
          and cs_bill_customer_sk in (select c_customer_sk from best_ss_customer)
@@ -4518,8 +4518,8 @@ with /* TPC-DS query23.tpl 0.68 part2 */ frequent_ss_items as
        from web_sales
            ,customer
            ,date_dim 
-       where d_year = 2000 
-         and d_moy = 3 
+       where d_year = 1999 
+         and d_moy = 6 
          and ws_sold_date_sk = d_date_sk 
          and ws_item_sk in (select item_sk from frequent_ss_items)
          and ws_bill_customer_sk in (select c_customer_sk from best_ss_customer)
@@ -4535,24 +4535,24 @@ from(select *
      from (select item_sk,rank() over (order by rank_col asc) rnk
            from (select ss_item_sk item_sk,avg(ss_net_profit) rank_col 
                  from store_sales ss1
-                 where ss_store_sk = 214
+                 where ss_store_sk = 110
                  group by ss_item_sk
                  having avg(ss_net_profit) > 0.90*(select avg(ss_net_profit) rank_col
                                                   from store_sales
-                                                  where ss_store_sk = 214
-                                                    and ss_customer_sk is null
+                                                  where ss_store_sk = 110
+                                                    and ss_addr_sk is null
                                                   group by ss_store_sk))V1)V11
      where rnk  < 11) asceding,
     (select *
      from (select item_sk,rank() over (order by rank_col desc) rnk
            from (select ss_item_sk item_sk,avg(ss_net_profit) rank_col
                  from store_sales ss1
-                 where ss_store_sk = 214
+                 where ss_store_sk = 110
                  group by ss_item_sk
                  having avg(ss_net_profit) > 0.90*(select avg(ss_net_profit) rank_col
                                                   from store_sales
-                                                  where ss_store_sk = 214
-                                                    and ss_customer_sk is null
+                                                  where ss_store_sk = 110
+                                                    and ss_addr_sk is null
                                                   group by ss_store_sk))V2)V21
      where rnk  < 11) descending,
 item i1,
@@ -4585,12 +4585,12 @@ and     cr_returning_customer_sk= c_customer_sk
 and     cd_demo_sk              = c_current_cdemo_sk
 and     hd_demo_sk              = c_current_hdemo_sk
 and     ca_address_sk           = c_current_addr_sk
-and     d_year                  = 2000 
+and     d_year                  = 2001 
 and     d_moy                   = 12
 and     ( (cd_marital_status       = 'M' and cd_education_status     = 'Unknown')
         or(cd_marital_status       = 'W' and cd_education_status     = 'Advanced Degree'))
-and     hd_buy_potential like '1001-5000%'
-and     ca_gmt_offset           = -6
+and     hd_buy_potential like '0-500%'
+and     ca_gmt_offset           = -7
 group by cc_call_center_id,cc_name,cc_manager,cd_marital_status,cd_education_status
 order by sum(cr_net_loss) desc;
 
@@ -4628,7 +4628,7 @@ select /* TPC-DS query49.tpl 0.48 */  channel, item, return_ratio, return_rank, 
                          and ws.ws_quantity > 0
                          and ws_sold_date_sk = d_date_sk
                          and d_year = 1998
-                         and d_moy = 12
+                         and d_moy = 11
  		group by ws.ws_item_sk
  	) in_web
  ) web
@@ -4671,7 +4671,7 @@ select /* TPC-DS query49.tpl 0.48 */  channel, item, return_ratio, return_rank, 
                          and cs.cs_quantity > 0
                          and cs_sold_date_sk = d_date_sk
                          and d_year = 1998
-                         and d_moy = 12
+                         and d_moy = 11
                  group by cs.cs_item_sk
  	) in_cat
  ) catalog
@@ -4710,7 +4710,7 @@ select /* TPC-DS query49.tpl 0.48 */  channel, item, return_ratio, return_rank, 
                          and sts.ss_quantity > 0
                          and ss_sold_date_sk = d_date_sk
                          and d_year = 1998
-                         and d_moy = 12
+                         and d_moy = 11
  		group by sts.ss_item_sk
  	) in_store
  ) store
@@ -4726,21 +4726,21 @@ select /* TPC-DS query49.tpl 0.48 */  channel, item, return_ratio, return_rank, 
 -- end template query49.tpl query 92 in stream 9
 -- start template query76.tpl query 93 in stream 9
 select /* TPC-DS query76.tpl 0.99 */  channel, col_name, d_year, d_qoy, i_category, COUNT(*) sales_cnt, SUM(ext_sales_price) sales_amt FROM (
-        SELECT 'store' as channel, 'ss_addr_sk' col_name, d_year, d_qoy, i_category, ss_ext_sales_price ext_sales_price
+        SELECT 'store' as channel, 'ss_promo_sk' col_name, d_year, d_qoy, i_category, ss_ext_sales_price ext_sales_price
          FROM store_sales, item, date_dim
-         WHERE ss_addr_sk IS NULL
+         WHERE ss_promo_sk IS NULL
            AND ss_sold_date_sk=d_date_sk
            AND ss_item_sk=i_item_sk
         UNION ALL
-        SELECT 'web' as channel, 'ws_ship_addr_sk' col_name, d_year, d_qoy, i_category, ws_ext_sales_price ext_sales_price
+        SELECT 'web' as channel, 'ws_bill_customer_sk' col_name, d_year, d_qoy, i_category, ws_ext_sales_price ext_sales_price
          FROM web_sales, item, date_dim
-         WHERE ws_ship_addr_sk IS NULL
+         WHERE ws_bill_customer_sk IS NULL
            AND ws_sold_date_sk=d_date_sk
            AND ws_item_sk=i_item_sk
         UNION ALL
-        SELECT 'catalog' as channel, 'cs_ship_addr_sk' col_name, d_year, d_qoy, i_category, cs_ext_sales_price ext_sales_price
+        SELECT 'catalog' as channel, 'cs_ship_hdemo_sk' col_name, d_year, d_qoy, i_category, cs_ext_sales_price ext_sales_price
          FROM catalog_sales, item, date_dim
-         WHERE cs_ship_addr_sk IS NULL
+         WHERE cs_ship_hdemo_sk IS NULL
            AND cs_sold_date_sk=d_date_sk
            AND cs_item_sk=i_item_sk) foo
 GROUP BY channel, col_name, d_year, d_qoy, i_category
@@ -4760,7 +4760,7 @@ from (select i_manager_id
       where ss_item_sk = i_item_sk
         and ss_sold_date_sk = d_date_sk
         and ss_store_sk = s_store_sk
-        and d_month_seq in (1190,1190+1,1190+2,1190+3,1190+4,1190+5,1190+6,1190+7,1190+8,1190+9,1190+10,1190+11)
+        and d_month_seq in (1177,1177+1,1177+2,1177+3,1177+4,1177+5,1177+6,1177+7,1177+8,1177+9,1177+10,1177+11)
         and ((    i_category in ('Books','Children','Electronics')
               and i_class in ('personal','portable','reference','self-help')
               and i_brand in ('scholaramalgamalg #14','scholaramalgamalg #7',
@@ -4778,7 +4778,7 @@ limit 100;
 
 -- end template query63.tpl query 94 in stream 9
 -- start template query45.tpl query 95 in stream 9
-select /* TPC-DS query45.tpl 0.18 */ ca_zip, ca_city, sum(ws_sales_price)
+select /* TPC-DS query45.tpl 0.18 */ ca_zip, ca_state, sum(ws_sales_price)
  from web_sales, customer, customer_address, date_dim, item
  where ws_bill_customer_sk = c_customer_sk
  	and c_current_addr_sk = ca_address_sk 
@@ -4791,9 +4791,9 @@ select /* TPC-DS query45.tpl 0.18 */ ca_zip, ca_city, sum(ws_sales_price)
                              )
  	    )
  	and ws_sold_date_sk = d_date_sk
- 	and d_qoy = 2 and d_year = 1999
- group by ca_zip, ca_city
- order by ca_zip, ca_city
+ 	and d_qoy = 1 and d_year = 1999
+ group by ca_zip, ca_state
+ order by ca_zip, ca_state
  limit 100;
 
 -- end template query45.tpl query 95 in stream 9
@@ -4809,8 +4809,8 @@ select /* TPC-DS query43.tpl 0.15 */  s_store_name, s_store_id,
  from date_dim, store_sales, store
  where d_date_sk = ss_sold_date_sk and
        s_store_sk = ss_store_sk and
-       s_gmt_offset = -7 and
-       d_year = 1999 
+       s_gmt_offset = -6 and
+       d_year = 2001 
  group by s_store_name, s_store_id
  order by s_store_name, s_store_id,sun_sales,mon_sales,tue_sales,wed_sales,thu_sales,fri_sales,sat_sales
  limit 100;
@@ -4826,7 +4826,7 @@ select /* TPC-DS query85.tpl 0.33 */  substring(r_reason_desc,1,20)
  where ws_web_page_sk = wp_web_page_sk
    and ws_item_sk = wr_item_sk
    and ws_order_number = wr_order_number
-   and ws_sold_date_sk = d_date_sk and d_year = 1998
+   and ws_sold_date_sk = d_date_sk and d_year = 2002
    and cd1.cd_demo_sk = wr_refunded_cdemo_sk 
    and cd2.cd_demo_sk = wr_returning_cdemo_sk
    and ca_address_sk = wr_refunded_addr_sk
@@ -4834,11 +4834,11 @@ select /* TPC-DS query85.tpl 0.33 */  substring(r_reason_desc,1,20)
    and
    (
     (
-     cd1.cd_marital_status = 'S'
+     cd1.cd_marital_status = 'U'
      and
      cd1.cd_marital_status = cd2.cd_marital_status
      and
-     cd1.cd_education_status = 'Unknown'
+     cd1.cd_education_status = 'College'
      and 
      cd1.cd_education_status = cd2.cd_education_status
      and
@@ -4846,11 +4846,11 @@ select /* TPC-DS query85.tpl 0.33 */  substring(r_reason_desc,1,20)
     )
    or
     (
-     cd1.cd_marital_status = 'U'
+     cd1.cd_marital_status = 'S'
      and
      cd1.cd_marital_status = cd2.cd_marital_status
      and
-     cd1.cd_education_status = '4 yr Degree' 
+     cd1.cd_education_status = 'Primary' 
      and
      cd1.cd_education_status = cd2.cd_education_status
      and
@@ -4858,11 +4858,11 @@ select /* TPC-DS query85.tpl 0.33 */  substring(r_reason_desc,1,20)
     )
    or
     (
-     cd1.cd_marital_status = 'D'
+     cd1.cd_marital_status = 'W'
      and
      cd1.cd_marital_status = cd2.cd_marital_status
      and
-     cd1.cd_education_status = '2 yr Degree'
+     cd1.cd_education_status = 'Secondary'
      and
      cd1.cd_education_status = cd2.cd_education_status
      and
@@ -4874,21 +4874,21 @@ select /* TPC-DS query85.tpl 0.33 */  substring(r_reason_desc,1,20)
     (
      ca_country = 'United States'
      and
-     ca_state in ('TN', 'WV', 'MI')
+     ca_state in ('ID', 'VA', 'MO')
      and ws_net_profit between 100 and 200  
     )
     or
     (
      ca_country = 'United States'
      and
-     ca_state in ('IL', 'GA', 'NE')
+     ca_state in ('WV', 'MN', 'TX')
      and ws_net_profit between 150 and 300  
     )
     or
     (
      ca_country = 'United States'
      and
-     ca_state in ('NJ', 'AR', 'MT')
+     ca_state in ('OK', 'IN', 'OH')
      and ws_net_profit between 50 and 250  
     )
    )
@@ -4905,11 +4905,11 @@ select /* TPC-DS query37.tpl 0.31 */  i_item_id
        ,i_item_desc
        ,i_current_price
  from item, inventory, date_dim, catalog_sales
- where i_current_price between 20 and 20 + 30
+ where i_current_price between 37 and 37 + 30
  and inv_item_sk = i_item_sk
  and d_date_sk=inv_date_sk
- and d_date between cast('2001-05-12' as date) and dateadd(day,60,cast('2001-05-12' as date))
- and i_manufact_id in (709,849,973,828)
+ and d_date between cast('2001-02-16' as date) and dateadd(day,60,cast('2001-02-16' as date))
+ and i_manufact_id in (765,927,842,847)
  and inv_quantity_on_hand between 100 and 500
  and cs_item_sk = i_item_sk
  group by i_item_id,i_item_desc,i_current_price
@@ -4928,86 +4928,86 @@ select /* TPC-DS query8.tpl 0.63 */  s_store_name
       SELECT substring(ca_zip,1,5) ca_zip
       FROM customer_address
       WHERE substring(ca_zip,1,5) IN (
-                          '79533','10859','82317','81779','62397','25353',
-                          '97401','29646','22682','50414','43960',
-                          '70278','20279','46337','25274','61365',
-                          '70626','84760','60251','52099','49818',
-                          '78207','77784','28067','62406','21790',
-                          '60558','32755','31869','80459','79663',
-                          '11446','16113','26202','23018','57111',
-                          '54741','18148','89094','75371','13258',
-                          '42014','27650','14633','71588','63544',
-                          '58310','59073','18848','43925','49136',
-                          '16819','94318','77343','88954','66040',
-                          '27952','26694','39101','90144','47759',
-                          '95791','29460','26984','24009','30486',
-                          '64301','79353','87539','46820','39689',
-                          '31399','24699','28790','63005','90369',
-                          '88809','23448','40225','96838','43837',
-                          '14350','74785','77830','59765','73191',
-                          '91705','34648','92883','87290','31657',
-                          '49938','96489','82242','53331','89796',
-                          '74830','36701','30344','32260','61744',
-                          '16804','72273','13623','17722','98012',
-                          '62629','41243','97116','40790','57724',
-                          '30506','12583','70380','80026','45301',
-                          '60452','72870','16080','74519','72473',
-                          '49753','87615','98802','77772','72469',
-                          '27327','92506','31436','25917','32941',
-                          '99187','27833','29071','44927','28517',
-                          '26335','44042','12903','76086','20988',
-                          '12878','12554','28311','11630','67931',
-                          '27921','76019','27565','50010','64069',
-                          '55182','72004','41274','42891','75735',
-                          '17556','20012','37861','26473','37176',
-                          '58088','92116','27182','77005','92234',
-                          '19637','90851','86146','30470','14852',
-                          '90963','70611','55907','56402','94565',
-                          '82050','57110','24408','92877','82647',
-                          '63474','36535','93714','76398','84064',
-                          '78285','63650','27559','23224','46367',
-                          '81343','53264','42177','35129','16122',
-                          '71953','53758','22302','31011','35915',
-                          '82611','69908','18539','13416','80351',
-                          '50843','34089','86924','37360','32462',
-                          '14816','46416','85758','35390','69082',
-                          '50101','38375','97204','66627','56887',
-                          '93147','15717','55397','34092','52937',
-                          '43556','93854','99670','33145','69826',
-                          '64511','39514','44603','72700','50531',
-                          '31201','25434','41993','17973','55541',
-                          '81024','40928','57806','43014','89411',
-                          '92604','96513','37677','77554','76400',
-                          '15087','23811','19367','71584','89074',
-                          '67115','29823','73105','91932','46285',
-                          '71416','58161','27314','69369','96597',
-                          '60036','14141','61464','31773','94806',
-                          '59303','52576','19319','27893','32206',
-                          '26254','86219','53361','20794','47993',
-                          '86182','10740','57118','36874','37567',
-                          '13486','37332','57217','71706','33436',
-                          '88099','89769','27381','11070','74570',
-                          '35057','11612','93127','16401','21487',
-                          '27601','24398','40372','15994','79564',
-                          '53952','67266','66707','12646','70645',
-                          '48024','86291','26544','56774','54639',
-                          '50216','40880','99297','80966','51947',
-                          '16362','62315','93204','92530','14880',
-                          '39998','61483','24511','26344','84686',
-                          '70374','25478','96340','11884','33603',
-                          '67141','27586','48188','69812','44455',
-                          '38964','25007','75257','46032','92458',
-                          '79537','81090','16461','45133','47653',
-                          '35268','78600','84504','43963','85093',
-                          '47585','45924','88052','26346','60406',
-                          '24174','61807','32181','73260','46068',
-                          '66461','72113','77433','44391','27400',
-                          '23510','64176','79983','93133','41465',
-                          '89125','92079','37968','45343','40673',
-                          '35778','28742','85570','15882','69183',
-                          '50607','13371','34462','14796','97483',
-                          '36982','94154','21678','34396','21828',
-                          '67993','50844','67841','15392')
+                          '78878','34500','84987','86569','94793','71605',
+                          '98827','47283','92580','59573','95652',
+                          '74329','56608','68435','52193','80952',
+                          '22590','99459','80804','34648','21116',
+                          '18394','14071','24194','26623','43965',
+                          '68354','43032','23555','51854','81343',
+                          '85148','70469','73760','42263','98896',
+                          '58293','52264','68251','55329','13708',
+                          '88639','33685','30738','97852','30580',
+                          '45743','84110','61323','99723','69721',
+                          '11638','69680','70162','55607','62112',
+                          '28484','73848','11939','90222','20087',
+                          '39337','48876','50958','64382','97029',
+                          '86679','79851','15616','17120','12847',
+                          '17573','46992','94634','29388','76845',
+                          '94967','12023','36243','43066','90255',
+                          '87383','88044','85187','64972','64323',
+                          '48862','67442','56526','79416','30653',
+                          '56855','98476','96855','62770','93096',
+                          '92559','74114','68104','99145','61657',
+                          '27304','54386','79848','17572','63132',
+                          '53060','10150','16232','72524','92284',
+                          '71803','39084','72403','71917','67887',
+                          '78145','51155','10834','60454','85959',
+                          '46406','67623','35740','39209','90047',
+                          '74915','45552','20062','99660','54890',
+                          '45443','97957','85545','89373','61937',
+                          '41154','82565','35745','38789','19891',
+                          '19316','38746','35299','26554','36977',
+                          '45114','81126','63142','52111','64932',
+                          '79810','79990','40061','75619','53383',
+                          '27903','38274','58014','80942','36297',
+                          '50806','40087','98539','62288','92780',
+                          '31904','16154','72579','88956','18701',
+                          '86805','25140','16883','94163','95507',
+                          '53049','42061','15172','30493','79434',
+                          '11668','95695','15870','14641','79364',
+                          '47282','83796','78636','84397','21259',
+                          '31140','47052','41165','62015','51344',
+                          '79087','78450','64043','47432','15981',
+                          '16715','20427','11805','94262','76679',
+                          '99634','53620','58165','51510','15989',
+                          '82995','19723','66947','25346','46919',
+                          '65269','19856','77307','90914','35903',
+                          '85680','80550','58068','41423','62491',
+                          '15557','32780','39935','57069','69923',
+                          '13734','63506','98390','43891','89783',
+                          '69545','87905','21992','64631','77226',
+                          '70916','85104','87322','63625','61649',
+                          '81390','60336','13523','80745','26957',
+                          '10068','67758','46333','15603','94542',
+                          '10469','13065','51610','19296','76402',
+                          '73182','11224','23965','80689','73234',
+                          '26361','69305','36929','41766','48527',
+                          '55158','13126','53603','40047','65059',
+                          '73130','96306','57117','82001','68245',
+                          '87872','56428','70938','64192','81106',
+                          '39703','41820','45726','84596','98726',
+                          '80423','34576','60631','90669','57396',
+                          '52203','84880','32049','13405','68610',
+                          '99127','34163','11398','74548','29543',
+                          '13762','77093','51167','93176','99360',
+                          '86270','20708','95930','91977','26388',
+                          '75311','64114','35979','61017','74481',
+                          '21979','58125','20637','31187','11057',
+                          '25786','78279','27894','90304','76161',
+                          '32603','81831','33703','49798','26334',
+                          '54893','80601','35442','29336','33125',
+                          '85899','27052','36099','69833','59870',
+                          '25128','61288','64162','15380','46033',
+                          '76234','43027','86410','51883','64033',
+                          '25251','41370','96220','94008','24159',
+                          '68760','36866','68252','96432','72809',
+                          '23739','91783','91584','79352','14693',
+                          '19970','18660','30279','47471','81537',
+                          '57648','81562','82205','25660','42253',
+                          '51096','96266','84967','17525','81285',
+                          '78491','49943','86014','49287','51390',
+                          '53171','76632','98930','21105','95034',
+                          '69459','13545','14864','62172')
      intersect
       select ca_zip
       from (SELECT substring(ca_zip,1,5) ca_zip,count(*) cnt
@@ -5018,7 +5018,7 @@ select /* TPC-DS query8.tpl 0.63 */  s_store_name
             having count(*) > 10)A1)A2) V1
  where ss_store_sk = s_store_sk
   and ss_sold_date_sk = d_date_sk
-  and d_qoy = 1 and d_year = 2001
+  and d_qoy = 2 and d_year = 1998
   and (substring(s_zip,1,2) = substring(V1.ca_zip,1,2))
  group by s_store_name
  order by s_store_name
