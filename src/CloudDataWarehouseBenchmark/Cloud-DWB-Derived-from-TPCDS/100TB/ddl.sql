@@ -555,7 +555,7 @@ ss_sold_date_sk int4 ,
 	To load the sample data, you must provide authentication for your cluster to access Amazon S3 on your behalf.
 	You can provide either role-based authentication or key-based authentication.
 
-	Text files needed to load test data under s3://redshift-downloads/TPC-DS/100TB are publicly available.
+	Text files needed to load test data under s3://redshift-downloads/TPC-DS/2.13/100TB are publicly available.
 	Any valid credentials should have read access.
 
 	The COPY commands include a placeholder for the aws_access_key_id and aws_secret_access_key.
@@ -564,52 +564,52 @@ ss_sold_date_sk int4 ,
 	For more information check samples in https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-create-sample-db.html
 */
 
-copy store_sales from 's3://redshift-downloads/TPC-DS/100TB/store_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy catalog_sales from 's3://redshift-downloads/TPC-DS/100TB/catalog_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy web_sales from 's3://redshift-downloads/TPC-DS/100TB/web_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy web_returns from 's3://redshift-downloads/TPC-DS/100TB/web_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy store_returns from 's3://redshift-downloads/TPC-DS/100TB/store_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy catalog_returns from 's3://redshift-downloads/TPC-DS/100TB/catalog_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy call_center from 's3://redshift-downloads/TPC-DS/100TB/call_center/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy catalog_page from 's3://redshift-downloads/TPC-DS/100TB/catalog_page/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy customer_address from 's3://redshift-downloads/TPC-DS/100TB/customer_address/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy customer from 's3://redshift-downloads/TPC-DS/100TB/customer/customer.' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy customer_demographics from 's3://redshift-downloads/TPC-DS/100TB/customer_demographics/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy date_dim from 's3://redshift-downloads/TPC-DS/100TB/date_dim/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy household_demographics from 's3://redshift-downloads/TPC-DS/100TB/household_demographics/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy income_band from 's3://redshift-downloads/TPC-DS/100TB/income_band/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy inventory from 's3://redshift-downloads/TPC-DS/100TB/inventory/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy item from 's3://redshift-downloads/TPC-DS/100TB/item/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy promotion from 's3://redshift-downloads/TPC-DS/100TB/promotion/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy reason from 's3://redshift-downloads/TPC-DS/100TB/reason/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy ship_mode from 's3://redshift-downloads/TPC-DS/100TB/ship_mode/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy store from 's3://redshift-downloads/TPC-DS/100TB/store/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy time_dim from 's3://redshift-downloads/TPC-DS/100TB/time_dim/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy warehouse from 's3://redshift-downloads/TPC-DS/100TB/warehouse/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy web_page from 's3://redshift-downloads/TPC-DS/100TB/web_page/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
-copy web_site from 's3://redshift-downloads/TPC-DS/100TB/web_site/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1' ;
+copy call_center from 's3://redshift-downloads/TPC-DS/2.13/100TB/call_center/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy catalog_page from 's3://redshift-downloads/TPC-DS/2.13/100TB/catalog_page/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy catalog_returns from 's3://redshift-downloads/TPC-DS/2.13/100TB/catalog_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy catalog_sales from 's3://redshift-downloads/TPC-DS/2.13/100TB/catalog_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy customer_address from 's3://redshift-downloads/TPC-DS/2.13/100TB/customer_address/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy customer_demographics from 's3://redshift-downloads/TPC-DS/2.13/100TB/customer_demographics/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy customer from 's3://redshift-downloads/TPC-DS/2.13/100TB/customer/customer.' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy date_dim from 's3://redshift-downloads/TPC-DS/2.13/100TB/date_dim/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy household_demographics from 's3://redshift-downloads/TPC-DS/2.13/100TB/household_demographics/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy income_band from 's3://redshift-downloads/TPC-DS/2.13/100TB/income_band/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy inventory from 's3://redshift-downloads/TPC-DS/2.13/100TB/inventory/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy item from 's3://redshift-downloads/TPC-DS/2.13/100TB/item/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy promotion from 's3://redshift-downloads/TPC-DS/2.13/100TB/promotion/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy reason from 's3://redshift-downloads/TPC-DS/2.13/100TB/reason/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy ship_mode from 's3://redshift-downloads/TPC-DS/2.13/100TB/ship_mode/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy store from 's3://redshift-downloads/TPC-DS/2.13/100TB/store/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy store_returns from 's3://redshift-downloads/TPC-DS/2.13/100TB/store_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy store_sales from 's3://redshift-downloads/TPC-DS/2.13/100TB/store_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy time_dim from 's3://redshift-downloads/TPC-DS/2.13/100TB/time_dim/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy warehouse from 's3://redshift-downloads/TPC-DS/2.13/100TB/warehouse/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy web_page from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_page/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy web_returns from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy web_sales from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy web_site from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_site/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
 
-select count(*) from call_center;
-select count(*) from catalog_page;
-select count(*) from catalog_returns;
-select count(*) from catalog_sales;
-select count(*) from customer_address;
-select count(*) from customer_demographics;
-select count(*) from customer;
-select count(*) from date_dim;
-select count(*) from household_demographics;
-select count(*) from income_band;
-select count(*) from inventory;
-select count(*) from item;
-select count(*) from promotion;
-select count(*) from reason;
-select count(*) from ship_mode;
-select count(*) from store_returns;
-select count(*) from store_sales;
-select count(*) from store;
-select count(*) from time_dim;
-select count(*) from warehouse;
-select count(*) from web_page;
-select count(*) from web_returns;
-select count(*) from web_sales;
-select count(*) from web_site;
+select count(*) from call_center; -- 60
+select count(*) from catalog_page; -- 50000
+select count(*) from catalog_returns; -- 14407487006
+select count(*) from catalog_sales; -- 144065709209
+select count(*) from customer; -- 100000000
+select count(*) from customer_address; -- 50000000
+select count(*) from customer_demographics; -- 1920800
+select count(*) from date_dim; -- 73049
+select count(*) from household_demographics; -- 7200
+select count(*) from income_band; -- 20
+select count(*) from inventory; -- 1965337830
+select count(*) from item; -- 502000
+select count(*) from promotion; -- 2500
+select count(*) from reason; -- 75
+select count(*) from ship_mode; -- 20
+select count(*) from store; -- 1902
+select count(*) from store_returns; -- 28770721279
+select count(*) from store_sales; -- 288056582818
+select count(*) from time_dim; -- 86400
+select count(*) from warehouse; -- 30
+select count(*) from web_page; -- 5004
+select count(*) from web_returns; -- 7191501511
+select count(*) from web_sales; -- 71983449467
+select count(*) from web_site; -- 96

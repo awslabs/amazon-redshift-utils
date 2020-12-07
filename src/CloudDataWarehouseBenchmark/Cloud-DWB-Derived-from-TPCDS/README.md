@@ -1,4 +1,4 @@
-# Cloud Data Warehouse Benchmark Derived from TPC-DS
+# Cloud Data Warehouse Benchmark Derived from TPC-DS 2.13
 
 Amazon Redshift is a fast, scalable data warehouse that makes it simple and cost-effective to analyze all your data across your data warehouse and data lake. Redshift delivers faster performance than other data warehouses by using machine learning, massively parallel query execution, and columnar storage on high-performance disk. We continuously improve the performance of the Redshift service. One workload that we use is the Cloud DW benchmark derived from TPC-DS (http://www.tpc.org/tpcds/default.asp).
 
@@ -12,4 +12,4 @@ In order to address the enormous range of query types and user behaviors encount
 
 The Cloud DW benchmark consists of the same set of 99 queries as in TPC-DS. These have a wide variation of complexity, amount of data scanned, answer set size and elapsed time. Each query asks a business question and includes the corresponding query to answer the question. We have generated instances of the 99 queries for a given database scale,  3TB, and we have used the well defined default seed for the random number generator. We have also provided sample DDL for each of the tables in the Cloud DW benchmark. Similarly we have generated the input data files that you can use as a data source to populate the tables. This gives you an easy and complete way of setting up your own Cloud DW benchmark on Redshift and running the same queries that we use in our own testing. Alternatively, you can use the tools in the TPC-DS Benchmark Kit to generate many different versions of these queries that vary by parameter values.
 
-
+As Amazon Redshift does not currently support the ROLLUP or GROUPING operators, this benchmark uses the approved SQL variants provided by TPC-DS for queries 5, 14, 18, 22, 27, 35, 36, 67, 70, 77, 80, and 86.
