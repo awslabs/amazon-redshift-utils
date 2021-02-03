@@ -1,10 +1,8 @@
 # Simple Replay README
 
-**Please note that this is the README for Simpe Replay - Version 2.**
-
 ## Introduction
 
-The Simple Replay tool enables customers to easily conduct what-if analysis and evaluate how their workload will perform in different scenarios. For example, customers can use the tool to benchmark their actual workload on a new instance type like RA3, evaluate a new feature, or different cluster configurations. The new version of Simple Replay enhances existing Simple Replay tool by providing following additional functionalities:
+Customers are always trying to reproduce issues or workloads from clusters or to do what-if scenarios. A customer can easily clone a production cluster, but replicating the workload is more complicated. Simple Replay was created to bridge that gap. Simple Replay V2 enhances existing Simple Replay tool by providing following additional functionalities: 
 
 * Ability to mimic COPY and UNLOAD workloads. 
 * Ability to execute the transactions and queries in the same time interval as executed in the source cluster. 
@@ -36,9 +34,9 @@ In the newly created EC2 machine:
 2.1 Install Python3
 
 ```
-sudo yum install python36
+sudo yum install python3
 
-sudo yum install python36-pip
+sudo yum install python3-pip
 ```
 
 2.2 Install ODBC dependencies
@@ -58,7 +56,7 @@ sudo yum install gcc gcc-c++ python36 python36-devel unixODBC unixODBC-devel
 In Simple Replay root directory, you will find the file requirements.txt. Run the following command
 
 ```
-sudo pip-3.6 install -r requirements.txt
+sudo pip3 install -r requirements.txt
 ```
 
 2.5 Install ODBC Driver for Linux
@@ -104,8 +102,8 @@ This script extracts query and connection info from User Activity Log (audit) an
 | Configuration value    |Required?    |Details    |Example    |
 | ---    |---    |---    |---    |
 | workload_location    |Required    |Amazon S3 or local location. Where to save the extracted workload.    |"s3://mybucket/myworkload"    |
-| start_time    |Optional    |Start time of the workload to be extracted. If not provided process will extract workload from all the audit logs files available.    |“2020-07-24T09:31:00+00:00”    |
-| end_time    |Optional    |End time of the workload to be extracted. If not provided process will extract workload from all the audit logs files available.    |“2020-07-26T21:45:00+00:00”    |
+| start_time    |Required    |Start time of the workload to be extracted. If not provided process will extract workload from all the audit logs files available.    |“2020-07-24T09:31:00+00:00”    |
+| end_time    |Required    |End time of the workload to be extracted. If not provided process will extract workload from all the audit logs files available.    |“2020-07-26T21:45:00+00:00”    |
 | Source cluster information and log location (Either the source cluster endpoint and master user name OR the log location has to be provided)      |
 | source_cluster_endpoint    |Optional    |If provided, Simple Replay will use [`describe-logging-status`](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/redshift/describe-logging-status.html) to automatically retrieve the S3 audit log location. Additionally, Simple Replay will query [SVL_STATEMENTTEXT](https://docs.aws.amazon.com/redshift/latest/dg/r_SVL_STATEMENTTEXT.html) to retrieve query start and end times. If this endpoint isn’t provided, or if the query cannot be found in SVL_STATEMENTTEXT, the record time present in the audit logs will be used for the query’s start and end times.    |"<redshift-cluster-name>.<identifier>.<region>.redshift.amazonaws.com:<port>\<databasename>"    |
 | master_username    |Optional    |Required only if source_cluster_endpoint is provided.    |"awsuser"    |
@@ -120,7 +118,7 @@ This script extracts query and connection info from User Activity Log (audit) an
 Once the above configuration parameters are set in extraction.yaml, the workload from the source cluster can be extracted using the following command:
 
 ```
-python3 Extraction.py extraction.yaml
+python3 extract.py extract.yaml
 ```
 
 ### Output
@@ -149,6 +147,7 @@ Takes an extracted workload and replays it against a target cluster.
 
 | Configuration value    |Required?     |Details    |Example    |
 | ---    |---    |---    |---    |
+| log_level    |Required    |Default will be INFO. DEBUG can be used for additional logging.   |debug    |
 | workload_location    |Required    |S3 or local. Location of the extracted workload to be replayed. Errors encountered during replay will be logged in a unique folder in the workload location.    |“s3://mybucket/myworkload”    |
 | target_cluster_endpoint    |Required    |Cluster that will be used to replay the extracted workload.    |“<redshift-cluster-name>.<identifier>.<region>.redshift.amazonaws.com:<port>/<databasename>”    |
 | master_username    |Required    |This is necessary so `set session_authorization` can be successfully executed to mimic users during replay.    |"awsuser"    |
@@ -162,11 +161,14 @@ Takes an extracted workload and replays it against a target cluster.
 | replay_output    |Optional    |S3 Location for UNLOADs (all UNLOAD locations will be appended to this given location) and system table UNLOADs.    |“s3://mybucket/myreplayoutput”    |
 | unload_system_table_queries    |Optional    |If provided, this SQL file will be run at the end of the Extraction to UNLOAD system tables to the location provided in replay_output.    |"unload_system_tables.sql"    |
 | target_cluster_system_table_unload_iam_role    |Optional    |IAM role to perform system table unloads to replay_output.    |“arn:aws:iam::0123456789012:role/MyRedshiftUnloadRole”    |
+| Include Exclude Filters    |Optional    |The process can replay a subset of queries, filtered by including one or more lists of "databases AND users AND pids", or excluding one or more lists of "databases OR users OR pids". |""   |
+| num_workers    |Optional    |Number of processes to use to parallelize the work. If omitted or null, uses one process per cpu - 1.     |“”    |
+| connection_tolerance_sec    |Optional    |Output warnings if connections are not within this number of seconds from their expected time.    |“300”    |
 
 ### Command
 
 ```
-python3 Replay.py replay.yaml
+python3 replay.py replay.yaml
 ```
 
 ### Output
