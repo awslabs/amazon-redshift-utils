@@ -1,18 +1,69 @@
-workload_location: "s3://mybucketname/myworkload/Extraction-<cluster-identifier>-<timestamp>" # S3 or local location of extracted workload. Errors are logged here.
-target_cluster_endpoint: "endpoint:port/dbname"
-master_username: "awsuser"
+# Set the amount of logging
+log_level: info
 
-odbc_driver: "Amazon Redshift" # Requried only for playback using ODBC (pyodbc)
-default_interface: "psql" # If original driver isn't supported (e.g. JDBC), use this driver. "psql" or "odbc" are the only valid values.
+# Directory for extracted workload, relative to current directory
+workload_location: ""
 
-time_interval_between_transactions: "" # Optional - Leaving it empty defers to connections.json. "all on" preserves time between transactions. "all off" disregards time between transactions, executing them as a batch.
-time_interval_between_queries: "" # Optional - Leaving it empty defers to connections.json. "all on" preserves time between queries. "all off" disregards time between queries, executing them as a batch.
+# Endpoint and username of cluster to replay again
+target_cluster_endpoint: ""
+master_username: ""
 
-execute_copy_statements: "false" # Should COPY statements be executed?
-execute_unload_statements: "false" # Should UNLOAD statements be executed?
+# Required only for playback using ODBC (pyodbc)
+odbc_driver: ""
 
-replay_output: "" # Optional - Where the UNLOADs and system table unload goes
-unload_iam_role: "" # Optional - Leaving this blank means UNLOADs will not be replayed. IAM role for UNLOADs to be performed with.
+# If original driver isn't supported (e.g. JDBC), use this driver. "psql" or
+# "odbc" are the only valid values.
+default_interface: "psql"
 
-unload_system_table_queries: "unload_system_tables.sql" # Location of the SQL file containing queries to unload system tables
-target_cluster_system_table_unload_iam_role: "" # IAM role to UNLOAD system tables from source cluster to S3 location for later analysis
+# Optional - Leaving it empty defers to connections.json. "all on" preserves
+# time between transactions. "all off" disregards time between transactions,
+# executing them as a batch.
+time_interval_between_transactions: "all on"
+
+# Optional - Leaving it empty defers to connections.json. "all on" preserves
+# time between queries. "all off" disregards time between queries, executing
+# them as a batch.
+time_interval_between_queries: "all on" 
+
+# Should COPY statements be executed?
+execute_copy_statements: "false"
+
+# Should UNLOAD statements be executed?
+execute_unload_statements: "false"
+
+# Optional - Where the UNLOADs and system table unload goes
+replay_output: ""
+
+# Optional - Leaving this blank means UNLOADs will not be replayed. IAM role
+# for UNLOADs to be performed with.
+unload_iam_role: ""
+
+# Location of the SQL file containing queries to unload system tables
+unload_system_table_queries: "unload_system_tables.sql"
+
+# IAM role to UNLOAD system tables from source cluster to S3 location for later
+# analysis
+target_cluster_system_table_unload_iam_role: ""
+
+# Include filters will work as "db AND user AND pid". Exclude filters will work as "db OR user OR pid".
+filters:
+  include:
+    database_name: ['*']
+    username: ['*']
+    pid: ['*']
+  exclude:
+    database_name: []
+    username: []
+    pid: []
+
+##
+## The settings below probably don't need to be modified for a typical run
+##
+
+# number of proceses to use to parallelize the work. If omitted or null, uses
+# one process per cpu - 1 
+num_workers: ~
+
+# output warnings if connections are not within this number of seconds from
+# their expected time.
+connection_tolerance_sec: 300

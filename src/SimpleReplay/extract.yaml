@@ -4,8 +4,8 @@ master_username: "awsuser" # Required only if source_cluster_endpoint is given.
 
 odbc_driver: "" # Required only if extraction using ODBC is preferred and installed. Otherwise psql is used.
 
-start_time: "" # Optional - Suggested. Start time of the workload to be extracted, e.g. 2020-06-14T21:41:16+00:00
-end_time: "" # Optional - Suggested. End time of the workload to be extracted, e.g. 2020-06-14T21:41:16+00:00
+start_time: "" # Required - Start time of the workload to be extracted, e.g. 2020-06-14T21:41:16+00:00
+end_time: "" # Required - End time of the workload to be extracted, e.g. 2020-06-14T21:41:16+00:00
 
 log_location: "" # Leave blank to automatically retrieve audit logs from the source cluster. Otherwise, an S3 or local location containing the audit logs is required.
 

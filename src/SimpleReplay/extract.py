@@ -76,9 +76,9 @@ class Log:
         return hash((str(self.pid), str(self.xid), self.text.strip("\n")))
 
 class ConnectionLog:
-    def __init__(self, session_initiation_time, database_name, username, pid):
+    def __init__(self, session_initiation_time, end_time, database_name, username, pid):         
         self.session_initiation_time = session_initiation_time
-        self.disconnection_time = ""
+        self.disconnection_time = end_time        
         self.application_name = ""
         self.database_name = database_name
         self.username = username
@@ -102,8 +102,10 @@ class ConnectionLog:
         )
 
     def __hash__(self):
-        return hash((self.database_name, self.username, self.pid))
+            return hash((self.database_name, self.username, self.pid))
 
+    def get_pk(self):         
+            return hash((self.session_initiation_time, self.database_name, self.username, self.pid))
 
 class SystemLog:
     def __init__(self, start_time, end_time, database_name, user_id, pid, xid, text):
@@ -251,10 +253,14 @@ def initiate_connection(cluster_urls, interface, database_name):
 
 def get_local_logs(log_directory_path, start_time, end_time):
     connections = {}
+    last_connections = {}
     logs = {}
     databases = set()
 
-    log_directory = os.listdir(log_directory_path)
+
+    unsorted_list = os.listdir(log_directory_path)         
+    log_directory = sorted(unsorted_list)                  
+
     for filename in log_directory:
         if "start_node" in filename:
             log_file = gzip.open(
@@ -263,28 +269,28 @@ def get_local_logs(log_directory_path, start_time, end_time):
         else:
             log_file = gzip.open(log_directory_path + "/" + filename, "r")
         parse_log(
-            log_file, filename, connections, logs, databases, start_time, end_time,
+            log_file, filename, connections, last_connections, logs, databases, start_time, end_time,
         )
         log_file.close()
 
-    return (connections, logs, databases)
+    return (connections, logs, databases, last_connections)
 
 
 def parse_log(
-    log_file, filename, connections, logs, databases, start_time, end_time,
+    log_file, filename, connections, last_connections, logs, databases, start_time, end_time,         
 ):
     if "useractivitylog" in filename:
         logger.debug(f"Parsing user activity log: {filename}")
         parse_user_activity_log(log_file, logs, databases, start_time, end_time)
     elif "connectionlog" in filename:
         logger.debug(f"Parsing connection log: {filename}")
-        parse_connection_log(log_file, connections, start_time, end_time)
+        parse_connection_log(log_file, connections, last_connections, start_time, end_time)         
     elif "start_node" in filename:
         logger.debug(f"Parsing start node log: {filename}")
         parse_start_node_log(log_file, logs, databases, start_time, end_time)
 
 
-def parse_connection_log(file, connections, start_time, end_time):
+def parse_connection_log(file, connections, last_connections, start_time, end_time):         
     for line in file.readlines():
         line = line.decode("utf-8")
         connection_information = line.split("|")
@@ -294,11 +300,12 @@ def parse_connection_log(file, connections, start_time, end_time):
         ).replace(tzinfo=datetime.timezone.utc)
         pid = connection_information[4]
         database_name = connection_information[5].strip()
-        username = connection_information[6].strip()
+        if connection_information[7].strip() == 'IAM AssumeUser':
+            username = connection_information[6].strip()[4:]
+        else:
+            username = connection_information[6].strip()
         application_name = connection_information[15]
 
-        connection_log = ConnectionLog(event_time, database_name, username, pid)
-        connection_key = hash(connection_log)
 
 #        if username != "rdsdb":
 #            if connection_event == "initiating session ":
@@ -317,36 +324,45 @@ def parse_connection_log(file, connections, start_time, end_time):
 #                        connection = connections[connection_key]
 #                        connection.disconnection_time = event_time
 
-        if username != "rdsdb":
+        if username != "rdsdb" and event_time >= start_time and event_time <= end_time:
+
+            connection_log = ConnectionLog(event_time, end_time, database_name, username, pid)
+
             if connection_event == "initiating session ":
-                if not start_time or (start_time and event_time < end_time):
-                    connections[connection_key] = connection_log
-                    connection = connections[connection_key]
-                    if start_time and event_time < start_time:
-                        connection.session_initiation_time = start_time
-                    #connection = connections[connection_key]
-                    #connections[connection_key] = connection_log
+                connection_key = connection_log.get_pk()
+                # create a new connection
+                connections[connection_key] = connection_log
+                last_connections[hash(connection_log)]=connection_key
             elif connection_event == "set application_name ":
-                if connection_key in connections:
-                    connections[connection_key].application_name = " ".join(
-                        application_name.split()
-)
+                if hash(connection_log) in last_connections:
+                    connection_key = last_connections[hash(connection_log)]
+                    if connection_key in connections:
+                        # set the latest connection with application name
+                        connections[connection_key].application_name = " ".join( application_name.split())
+                    else: # create new connection if there's no one yet with start time equals to start of extraction
+                        connection_log.session_initiation_time = start_time
+                        connection_key = connection_log.get_pk()
+                        connections[connection_key] = connection_log
+                        last_connections[hash(connection_log)] = connection_key
             elif connection_event == "disconnecting session ":
-                if connection_key in connections:
-                    if end_time and event_time < start_time:
-                        del connections[connection_key]
-                    else:
-                        connection = connections[connection_key]
-                        if end_time and event_time > end_time:
-                            connection.disconnection_time = end_time
-                        else:
-                            connection.disconnection_time = event_time
-             
+                if hash(connection_log) in last_connections:
+                    connection_key = last_connections[hash(connection_log)]
+                    if connection_key in connections:
+                        # set the latest connection with disconnection time
+                        connections[connection_key].disconnection_time = event_time
+                else: # create new connection if there's no one yet with start time equals to start of extraction
+                    connection_log.session_initiation_time = start_time
+                    connection_log.disconnection_time = event_time
+                    connection_key = connection_log.get_pk()
+                    connections[connection_key] = connection_log
+                    last_connections[hash(connection_log)] = connection_key
+
 
 def parse_user_activity_log(file, logs, databases, start_time, end_time):
     user_activity_log = Log()
 
     datetime_pattern = re.compile(r"'\d+-\d+-\d+T\d+:\d+:\d+Z UTC")
+    fetch_pattern = re.compile(r"fetch\s+(next|all|forward all|\d+|forward\s+\d+)\s+(from|in)\s+\S+", flags=re.IGNORECASE)
     for line in file.readlines():
         line = line.decode("utf-8")
         if datetime_pattern.match(line):
@@ -358,7 +374,11 @@ def parse_user_activity_log(file, logs, databases, start_time, end_time):
                     # Check if duplicate. This happens with JDBC connections.
                     prev_query = logs[filename][-1]
                     if not is_duplicate(prev_query.text, user_activity_log.text):
-                        logs[filename].append(user_activity_log)
+                        if fetch_pattern.search(prev_query.text) and fetch_pattern.search(user_activity_log.text):
+                            user_activity_log.text = f"--{user_activity_log.text}"
+                            logs[filename].append(user_activity_log)
+                        else:
+                            logs[filename].append(user_activity_log)
                 else:
                     logs[filename] = [user_activity_log]
 
@@ -428,12 +448,12 @@ def is_duplicate(first_query_text, second_query_text):
     second_query_text = second_query_text.strip().lower()
 
     return (
-        not first_query_text.endswith(";")
-        and second_query_text.endswith(";")
-        and any(
-            second_query_text.startswith(word)
-            for word in dedupe_these
-        )
+            (not first_query_text.endswith(";")
+             and second_query_text.endswith(";")
+             and any(
+                        second_query_text.startswith(word)
+                        for word in dedupe_these
+                    ))
     )
 
 
@@ -495,7 +515,7 @@ def connection_time_replacement(sorted_connections):
 
         if connection['disconnection_time'] == '':
             empty_disconnect_times.append(i)
-        #elif max_disconnect_time < connection['disconnection_time']:
+
         elif max_disconnect_time == '' or ( max_disconnect_time and max_disconnect_time < connection['disconnection_time']):
             max_disconnect_time = connection['disconnection_time']
             
@@ -518,7 +538,7 @@ return: a string of the update query lines
 def remove_line_comments(query):
     removed_string = query
     prev_location = 0
-    #found_comment = False
+
     while True:
         line_comment_begin = removed_string.find('--', prev_location)
         prev_location = line_comment_begin
@@ -543,6 +563,7 @@ def remove_line_comments(query):
             # reached end of query
             if start_comment == -1 and end_comment != -1:
                 # if line comment is between start and end, then remove until end of comment
+            
                 removed_string = removed_string[:line_comment_begin] + removed_string[end_comment:]
             else:
                 # else remove up the end of line
@@ -550,12 +571,12 @@ def remove_line_comments(query):
    
     return removed_string
 
-def save_logs(logs, connections, output_directory):
+def save_logs(logs, last_connections, output_directory):
     num_queries = 0
     for filename, transaction in logs.items():
         num_queries += len(transaction)
     logger.info(
-        f"Exporting {len(logs)} transcations ({num_queries} queries) to {output_directory}"
+        f"Exporting {len(logs)} transactions ({num_queries} queries) to {output_directory}"
     )
 
     is_s3 = True
@@ -574,7 +595,7 @@ def save_logs(logs, connections, output_directory):
     for filename, queries in logs.items():
         file_text = "--Time interval: true\n\n"
         for query in queries:
-            query.text = remove_line_comments(query.text)
+            query.text = remove_line_comments(query.text).strip()
             time_info = "--Record time: " + query.record_time.isoformat() + "\n"
             if query.start_time:
                 time_info += "--Start time: " + query.start_time.isoformat() + "\n"
@@ -584,16 +605,28 @@ def save_logs(logs, connections, output_directory):
             if "copy " in query.text.lower() and "from 's3:" in query.text.lower(): #Raj
                 bucket = re.search(r"from 's3:\/\/[^']*", query.text, re.IGNORECASE).group()[6:]
                 replacements.add(bucket)
-
+                query.text = re.sub(
+                    r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'",
+                    f" IAM_ROLE ''",
+                    query.text,
+                    flags=re.IGNORECASE,
+                )
+            if "unload" in query.text.lower() and "to 's3:" in query.text.lower():
+                query.text = re.sub(
+                    r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'",
+                    f" IAM_ROLE ''",
+                    query.text,
+                    flags=re.IGNORECASE,
+                )
             if not len(query.text) == 0:
-                query.text = query.text.strip()
+                query.text = f"/* Replay source file: {filename} */ {query.text.strip()}"
                 if not query.text.endswith(";"):
                     query.text += ";"
                 file_text += time_info + query.text + "\n"
 
             if (
-                not hash((query.database_name, query.username, query.pid))
-                in connections
+                not hash((query.database_name, query.username, query.pid)) in last_connections         
+
             ):
                 missing_audit_log_connections.add(
                     (query.database_name, query.username, query.pid)
@@ -612,13 +645,14 @@ def save_logs(logs, connections, output_directory):
 
     logger.info(f"Generating {len(missing_audit_log_connections)} missing connections.")
     for missing_audit_log_connection_info in missing_audit_log_connections:
-        connections[hash(missing_audit_log_connection_info)] = ConnectionLog(
-            "",
+        connection = ConnectionLog(
+            start_time,end_time, # for missing connections set start_time and end_time
             missing_audit_log_connection_info[0],
             missing_audit_log_connection_info[1],
             missing_audit_log_connection_info[2],
         )
-
+        pk = connection.get_pk()
+        connections[pk]=connection
     logger.info(
         f"Exporting a total of {len(connections.values())} connections to {output_directory}"
     )
@@ -678,6 +712,7 @@ def get_cluster_log_location(source_cluster_endpoint):
 def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
     connections = {}
     logs = {}
+    last_connections = {}
     databases = set()
 
     conn = client("s3")
@@ -719,6 +754,7 @@ def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
         connections,
         logs,
         databases,
+        last_connections,
     )
     get_s3_audit_logs(
         log_bucket,
@@ -729,9 +765,10 @@ def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
         connections,
         logs,
         databases,
+        last_connections,
     )
-
-    return (connections, logs, databases)
+    return (connections, logs, databases, last_connections)
+    #return (connections, logs, databases)
 
 
 def get_s3_audit_logs(
@@ -743,8 +780,10 @@ def get_s3_audit_logs(
     connections,
     logs,
     databases,
+    last_connections,
 ):
     s3 = boto3.resource("s3")
+    #last_connections = {}
 
     index_of_last_valid_log = len(audit_objects) - 1
 
@@ -778,7 +817,7 @@ def get_s3_audit_logs(
         log_file = gzip.GzipFile(fileobj=log_object.get()["Body"])
 
         parse_log(
-            log_file, filename, connections, logs, databases, start_time, end_time,
+            log_file, filename, connections, last_connections, logs, databases, start_time, end_time,
         )
 
         if (
@@ -794,6 +833,7 @@ def get_s3_audit_logs(
     logger.debug(
         f'First audit log in start_time range: {audit_objects[curr_index]["Key"].split("/")[-1]}'
     )
+    return (connections, logs, databases, last_connections)
 
 
 def get_connection_string(cluster_endpoint, username, odbc_driver):
@@ -910,7 +950,12 @@ def validate_config_file(config_file):
                 'Config file missing value for "log_location". Please provide a value for "log_location", or provide a value for "source_cluster_endpoint".'
             )
             exit(EXIT_MISSING_VALUE_CONFIG_FILE)
-    if config_file["start_time"]:
+    if not config_file["start_time"]:
+        logger.error(
+            'Config file is missing "start_time". Please provide a valid "start_time" for extract.'
+        )
+        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+    else:
         try:
             dateutil.parser.isoparse(config_file["start_time"])
         except ValueError:
@@ -918,7 +963,12 @@ def validate_config_file(config_file):
                 'Config file "start_time" value not formatted as ISO 8601. Please format "start_time" as ISO 8601 or remove its value.'
             )
             exit(EXIT_INVALID_VALUE_CONFIG_FILE)
-    if config_file["end_time"]:
+    if not config_file["end_time"]:
+        logger.error(
+            'Config file is missing "end_time". Please provide a valid "end_time" for extract.'
+        )
+        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+    else:
         try:
             dateutil.parser.isoparse(config_file["end_time"])
         except ValueError:
@@ -926,6 +976,16 @@ def validate_config_file(config_file):
                 'Config file "end_time" value not formatted as ISO 8601. Please format "end_time" as ISO 8601 or remove its value.'
             )
             exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+    if not config_file["start_time"]:
+        logger.error(
+            'Config file missing value for "start_time". Please provide a value for "start_time".'
+        )
+        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+    if not config_file["end_time"]:
+        logger.error(
+            'Config file missing value for "end_time". Please provide a value for "end_time".'
+        )
+        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
     if not config_file["workload_location"]:
         logger.error(
             'Config file missing value for "workload_location". Please provide a value for "workload_location".'
@@ -1028,15 +1088,15 @@ if __name__ == "__main__":
         end_time = ""
 
     if config_file["log_location"]:
-        logger.info(f'Retrieveing logs from {config_file["log_location"]}')
+        logger.info(f'Retrieving logs from {config_file["log_location"]}')
         if config_file["log_location"].startswith("s3://"):
             log_bucket = config_file["log_location"][5:].split("/")[0]
             log_prefix = config_file["log_location"][5:].partition("/")[2]
-            (connections, audit_logs, databases) = get_s3_logs(
+            (connections, audit_logs, databases, last_connections) = get_s3_logs(
                 log_bucket, log_prefix, start_time, end_time,
             )
         else:
-            (connections, audit_logs, databases) = get_local_logs(
+            (connections, audit_logs, databases, last_connections) = get_local_logs(
                 config_file["log_location"], start_time, end_time,
             )
     else:
@@ -1048,7 +1108,7 @@ if __name__ == "__main__":
         )
 
         logger.info(f"Retrieving logs from s3://{log_bucket}/{log_prefix}")
-        (connections, audit_logs, databases) = get_s3_logs(
+        (connections, audit_logs, databases,last_connections) = get_s3_logs(
             log_bucket, log_prefix, start_time, end_time,
         )
 
@@ -1089,7 +1149,7 @@ if __name__ == "__main__":
 
     save_logs(
         audit_logs,
-        connections,
+        last_connections,
         config_file["workload_location"] + "/" + extraction_name,
     )
 
