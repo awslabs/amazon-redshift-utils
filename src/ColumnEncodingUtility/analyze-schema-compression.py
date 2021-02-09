@@ -632,7 +632,6 @@ def analyze(table_info):
             non_identity_columns = []
             fks = []
             table_distkey = None
-            table_sortkeys = []
             new_sortkey_arr = [t.strip() for t in new_sort_keys.split(',')] if new_sort_keys is not None else []
 
             # count of suggested optimizations
@@ -686,20 +685,17 @@ def analyze(table_info):
                 if table_name is not None and len(new_sortkey_arr) > 0:
                     if col in new_sortkey_arr:
                         sortkeys[new_sortkey_arr.index(col) + 1] = col
-                        table_sortkeys.append(col)
                 else:
                     if row_sortkey != 0:
                         # add the absolute ordering of the sortkey to the list of all sortkeys
                         sortkeys[abs(row_sortkey)] = col
-                        table_sortkeys.append(col)
 
                         if row_sortkey < 0:
                             has_zindex_sortkeys = True
 
                 # don't compress first sort key column. This will be set on the basis of the existing sort key not
                 # being modified, or on the assignment of the new first sortkey
-                if (abs(row_sortkey) == 1 and len(new_sortkey_arr) == 0) or (
-                        col in table_sortkeys and table_sortkeys.index(col) == 0):
+                if sortkeys.get(1, None) == col:
                     compression = 'RAW'
                 else:
                     compression = new_encoding
@@ -740,11 +736,13 @@ def analyze(table_info):
                 comment(msg)
                 raise Exception(msg)
 
+            ordered_sortkey_columns = [sortkeys[index] for index in range(1, len(sortkeys) + 1)]
+
             # abort if new sortkeys were set but we couldn't find them in the set of all columns
-            if new_sort_keys is not None and len(table_sortkeys) != len(new_sortkey_arr):
+            if new_sort_keys is not None and len(ordered_sortkey_columns) != len(new_sortkey_arr):
                 if debug:
                     comment("Requested Sort Keys: %s" % new_sortkey_arr)
-                    comment("Resolved Sort Keys: %s" % table_sortkeys)
+                    comment("Resolved Sort Keys: %s" % ordered_sortkey_columns)
                 msg = "Column resolution of sortkeys '%s' not found when setting new Table Sort Keys" % new_sortkey_arr
                 comment(msg)
                 raise Exception(msg)
@@ -772,13 +770,10 @@ def analyze(table_info):
                         comment("Adding Sortkeys: %s" % sortkeys)
                     sortkey = '%sSORTKEY(' % ('INTERLEAVED ' if has_zindex_sortkeys else '')
 
-                    for i in range(1, len(sortkeys) + 1):
-                        sortkey = sortkey + sortkeys[i]
+                    ordered_sortkey_columns = [sortkeys[index] for index in range(1, len(sortkeys) + 1)]
 
-                        if i != len(sortkeys):
-                            sortkey = sortkey + ','
-                        else:
-                            sortkey = sortkey + ')\n'
+                    sortkey += ','.join(ordered_sortkey_columns) + ')\n'
+
                     create_table = create_table + (' %s ' % sortkey)
 
                 create_table = create_table + ';'
@@ -811,8 +806,8 @@ def analyze(table_info):
                                                                             source_columns,
                                                                             schema_name,
                                                                             table_name)
-                if len(table_sortkeys) > 0:
-                    insert = "%s order by \"%s\";" % (insert, ",".join(table_sortkeys).replace(',', '\",\"'))
+                if len(ordered_sortkey_columns) > 0:
+                    insert = "%s order by \"%s\";" % (insert, ",".join(ordered_sortkey_columns).replace(',', '\",\"'))
                 else:
                     insert = "%s;" % (insert)
 
