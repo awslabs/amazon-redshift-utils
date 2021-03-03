@@ -450,6 +450,7 @@ def is_duplicate(first_query_text, second_query_text):
     return (
             (not first_query_text.endswith(";")
              and second_query_text.endswith(";")
+             and first_query_text == second_query_text
              and any(
                         second_query_text.startswith(word)
                         for word in dedupe_these
