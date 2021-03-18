@@ -444,18 +444,17 @@ def is_duplicate(first_query_text, second_query_text):
         "with"
     ]
 
-    first_query_text = first_query_text.strip().lower()
-    second_query_text = second_query_text.strip().lower()
-
+    first_query_text = first_query_text.strip().replace(";", "")
+    second_query_text = second_query_text.strip().replace(";", "")
+    second_query_comment_removed = second_query_text
+    if second_query_text.startswith("/*"):
+        second_query_comment_removed = second_query_text[second_query_text.find('*/')+2:len(second_query_text)].strip()
     return (
-            (not first_query_text.endswith(";")
-             and second_query_text.endswith(";")
-             and first_query_text == second_query_text
-             and any(
-                        second_query_text.startswith(word)
-                        for word in dedupe_these
-                    ))
+        (
+                first_query_text == second_query_text
+                and any(second_query_comment_removed.startswith(word) for word in dedupe_these))
     )
+
 
 
 def parse_start_node_log(file, logs, databases, start_time, end_time):

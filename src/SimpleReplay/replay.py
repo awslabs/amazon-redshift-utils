@@ -319,7 +319,7 @@ class ConnectionThread(threading.Thread):
                     cursor.execute(query.text)
                 elif (g_config["execute_unload_statements"] == "true" and  "to 's3:" in query.text.lower() and g_config["replay_output"] is not None):
                     cursor.execute(query.text)
-                elif ("from 's3:" not in query.text.lower()) and ("to 's3:" not in query.text.lower()):
+                elif ("from 's3:" not in query.text.lower()) and ("to 's3:" not in query.text.lower()) and ("$1" not in query.text):
                     cursor.execute(query.text)
                 
                 logger.debug(
@@ -542,7 +542,7 @@ def get_connection_key(database_name, username, pid):
 
 
 def parse_transaction(sql_filename, sql_file_text):
-    sql_filename_split = sql_filename.split(".")[0].split("-")
+    sql_filename_split = sql_filename.split(".sql")[0].split("-")
     database_name = sql_filename_split[0]
     username = sql_filename_split[1]
     pid = sql_filename_split[2]
