@@ -47,6 +47,7 @@ History:
 2018-10-12 dmenin Added table ownership to the script (as an alter table statment as the owner of the table is the issuer of the CREATE TABLE command)
 2019-03-24 adedotua added filter for diststyle AUTO distribution style
 2020-11-11 leisersohn Added COMMENT section
+2021-25-03 venkat.yerneni Fixed Table COMMENTS and added Column COMMENTS
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
@@ -258,12 +259,16 @@ from (SELECT
   WHERE c.relkind = 'r' 
   --COMMENT
   UNION
-  SELECT 
-  c.oid::bigint as table_id ,n.nspname AS schemaname, c.relname AS tablename, 600250000 as seq,
-  'COMMENT ON TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' IS ''' + QUOTE_IDENT(des.description) + ''';' as ddl
+  SELECT c.oid::bigint AS table_id,
+       n.nspname     AS schemaname,
+       c.relname     AS tablename,
+       600250000     AS seq,
+       ('COMMENT ON '::text + nvl2(cl.column_name, 'column '::text, 'table '::text) + quote_ident(n.nspname::text) + '.'::text + quote_ident(c.relname::text) + nvl2(cl.column_name, '.'::text + cl.column_name::text, ''::text) + ' IS \''::text + quote_ident(des.description) + '\'; '::text)::character VARYING AS ddl
   FROM pg_description des
-  INNER JOIN pg_class AS c ON c.oid = des.objoid
-  INNER JOIN pg_namespace AS n ON n.oid = c.relnamespace
+  JOIN pg_class c ON c.oid = des.objoid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  LEFT JOIN information_schema."columns" cl
+  ON cl.ordinal_position::integer = des.objsubid AND cl.table_name::NAME = c.relname
   WHERE c.relkind = 'r'
 
   UNION
