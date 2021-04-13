@@ -236,13 +236,13 @@ def initiate_connection(cluster_urls, interface, database_name):
                 conn.close()
     elif interface == "psql":
         try:
-            conn = pg8000.connect(
+            conn = redshift_connector.connect(
                 user=cluster_urls["psql"]["username"],
                 password=cluster_urls["psql"]["password"],
                 host=cluster_urls["psql"]["host"],
-                port=cluster_urls["psql"]["port"],
+                port=int(cluster_urls["psql"]["port"]),
                 database=database_name,
-                ssl_context=True,
+
             )
             conn.autocommit = True
             yield conn
@@ -444,15 +444,23 @@ def is_duplicate(first_query_text, second_query_text):
         "with"
     ]
 
-    first_query_text = first_query_text.strip().replace(";", "")
-    second_query_text = second_query_text.strip().replace(";", "")
+    first_query_text = first_query_text.strip()
+    second_query_text = second_query_text.strip()
+    first_query_text_no_semi = first_query_text.replace(";", "")
+    second_query_tex_no_semi = second_query_text.replace(";", "")
     second_query_comment_removed = second_query_text
+    first_query_comment_removed = first_query_text
     if second_query_text.startswith("/*"):
         second_query_comment_removed = second_query_text[second_query_text.find('*/')+2:len(second_query_text)].strip()
+    if first_query_text.startswith("/*"):
+        first_query_comment_removed = first_query_text[second_query_text.find('*/')+2:len(first_query_text)].strip()
     return (
         (
-                first_query_text == second_query_text
-                and any(second_query_comment_removed.startswith(word) for word in dedupe_these))
+                first_query_text_no_semi == second_query_tex_no_semi
+                and any(second_query_comment_removed.startswith(word) for word in dedupe_these)
+        ) or ((second_query_comment_removed.lower().startswith('create')) and (first_query_comment_removed.lower().startswith('create')) and second_query_comment_removed.endswith(';'))
+        or ((second_query_comment_removed.lower().startswith('drop')) and (first_query_comment_removed.lower().startswith('drop')) and second_query_comment_removed.endswith(';'))
+        or ((second_query_comment_removed.lower().startswith('alter')) and (first_query_comment_removed.lower().startswith('alter')) and second_query_comment_removed.endswith(';'))
     )
 
 
@@ -596,11 +604,19 @@ def save_logs(logs, last_connections, output_directory):
         file_text = "--Time interval: true\n\n"
         for query in queries:
             query.text = remove_line_comments(query.text).strip()
-            time_info = "--Record time: " + query.record_time.isoformat() + "\n"
+            header_info = "--Record time: " + query.record_time.isoformat() + "\n"
             if query.start_time:
-                time_info += "--Start time: " + query.start_time.isoformat() + "\n"
+                header_info += "--Start time: " + query.start_time.isoformat() + "\n"
             if query.end_time:
-                time_info += "--End time: " + query.end_time.isoformat() + "\n"
+                header_info += "--End time: " + query.end_time.isoformat() + "\n"
+            try:
+                header_info += f"--Database: {query.database_name}\n"
+                header_info += f"--Username: {query.username}\n"
+                header_info += f"--Pid: {query.pid}\n"
+                header_info += f"--Xid: {query.xid}\n"
+            except AttributeError:
+                logger.error(f'Query is missing header info, skipping: {query}')
+                continue
 
             if "copy " in query.text.lower() and "from 's3:" in query.text.lower(): #Raj
                 bucket = re.search(r"from 's3:\/\/[^']*", query.text, re.IGNORECASE).group()[6:]
@@ -622,7 +638,7 @@ def save_logs(logs, last_connections, output_directory):
                 query.text = f"/* Replay source file: {filename} */ {query.text.strip()}"
                 if not query.text.endswith(";"):
                     query.text += ";"
-                file_text += time_info + query.text + "\n"
+                file_text += header_info + query.text + "\n"
 
             if (
                 not hash((query.database_name, query.username, query.pid)) in last_connections         
@@ -882,13 +898,13 @@ def unload_system_table(
     if odbc_driver:
         conn = pyodbc.connect(source_cluster_urls["odbc"])
     else:
-        conn = pg8000.connect(
+        conn = redshift_connector.connect(
             user=source_cluster_urls["psql"]["username"],
             password=source_cluster_urls["psql"]["password"],
             host=source_cluster_urls["psql"]["host"],
-            port=source_cluster_urls["psql"]["port"],
+            port=int(source_cluster_urls["psql"]["port"]),
             database=source_cluster_urls["psql"]["database"],
-            ssl_context=True,
+
         )
 
     conn.autocommit = True
@@ -1059,17 +1075,17 @@ if __name__ == "__main__":
 
             interface = "odbc"
         else:
-            import pg8000
+            import redshift_connector
 
             interface = "psql"
     except Exception as err:
         if config_file["odbc_driver"]:
             logger.error(
-                'Error while importing pyodbc. Please ensure pyodbc is correctly installed or remove the value for "odbc_driver" to use pg8000.'
+                'Error while importing pyodbc. Please ensure pyodbc is correctly installed or remove the value for "odbc_driver" to use redshift_connector.'
             )
         else:
             logger.error(
-                'Error while importing pg8000. Please ensure pg8000 is correctly installed or add an ODBC driver name value for "odbc_driver" to use pyodbc.'
+                'Error while importing redshift_connector. Please ensure redshift_connector is correctly installed or add an ODBC driver name value for "odbc_driver" to use pyodbc.'
             )
         exit(EXIT_INVALID_VALUE_CONFIG_FILE)
 

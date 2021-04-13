@@ -20,7 +20,7 @@ import sys
 from boto3 import client
 from boto3 import resource
 from datetime import timezone
-import pg8000
+import redshift_connector
 import dateutil.parser
 
 EXIT_MISSING_VALUE_CONFIG_FILE = 100
@@ -42,13 +42,11 @@ format = get_log_formatter()
 logging.basicConfig(format=format, datefmt="%Y-%m-%d %H:%M:%S")
 logger.setLevel(logging.DEBUG)
 
-g_target_cluster_urls = {}
-
 g_total_connections = 0
 g_queries_executed = 0
 
-g_refresh_credentials = True
-g_credentials_timer = None
+# map username to credential strings and timestamp
+g_credentials_cache = {}
 
 g_copy_replacements_filename = 'copy_replacements.csv'
 
@@ -101,8 +99,6 @@ class ConnectionLog:
     @staticmethod
     def supported_filters():
         return {'database_name', 'username', 'pid'}
-
-
 
 
 class Transaction:
@@ -193,7 +189,7 @@ class ConnectionThread(threading.Thread):
 
 
     @contextmanager
-    def initiate_connection(self):
+    def initiate_connection(self, username):
         conn = None
 
         # check if this connection is happening at the right time
@@ -222,19 +218,20 @@ class ConnectionThread(threading.Thread):
         else:
             interface = "psql"
 
+        target_cluster_urls = get_connection_string(username)
+
         try:
             try:
                 if interface == "psql":
-                    conn = pg8000.connect(
-                        user=g_target_cluster_urls["psql"]["username"],
-                        password=g_target_cluster_urls["psql"]["password"],
-                        host=g_target_cluster_urls["psql"]["host"],
-                        port=g_target_cluster_urls["psql"]["port"],
+                    conn = redshift_connector.connect(
+                        user=target_cluster_urls["psql"]["username"],
+                        password=target_cluster_urls["psql"]["password"],
+                        host=target_cluster_urls["psql"]["host"],
+                        port=int(target_cluster_urls["psql"]["port"]),
                         database=self.connection_log.database_name,
-                        ssl_context=ssl.create_default_context(ssl.Purpose.CLIENT_AUTH),
                     )
                 else:
-                    target_cluster_split = g_target_cluster_urls["odbc"].split(";")
+                    target_cluster_split = target_cluster_urls["odbc"].split(";")
                     target_cluster_split[2] = (
                         "Database=" + self.connection_log.database_name
                     )
@@ -244,7 +241,7 @@ class ConnectionThread(threading.Thread):
                 conn.autocommit = False
                 logger.debug(f"Connected using {interface} for PID: {self.connection_log.pid}")
             except Exception as err:
-                hashed_cluster_url = copy.deepcopy(g_target_cluster_urls["psql"])
+                hashed_cluster_url = copy.deepcopy(target_cluster_urls["psql"])
                 hashed_cluster_url["password"] = "***"
                 logger.error(f'({self.job_id+1}) Failed to initiate connection for {self.connection_log.database_name}-{self.connection_log.username}-{self.connection_log.pid} ({hashed_cluster_url}): {err}')
                 self.thread_stats['connection_error_log'][f"{self.connection_log.database_name}-{self.connection_log.username}-{self.connection_log.pid}"] = f"{self.connection_log}\n\n{err}"
@@ -255,21 +252,9 @@ class ConnectionThread(threading.Thread):
             if conn is not None:
                 conn.close()
 
-    def set_session_authorization(self, connection):
-        cursor = connection.cursor()
-
-        session_auth_username = self.connection_log.username
-        if session_auth_username.startswith("IAM:"):
-            session_auth_username = session_auth_username[4:]
-        cursor.execute(f"SET SESSION AUTHORIZATION '{session_auth_username}';")
-
-        connection.commit()
-        cursor.close()
-
     def run(self):
-        with self.initiate_connection() as connection:
+        with self.initiate_connection(self.connection_log.username) as connection:
             if connection:
-                self.set_session_authorization(connection)
                 self.execute_transactions(connection)
 
                 if self.connection_log.time_interval_between_transactions == True:
@@ -348,6 +333,10 @@ class ConnectionThread(threading.Thread):
 
 # exception thrown if any filters are invalid
 class InvalidFilterException(Exception):
+    pass
+
+# exception thrown if credentials can't be retrieved
+class CredentialsException(Exception):
     pass
 
 
@@ -542,40 +531,49 @@ def get_connection_key(database_name, username, pid):
 
 
 def parse_transaction(sql_filename, sql_file_text):
-    sql_filename_split = sql_filename.split(".sql")[0].split("-")
-    database_name = sql_filename_split[0]
-    username = sql_filename_split[1]
-    pid = sql_filename_split[2]
-    xid = sql_filename_split[3]
-
-    if xid.endswith(".sql"):
-        xid = xid[:-4]
-
     queries = []
     time_interval = True
 
+    database_name = None
+    username = None
+    pid = None
+    xid = None
     query_start_time = ""
     query_end_time = ""
     query_text = ""
     for line in sql_file_text.splitlines():
         if line.startswith("--Time interval"):
             time_interval = line.split("--Time interval: ")[1].strip()
-        if line.startswith("--Record time"):
+        elif line.startswith("--Record time"):
             if query_text.strip():
                 query = Query(query_start_time, query_end_time, query_text.strip())
                 queries.append(query)
                 query_text = ""
 
             query_start_time = dateutil.parser.isoparse(line.split(": ")[1].strip())
-            
             query_end_time = query_start_time
         elif line.startswith("--Start time"):
             query_start_time = dateutil.parser.isoparse(line.split(": ")[1].strip())
-            
         elif line.startswith("--End time"):
             query_end_time = dateutil.parser.isoparse(line.split(": ")[1].strip())
+        elif line.startswith("--Database"):
+            database_name = line.split(": ")[1].strip()
+        elif line.startswith("--Username"):
+            username = line.split(": ")[1].strip()
+        elif line.startswith("--Pid"):
+            pid = line.split(": ")[1].strip()
+        elif line.startswith("--Xid"):
+            xid = line.split(": ")[1].strip()
+        # remove all other comments
         elif not line.startswith("--"):
             query_text += " " + line
+
+    # fallback to using the filename to retrieve the query details. This should only happen if
+    # replay is run over an old extraction.
+    if not all([database_name, username, pid, xid]):
+        database_name, username, pid, xid = parse_filename(sql_filename)
+        if not all([database_name, username, pid, xid]):
+            logger.error(f"Failed to parse filename {sql_filename}")
 
     queries.append(Query(query_start_time, query_end_time, query_text.strip()))
     
@@ -584,6 +582,16 @@ def parse_transaction(sql_filename, sql_file_text):
     transaction_key = get_connection_key(database_name, username, pid)
     return Transaction(time_interval, database_name, username, pid, xid, queries, transaction_key)
 
+
+def parse_filename(filename):
+    # Try to parse the info from the filename. Filename format is:
+    #  {database_name}-{username}-{pid}-{xid}
+    # Both database_name and username can contain "-" characters.  In that case, we'll
+    # take a guess that the - is in the username rather than the database name.
+    match = re.search("^([^-]+)-(.+)-(\d+)-(\d+)", filename)
+    if not match:
+        return (None, None, None, None)
+    return match.groups()
 
 def parse_copy_replacements(workload_directory):
     copy_replacements = {}
@@ -650,6 +658,25 @@ def collect_stats(aggregated_stats, stats):
         aggregated_stats[stat] = new_stats
 
 
+def join_finished_threads(connection_threads, worker_stats):
+    # join any finished threads
+    finished_threads = []
+    for t in connection_threads:
+        if not t.is_alive():
+            logger.debug(f"Joining thread {t.connection_log.session_initiation_time}")
+            t.join()
+            collect_stats(worker_stats, connection_threads[t])
+            finished_threads.append(t)
+
+    # remove the joined threads from the list of active ones
+    for t in finished_threads:
+        del connection_threads[t]
+
+    logger.debug(f"Joined {len(finished_threads)} threads, {len(connection_threads)} still active.")
+    return len(finished_threads)
+
+      
+
 def replay_worker(process_idx, replay_start_time, first_event_time, queue, worker_stats, default_interface, odbc_driver):
     """ Worker process to distribute the work among several processes.  Each
         worker pulls a connection off the queue, waits until its time to start
@@ -669,27 +696,6 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
     
         # stagger worker startup to not hammer the get_cluster_credentials api
         time.sleep(random.randrange(1, 3))
-    
-        # Get new database credentials periodically since credentials retrieved
-        # from get_cluster_credentials are temporary and expire.  Retry on the
-        # first attempt if it failed
-        max_attempts = 3
-        for attempt in range(1, max_attempts):
-            refresh_connection_string(
-                g_config["target_cluster_endpoint"],
-                g_config["master_username"],
-                g_config["odbc_driver"]
-            )
-            if {'psql', 'odbc'}.issubset(set(g_target_cluster_urls.keys())):
-                break
-            cancel_refresh_timer()
-            logger.error(f"Failed to get initial credentials on attempt {attempt} / {max_attempts}")
-            time.sleep(1)
-    
-        if not {'psql', 'odbc'}.issubset(set(g_target_cluster_urls.keys())):
-            logger.error("Couldn't get initial IAM credentials, exiting")
-            return
-    
         logger.info(f"Worker {process_idx} ready for jobs")
     
         # time to block waiting for jobs on the queue
@@ -747,7 +753,7 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
             if connection_offset_ms - time_elapsed_ms > 10:
                 time.sleep(delay_sec)
 
-            logger.debug(f"Starting job {job['job_id']+1} (extracted connection time: {job['connection'].session_initiation_time})")
+            logger.debug(f"Starting job {job['job_id']+1} (extracted connection time: {job['connection'].session_initiation_time}). {len(threading.enumerate())}, {threading.active_count()} connections active.")
     
             connection_thread = ConnectionThread(
                 process_idx,
@@ -763,20 +769,8 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
             connection_thread.start()
             connection_threads[connection_thread] = thread_stats
     
-            # join any finished threads
-            finished_threads = []
-            for t in connection_threads:
-                if not t.is_alive():
-                    logger.debug(f"Joining thread {t.connection_log.session_initiation_time}")
-                    t.join()
-                    collect_stats(worker_stats, connection_threads[t])
-                    finished_threads.append(t)
-      
-            # collect stats and removed the joined threads from the list of active ones
-            for t in finished_threads:
-                del connection_threads[t]
+            join_finished_threads(connection_threads, worker_stats)
     
-            logger.debug(f"Joined {len(finished_threads)} threads, {len(connection_threads)} still active.")
             connections_processed += 1
       
         logger.debug(f"Waiting for {len(connection_threads)} connections to finish...")
@@ -790,10 +784,6 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
 
     if connections_processed:
         logger.debug(f"Max connection offset for this process: {worker_stats['connection_diff_sec']:.3f} sec")
-
-    global g_refresh_credentials
-    g_refresh_credentials = False
-    cancel_refresh_timer()
 
     logger.debug(f"Process {process_idx} finished")
 
@@ -827,7 +817,12 @@ def start_replay(connection_logs, default_interface, odbc_driver, first_event_ti
 
     if not num_workers:
         # get number of available cpus, leave 1 for main thread and manager
-        num_workers = max(len(os.sched_getaffinity(0))-1, 1)
+        num_workers = os.cpu_count()
+        if num_workers > 0:
+            num_workers = max(num_workers - 1, 4)
+        else:
+            num_workers = 4
+            logger.warning(f"Couldn't determine the number of cpus, defaulting to {num_workers} processes.  Use the configuration parameter num_workers to change this.")
 
     replay_start_time = datetime.datetime.now(tz=datetime.timezone.utc)
     logger.info(f"Replay start time: {replay_start_time}")
@@ -1106,10 +1101,23 @@ def assign_create_user_password(connection_logs):
                     )
 
 
-def refresh_connection_string(cluster_endpoint, username, odbc_driver, start_timer=True):
+def get_connection_string(username, max_attempts=10, skip_cache=False):
     credentials_timeout_sec = 3600
-    refresh_interval_sec = 600
-    logger.info(f"Refreshing database credentials (interval {refresh_interval_sec})")
+    retry_delay_sec = 10
+
+    # how long to cache credentials per user
+    cache_timeout_sec = 1800
+
+    # check the cache
+    if not skip_cache and g_credentials_cache.get(username) is not None:
+        record = g_credentials_cache.get(username)
+        if (datetime.datetime.now(tz=datetime.timezone.utc) - record['last_update']).total_seconds() < cache_timeout_sec:
+            logger.debug(f'Using {username} credentials from cache')
+            return record['target_cluster_urls']
+        del g_credentials_cache[username]
+
+    cluster_endpoint = g_config["target_cluster_endpoint"]
+    odbc_driver = g_config["odbc_driver"]
 
     cluster_endpoint_split = cluster_endpoint.split(".")
     cluster_id = cluster_endpoint_split[0]
@@ -1121,61 +1129,50 @@ def refresh_connection_string(cluster_endpoint, username, odbc_driver, start_tim
     if os.environ.get('ENDPOINT_URL'):
         additional_args = { 'endpoint_url': os.environ.get('ENDPOINT_URL'),
                             'verify': False }
-    
-    try:
+
+    response = None
+    for attempt in range(1, max_attempts+1):
         response = client("redshift", **additional_args).get_cluster_credentials(
             DbUser=username, ClusterIdentifier=cluster_id, AutoCreate=False, DurationSeconds=credentials_timeout_sec
         )
-        hash_response = copy.deepcopy(response)
-        hash_response["DbPassword"] = hash(hash_response["DbPassword"])
-        logger.debug(f"New credentials: {hash_response}")
-        
-        cluster_odbc_url = (
-            "Driver={%s}; Server=%s; Database=%s; IAM=1; DbUser=%s; DbPassword=%s; Port=%s"
-            % (
-                odbc_driver,
-                cluster_host,
-                cluster_database,
-                response["DbUser"].split(":")[1],
-                response["DbPassword"],
-                cluster_port,
-            )
+        if response is None or response.get('DbPassword') is None:
+            logger.warning(f"Failed to retrieve credentials for {username} (attempt {attempt}/{max_attempts})")
+            logger.debug(response)
+            response = None
+            time.sleep(retry_delay_sec)
+        else:
+            break
+
+    if response is None:
+        msg = f"Failed to retrieve credentials for {username}"
+        logger.error(msg)
+        raise CredentialsException(msg)
+    
+    cluster_odbc_url = (
+        "Driver={}; Server={}; Database={}; IAM=1; DbUser={}; DbPassword={}; Port={}".format(
+            odbc_driver,
+            cluster_host,
+            cluster_database,
+            response["DbUser"].split(":")[1],
+            response["DbPassword"],
+            cluster_port,
         )
+    )
 
-        cluster_psql = {
-            "username": response["DbUser"],
-            "password": response["DbPassword"],
-            "host": cluster_host,
-            "port": cluster_port,
-            "database": cluster_database,
-        }
+    cluster_psql = {
+        "username": response["DbUser"],
+        "password": response["DbPassword"],
+        "host": cluster_host,
+        "port": cluster_port,
+        "database": cluster_database,
+    }
 
-        global g_target_cluster_urls
-        g_target_cluster_urls['odbc'] = cluster_odbc_url
-        g_target_cluster_urls['psql'] = cluster_psql
-        logger.info("Successfully refreshed database credentials".format(response["DbPassword"]))
-    except Exception as err:
-        logger.error(f"Failed to generate connection string: {err}")
-    finally:
-        # setup a timer to refresh again
-        cancel_refresh_timer()
-        if start_timer and g_refresh_credentials:
-            global g_credentials_timer
-            g_credentials_timer = threading.Timer(
-                refresh_interval_sec, refresh_connection_string, [cluster_endpoint, username, odbc_driver],
-            )
-            g_credentials_timer.name = "Timer"
-            g_credentials_timer.start()
-        elif start_timer:
-            logger.info("No longer refreshing credentials")
-        return
-
-
-def cancel_refresh_timer():
-    global g_credentials_timer
-    if g_credentials_timer is not None:
-        g_credentials_timer.cancel()
-        g_credentials_timer = None
+    target_cluster_urls = { 'odbc': cluster_odbc_url,
+                            'psql': cluster_psql }
+    logger.info("Successfully retrieved database credentials for {}".format(username))
+    g_credentials_cache[username] = {'last_update': datetime.datetime.now(tz=datetime.timezone.utc),
+                                     'target_cluster_urls': target_cluster_urls}
+    return target_cluster_urls
 
 
 def unload_system_table(
@@ -1184,17 +1181,21 @@ def unload_system_table(
     unload_location,
     unload_iam_role,
 ):
+
+    target_cluster_urls = get_connection_string(g_config["master_username"], max_attempts=3)
+
     conn = None
+
     if default_interface == "odbc":
-        conn = pyodbc.connect(g_target_cluster_urls["odbc"])
+        conn = pyodbc.connect(target_cluster_urls["odbc"])
     else:
-        conn = pg8000.connect(
-            user=g_target_cluster_urls["psql"]["username"],
-            password=g_target_cluster_urls["psql"]["password"],
-            host=g_target_cluster_urls["psql"]["host"],
-            port=g_target_cluster_urls["psql"]["port"],
-            database=g_target_cluster_urls["psql"]["database"],
-            ssl_context=ssl.create_default_context(ssl.Purpose.CLIENT_AUTH),
+        conn = redshift_connector.connect(
+            user=target_cluster_urls["psql"]["username"],
+            password=target_cluster_urls["psql"]["password"],
+            host=target_cluster_urls["psql"]["host"],
+            port=int(target_cluster_urls["psql"]["port"]),
+            database=target_cluster_urls["psql"]["database"],
+
         )
 
     conn.autocommit = True
@@ -1248,8 +1249,8 @@ def validate_config(config):
         exit(EXIT_MISSING_VALUE_CONFIG_FILE)
     if not config["odbc_driver"]:
         config["odbc_driver"] = None
-        logger.error(
-            'Config file missing value for "odbc_driver". Therefore, replay will not use ODBC, and will use psql instead. Please provide a value for "odbc_driver" if playback using ODBC instead of psql is necessary.'
+        logger.debug(
+            'Config file missing value for "odbc_driver" so replay will not use ODBC. Please provide a value for "odbc_driver" to replay using ODBC.'
         )
     if config["odbc_driver"] or config["default_interface"] == "odbc":
         try:
@@ -1484,16 +1485,12 @@ def main():
     replay_start_time = datetime.datetime.now(tz=datetime.timezone.utc)
 
     # test connection
-    refresh_connection_string(
-        g_config["target_cluster_endpoint"],
-        g_config["master_username"],
-        g_config["odbc_driver"],
-        start_timer=False
-    )
-
-    if not {'psql', 'odbc'}.issubset(set(g_target_cluster_urls.keys())):
-        logger.error("Unable to connect to db.")
-        sys.exit()
+    try:
+        # use the first user as a test
+        get_connection_string(connection_logs[0].username, max_attempts=1)
+    except CredentialsException:
+        logger.error(f"Unable to retrieve credentials using GetClusterCredentials.  Please verify that an IAM policy exists granting access.  See the README for more details.")
+        sys.exit(-1)
 
     if len(connection_logs) == 0:
         logger.info("No logs to replay, nothing to do.")
