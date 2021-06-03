@@ -1169,7 +1169,7 @@ Resources:
               cd /amazonutils/amazon-redshift-utils/src/SimpleReplay/cloudformation
               sed -i 's#extract_bucket=\"\"#extract_bucket=\"${SourceAccountSimpleReplayExtractBucket}\"#g' run_replay.sh
               sed -i 's#replay_bucket=\"\"#replay_bucket=\"${TargetAccountWorkloadReplayBucket}\"#g' run_replay.sh
-              sed -i 's#redshift_iam_role=\"\"#redshift_iam_role=\"$arn:aws:iam::${AWS::AccountId}:role/${SimpleReplayRedshiftIAMRole}\"#g' run_replay.sh
+              sed -i 's#redshift_iam_role=\"\"#redshift_iam_role=\"arn:aws:iam::${AWS::AccountId}:role/${SimpleReplayRedshiftIAMRole}\"#g' run_replay.sh
 
               if [[ "${AWS::AccountId}" == "${SourceAccountNumber}" ]] && [[ "${GrantS3ReadOnlyAccessToRedshift}" == "Yes" ]]; then
                  sed -i 's#copy_replacements=\"\"#copy_replacements=\"true\"#g' run_replay.sh
@@ -1248,7 +1248,7 @@ Resources:
               cd /amazonutils/amazon-redshift-utils/src/SimpleReplay/cloudformation
               sed -i 's#extract_bucket=\"\"#extract_bucket=\"${SourceAccountSimpleReplayExtractBucket}\"#g' run_replay.sh
               sed -i 's#replay_bucket=\"\"#replay_bucket=\"${TargetAccountWorkloadReplayBucket}\"#g' run_replay.sh
-              sed -i 's#redshift_iam_role=\"\"#redshift_iam_role=\"$arn:aws:iam::${AWS::AccountId}:role/${SimpleReplayRedshiftIAMRole}\"#g' run_replay.sh
+              sed -i 's#redshift_iam_role=\"\"#redshift_iam_role=\"arn:aws:iam::${AWS::AccountId}:role/${SimpleReplayRedshiftIAMRole}\"#g' run_replay.sh
 
               #
               # configure redshift objects.yaml
