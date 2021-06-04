@@ -324,30 +324,155 @@ SELECT
 
 drop view if exists public.source_target_comparison cascade;
 
+
 create or replace view public.source_target_comparison as
-  SELECT
-      replica_queue
-      , target_queue
-      , replica_username
-      , target_username
-      , COUNT(1) total_queries
-      , ROUND(( SUM(replica_total_query_time) - SUM(target_total_query_time) ) / ( 1000 * 1000 ),2) total_query_time_saved_seconds
-      , ROUND(SUM(replica_total_query_time) / ( 1000 * 1000 ),2) replica_total_query_time_seconds
-      , ROUND(SUM(target_total_query_time) / ( 1000 * 1000 ),2) target_total_query_time_seconds
-      , ROUND(SUM(replica_total_queue_time) / ( 1000 * 1000 ),2) replica_total_queue_time_seconds
-      , ROUND(SUM(target_total_queue_time) / ( 1000 * 1000 ),2) target_total_queue_time_seconds
-      , ROUND(SUM(replica_total_compile_time) / ( 1000 * 1000 ),2) replica_total_compile_time_seconds
-      , ROUND(SUM(target_total_compile_time) / ( 1000 * 1000 ),2) target_total_compile_time_seconds
-      , ROUND(SUM(replica_total_exec_time) / ( 1000 * 1000 ),2) replica_total_exec_time_seconds
-      , ROUND(SUM(target_total_exec_time) / ( 1000 * 1000 ),2) target_total_exec_time_seconds
-      , COUNT(replica_cc_scaling) replica_cc_scaling_query_count
-      , COUNT(target_cc_scaling) target_cc_scaling_query_count
-  FROM public.source_target_comparison_raw
-  GROUP BY
-      replica_queue
-      , target_queue
-      , replica_username
-      , target_username;
+WITH replica_queries
+     AS ( SELECT
+              r.queue
+              , r.username
+              , r.cc_scaling
+              , SUM(1) total_queries
+              , ROUND(SUM(r.total_query_time::NUMERIC) / ( 1000 * 1000 ) ,2) total_query_time_seconds
+              , ROUND(AVG(r.total_query_time::NUMERIC) / ( 1000 * 1000 ) ,2) mean_query_time_seconds
+              , ROUND(( PERCENTILE_CONT(0.50) WITHIN GROUP( ORDER BY total_query_time) )::NUMERIC / ( 1000 * 1000 ),3) AS median_query_time_seconds
+              , ROUND(( PERCENTILE_CONT(0.75) WITHIN GROUP( ORDER BY total_query_time) )::NUMERIC / ( 1000 * 1000 ),3) AS pct75_query_time_seconds
+              , ROUND(( PERCENTILE_CONT(0.90) WITHIN GROUP( ORDER BY total_query_time) )::NUMERIC / ( 1000 * 1000 ),3) AS pct90_query_time_seconds
+              , ROUND(( PERCENTILE_CONT(0.95) WITHIN GROUP( ORDER BY total_query_time) )::NUMERIC / ( 1000 * 1000 ),3) AS pct95_query_time_seconds
+              , ROUND(MAX(total_query_time)::NUMERIC / ( 1000 * 1000 ),2) max_query_time_seconds
+          FROM
+              public.replica_cluster_query_stats r
+          WHERE    aborted = 0
+                   AND EXISTS (SELECT
+                                   1
+                               FROM
+                                   public.target_cluster_query_stats t
+                               WHERE  SHA2(t.querytxt::TEXT, 256) = SHA2(r.querytxt::TEXT, 256)
+                                      AND r.userid = t.userid
+                                      AND r.query_label = t.query_label
+                                      AND r.aborted = t.aborted)
+          GROUP BY
+              queue
+              , username
+              , cc_scaling ), target_queries
+     AS ( SELECT
+              t.queue
+              , t.username
+              , t.cc_scaling
+              , SUM(1) total_queries
+              , ROUND(SUM(t.total_query_time::NUMERIC) / ( 1000 * 1000 ) ,2) total_query_time_seconds
+              , ROUND(AVG(t.total_query_time::NUMERIC) / ( 1000 * 1000 ) ,2) mean_query_time_seconds
+              , ROUND(( PERCENTILE_CONT(0.50) WITHIN GROUP( ORDER BY total_query_time) )::NUMERIC / ( 1000 * 1000 ),3) AS median_query_time_seconds
+              , ROUND(( PERCENTILE_CONT(0.75) WITHIN GROUP( ORDER BY total_query_time) )::NUMERIC / ( 1000 * 1000 ),3) AS pct75_query_time_seconds
+              , ROUND(( PERCENTILE_CONT(0.90) WITHIN GROUP( ORDER BY total_query_time) )::NUMERIC / ( 1000 * 1000 ),3) AS pct90_query_time_seconds
+              , ROUND(( PERCENTILE_CONT(0.95) WITHIN GROUP( ORDER BY total_query_time) )::NUMERIC / ( 1000 * 1000 ),3) AS pct95_query_time_seconds
+              , ROUND(MAX(total_query_time)::NUMERIC / ( 1000 * 1000 ),2) max_query_time_seconds
+          FROM
+              public.target_cluster_query_stats t
+          WHERE    aborted = 0
+                   AND EXISTS (SELECT
+                                   1
+                               FROM
+                                   public.replica_cluster_query_stats r
+                               WHERE  SHA2(t.querytxt::TEXT, 256) = SHA2(r.querytxt::TEXT, 256)
+                                      AND r.userid = t.userid
+                                      AND r.query_label = t.query_label
+                                      AND r.aborted = t.aborted)
+          GROUP BY
+              queue
+              , username
+              , cc_scaling )
+    SELECT
+        queue
+        , username
+        , source_cluster
+        , cc_scaling
+        , total_queries
+        , total_query_time_seconds
+        , ( CASE
+              WHEN source_cluster = 'target'
+              THEN LAG(total_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+              WHEN source_cluster = 'replica'
+              THEN LEAD(total_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+            END ) - total_query_time_seconds total_query_time_saved_seconds
+        , mean_query_time_seconds
+        , ( CASE
+              WHEN source_cluster = 'target'
+              THEN LAG(mean_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+              WHEN source_cluster = 'replica'
+              THEN LEAD(mean_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+            END ) - mean_query_time_seconds mean_query_time_saved_seconds
+        , median_query_time_seconds
+        , ( CASE
+              WHEN source_cluster = 'target'
+              THEN LAG(median_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+              WHEN source_cluster = 'replica'
+              THEN LEAD(median_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+            END ) - median_query_time_seconds median_query_time_saved_seconds
+        , pct75_query_time_seconds
+        , ( CASE
+              WHEN source_cluster = 'target'
+              THEN LAG(pct75_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+              WHEN source_cluster = 'replica'
+              THEN LEAD(pct75_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+            END ) - pct75_query_time_seconds pct75_query_time_saved_seconds
+        , pct90_query_time_seconds
+        , ( CASE
+              WHEN source_cluster = 'target'
+              THEN LAG(pct90_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+              WHEN source_cluster = 'replica'
+              THEN LEAD(pct90_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+            END ) - pct90_query_time_seconds pct90_query_time_saved_seconds
+        , pct95_query_time_seconds
+        , ( CASE
+              WHEN source_cluster = 'target'
+              THEN LAG(pct95_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+              WHEN source_cluster = 'replica'
+              THEN LEAD(pct95_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+            END ) - pct95_query_time_seconds pct95_query_time_saved_seconds
+        , max_query_time_seconds
+        , ( CASE
+              WHEN source_cluster = 'target'
+              THEN LAG(max_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+              WHEN source_cluster = 'replica'
+              THEN LEAD(max_query_time_seconds,1) OVER (ORDER BY queue, username, source_cluster,cc_scaling)
+            END ) - max_query_time_seconds max_query_time_saved_seconds
+    FROM
+        (SELECT
+             queue
+             , username
+             , 'replica' source_cluster
+             , cc_scaling
+             , total_queries
+             , total_query_time_seconds
+             , mean_query_time_seconds
+             , median_query_time_seconds
+             , pct75_query_time_seconds
+             , pct90_query_time_seconds
+             , pct95_query_time_seconds
+             , max_query_time_seconds
+         FROM
+             replica_queries
+         UNION ALL
+         SELECT
+             queue
+             , username
+             , 'target' source_cluster
+             , cc_scaling
+             , total_queries
+             , total_query_time_seconds
+             , mean_query_time_seconds
+             , median_query_time_seconds
+             , pct75_query_time_seconds
+             , pct90_query_time_seconds
+             , pct95_query_time_seconds
+             , max_query_time_seconds
+         FROM
+             target_queries)
+    ORDER BY
+        1
+        , 2
+        , 3
+        , 4;
 
 
 drop view if exists public.source_target_queries_15_minutes_interval cascade;

@@ -34,7 +34,7 @@ aws s3 cp s3://$extract_bucket/$bucket_keyprefix/source_system_tables/ s3://$rep
 #
 if [[ $copy_replacements == "true" ]]; then
  aws s3 cp s3://$extract_bucket/$bucket_keyprefix/extract/$extract_output/copy_replacements.csv . || true
- sed -i "s#,,#,,$redshift_iam_role#g" copy_replacements.csv || true
+ sed -z -i "s#,,\n#,,$redshift_iam_role\n#g" copy_replacements.csv || true
  aws s3 cp copy_replacements.csv s3://$extract_bucket/$bucket_keyprefix/extract/$extract_output/copy_replacements.csv || true
 fi
 python3 replay.py ./$bucket_keyprefix/replay_$replay_type.yaml
