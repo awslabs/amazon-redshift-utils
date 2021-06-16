@@ -761,28 +761,32 @@ def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
         elif "useractivitylog" in filename:
             s3_user_activity_logs.append(log)
 
-    get_s3_audit_logs(
-        log_bucket,
-        log_prefix,
-        start_time,
-        end_time,
-        s3_connection_logs,
-        connections,
-        logs,
-        databases,
-        last_connections,
-    )
-    get_s3_audit_logs(
-        log_bucket,
-        log_prefix,
-        start_time,
-        end_time,
-        s3_user_activity_logs,
-        connections,
-        logs,
-        databases,
-        last_connections,
-    )
+    if len(s3_connection_logs) > 0:
+        get_s3_audit_logs(
+            log_bucket,
+            log_prefix,
+            start_time,
+            end_time,
+            s3_connection_logs,
+            connections,
+            logs,
+            databases,
+            last_connections,
+        )
+
+    if len(s3_user_activity_logs) > 0:
+        get_s3_audit_logs(
+            log_bucket,
+            log_prefix,
+            start_time,
+            end_time,
+            s3_user_activity_logs,
+            connections,
+            logs,
+            databases,
+            last_connections,
+        )
+    
     return (connections, logs, databases, last_connections)
     #return (connections, logs, databases)
 
