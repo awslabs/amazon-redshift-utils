@@ -99,7 +99,7 @@ This script extracts query and connection info from User Activity Log (audit) an
 * Simple Replay will extract starttime and endtime for each query from the system table automatically if the source cluster end point is provided as input in the YAML file. Recordtime from audit logs will be used otherwise. 
 * The source cluster should be accessible from wherever Simple Replay is being run. This may entail modifying the security group inbound rules to include “My IP”, or running Simple Replay on an EC2 instance in the same VPC.
 
-### Configuration file parameters for `extraction.yaml` :
+### Configuration file parameters for `extract.yaml` :
 
 | Configuration value    |Required?    |Details    |Example    |
 | ---    |---    |---    |---    |
