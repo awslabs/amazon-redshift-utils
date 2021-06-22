@@ -2,45 +2,35 @@ import argparse
 import os
 import json
 import yaml
-import ssl
 import csv
 import time
 import string
 import random
 import datetime
+import traceback
 import threading
+import signal
 import multiprocessing
+from multiprocessing.managers import SyncManager
+from tqdm import tqdm
 from queue import Empty, Full
 import re
 from contextlib import contextmanager
+from collections import OrderedDict
 import logging
 import copy
 import sys
 
-from boto3 import client
-from boto3 import resource
-from datetime import timezone
+from util import init_logging, set_log_level, prepend_ids_to_logs, add_logfile, log_version
+
+from boto3 import client, resource
+from botocore.exceptions import NoCredentialsError
+
 import redshift_connector
 import dateutil.parser
 
-EXIT_MISSING_VALUE_CONFIG_FILE = 100
-EXIT_INVALID_VALUE_CONFIG_FILE = 101
 
-def get_log_formatter(process_idx=None, job_id=None):
-    format = "[%(levelname)s] %(asctime)s"
-    if process_idx is not None:
-        format += f" [{process_idx}]"
-    if job_id is not None:
-        format += " (%(threadName)s)"
-    format += " %(message)s"
-    return format
-
-LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-logger = logging.getLogger("ReplayLogger")
-logging.Formatter.converter = time.gmtime
-format = get_log_formatter()
-logging.basicConfig(format=format, datefmt="%Y-%m-%d %H:%M:%S")
-logger.setLevel(logging.DEBUG)
+logger = None
 
 g_total_connections = 0
 g_queries_executed = 0
@@ -48,9 +38,14 @@ g_queries_executed = 0
 # map username to credential strings and timestamp
 g_credentials_cache = {}
 
+g_workers = []
+g_manager = None
+g_exit = False
+
 g_copy_replacements_filename = 'copy_replacements.csv'
 
 g_config = {}
+
 
 class ConnectionLog:
     def __init__(
@@ -184,9 +179,7 @@ class ConnectionThread(threading.Thread):
         self.first_event_time = first_event_time
         self.thread_stats = thread_stats
 
-        for handler in logging.root.handlers[:]:
-            handler.setFormatter(logging.Formatter(fmt=get_log_formatter(self.process_idx, self.job_id+1), datefmt=LOG_DATE_FORMAT))
-
+        prepend_ids_to_logs(self.process_idx, self.job_id + 1)
 
     @contextmanager
     def initiate_connection(self, username):
@@ -197,7 +190,7 @@ class ConnectionThread(threading.Thread):
         elapsed_sec = (datetime.datetime.now(tz=datetime.timezone.utc) - self.replay_start).total_seconds()
         connection_diff_sec = elapsed_sec - expected_elapsed_sec
 
-        logger.info(f"Establishing connection {self.job_id+1} of {g_total_connections} at {elapsed_sec:.3f} (expected: {expected_elapsed_sec:.3f}, {connection_diff_sec:+.3f})")
+        logger.debug(f"Establishing connection {self.job_id+1} of {g_total_connections} at {elapsed_sec:.3f} (expected: {expected_elapsed_sec:.3f}, {connection_diff_sec:+.3f})")
 
         # save the connection difference
         self.thread_stats['connection_diff_sec'] = connection_diff_sec
@@ -207,13 +200,13 @@ class ConnectionThread(threading.Thread):
             logger.warning("Connection at {} offset by {:+.3f} sec".format(self.connection_log.session_initiation_time, connection_diff_sec))
 
         interface = self.default_interface
-        
+
         if "psql" in self.connection_log.application_name.lower():
             interface = "psql"
         elif "odbc" in self.connection_log.application_name.lower() and self.odbc_driver is not None:
             interface = "odbc"
         elif self.default_interface == "odbc" and self.odbc_driver is None:
-            logger.warning(f"Default driver is set to ODBC. But no ODBC DSN provided. Replay will use PSQL as default driver.")
+            logger.warning("Default driver is set to ODBC. But no ODBC DSN provided. Replay will use PSQL as default driver.")
             interface = "psql"
         else:
             interface = "psql"
@@ -257,7 +250,7 @@ class ConnectionThread(threading.Thread):
             if connection:
                 self.execute_transactions(connection)
 
-                if self.connection_log.time_interval_between_transactions == True:
+                if self.connection_log.time_interval_between_transactions is True:
                     time_until_disconnect_sec = (self.connection_log.disconnection_time - datetime.datetime.now(tz=datetime.timezone.utc)).total_seconds()
                     if time_until_disconnect_sec > 0:
                         time.sleep(time_until_disconnect_sec)
@@ -266,9 +259,8 @@ class ConnectionThread(threading.Thread):
 
         logger.debug(f"Disconnected PID: {self.connection_log.pid}")
 
-
     def execute_transactions(self, connection):
-        if self.connection_log.time_interval_between_transactions == True:
+        if self.connection_log.time_interval_between_transactions is True:
             for idx, transaction in enumerate(self.connection_log.transactions):
                 # we can use this if we want to run transactions based on their offset from the start of the replay
                 # time_until_start_ms = transaction.offset_ms(self.first_event_time) - current_offset_ms(self.replay_start)
@@ -278,13 +270,13 @@ class ConnectionThread(threading.Thread):
                     time_until_start_ms = (transaction.start_time() -
                                            self.connection_log.session_initiation_time).total_seconds() * 1000.0
                 else:
-                    prev_transaction = self.connection_log.transactions[idx-1]
+                    prev_transaction = self.connection_log.transactions[idx - 1]
                     time_until_start_ms = (transaction.start_time() -
                                            prev_transaction.end_time()).total_seconds() * 1000.0
 
                 # wait for the transaction to start
                 if time_until_start_ms > 10:
-                    time.sleep(time_until_start_ms/1000.0)
+                    time.sleep(time_until_start_ms / 1000.0)
                 self.execute_transaction(transaction, connection)
         else:
             for transaction in self.connection_log.transactions:
@@ -297,16 +289,16 @@ class ConnectionThread(threading.Thread):
         for idx, query in enumerate(transaction.queries):
             time_until_start_ms = query.offset_ms(self.first_event_time) - current_offset_ms(self.replay_start)
             if time_until_start_ms > 10:
-                time.sleep(time_until_start_ms/1000.0)
+                time.sleep(time_until_start_ms / 1000.0)
 
             try:
-                if (g_config["execute_copy_statements"] == "true" and  "from 's3:" in query.text.lower()):
+                if (g_config["execute_copy_statements"] == "true" and "from 's3:" in query.text.lower()):
                     cursor.execute(query.text)
-                elif (g_config["execute_unload_statements"] == "true" and  "to 's3:" in query.text.lower() and g_config["replay_output"] is not None):
+                elif (g_config["execute_unload_statements"] == "true" and "to 's3:" in query.text.lower() and g_config["replay_output"] is not None):
                     cursor.execute(query.text)
                 elif ("from 's3:" not in query.text.lower()) and ("to 's3:" not in query.text.lower()) and ("$1" not in query.text):
                     cursor.execute(query.text)
-                
+
                 logger.debug(
                     f"Replayed DB={transaction.database_name}, USER={transaction.username}, PID={transaction.pid}, XID:{transaction.xid}, Query: {idx+1}/{len(transaction.queries)}"
                 )
@@ -335,8 +327,14 @@ class ConnectionThread(threading.Thread):
 class InvalidFilterException(Exception):
     pass
 
+
 # exception thrown if credentials can't be retrieved
 class CredentialsException(Exception):
+    pass
+
+
+# exception thrown if cluster doesn't exist
+class ClusterNotExist(Exception):
     pass
 
 
@@ -368,7 +366,7 @@ def validate_and_normalize_filters(object, filters):
         exclude = normalized_filters['exclude'][f]
 
         if len(include) == 0:
-            raise InvalidFilterException(f"Include filter must not be empty")
+            raise InvalidFilterException("Include filter must not be empty")
 
         overlap = set(include).intersection(set(exclude))
         if len(overlap) > 0:
@@ -376,7 +374,7 @@ def validate_and_normalize_filters(object, filters):
 
         for x in (include, exclude):
             if len(x) > 1 and '*' in x:
-                raise InvalidFilterException(f"'*' can not be used with other filter values filter")
+                raise InvalidFilterException("'*' can not be used with other filter values filter")
 
     return normalized_filters
 
@@ -390,7 +388,7 @@ def matches_filters(object, filters):
     for field in object.supported_filters():
         include = filters['include'][field]
         exclude = filters['exclude'][field]
-        
+
         # if include values were passed and its not a wildcard, check against it
         if '*' in include or getattr(object, field) in include:
             included += 1
@@ -411,7 +409,6 @@ def current_offset_ms(ref_time):
 
 
 def parse_connections(workload_directory, time_interval_between_transactions, time_interval_between_queries):
-
     connections = []
 
     # total number of connections before filters are applied
@@ -490,7 +487,7 @@ def parse_transactions(workload_directory):
         workload_s3_location = workload_directory[5:].partition("/")
         bucket_name = workload_s3_location[0]
         prefix = workload_s3_location[2]
-        
+
         conn = client("s3")
         s3 = resource("s3")
         paginator = conn.get_paginator('list_objects_v2')
@@ -576,7 +573,7 @@ def parse_transaction(sql_filename, sql_file_text):
             logger.error(f"Failed to parse filename {sql_filename}")
 
     queries.append(Query(query_start_time, query_end_time, query_text.strip()))
-    
+
     queries.sort(key=lambda query: query.start_time)
 
     transaction_key = get_connection_key(database_name, username, pid)
@@ -588,10 +585,11 @@ def parse_filename(filename):
     #  {database_name}-{username}-{pid}-{xid}
     # Both database_name and username can contain "-" characters.  In that case, we'll
     # take a guess that the - is in the username rather than the database name.
-    match = re.search("^([^-]+)-(.+)-(\d+)-(\d+)", filename)
+    match = re.search(r"^([^-]+)-(.+)-(\d+)-(\d+)", filename)
     if not match:
         return (None, None, None, None)
     return match.groups()
+
 
 def parse_copy_replacements(workload_directory):
     copy_replacements = {}
@@ -642,20 +640,44 @@ def collect_stats(aggregated_stats, stats):
 
     # for each aggregated, add up these scalars across all threads
     for stat in ('transaction_success', 'transaction_error', 'query_success', 'query_error'):
-        if stat not in aggregated_stats:
-            aggregated_stats[stat] = 0
         aggregated_stats[stat] += stats[stat]
 
     # same for arrays.
     for stat in ('transaction_error_log', 'connection_error_log'):
-        if stat not in aggregated_stats:
-            aggregated_stats[stat] = {}
-
         # note that per the Manager python docs, this extra copy is required to
         # get manager to notice the update
         new_stats = aggregated_stats[stat]
         new_stats.update(stats[stat])
         aggregated_stats[stat] = new_stats
+
+
+def percent(num, den):
+    if den == 0:
+        return 0
+    return float(num) / den * 100.0
+
+
+def init_stats(stats_dict):
+    # init by key to ensure Manager is notified of change, if applicable
+    stats_dict['connection_diff_sec'] = 0
+    stats_dict['transaction_success'] = 0
+    stats_dict['transaction_error'] = 0
+    stats_dict['query_success'] = 0
+    stats_dict['query_error'] = 0
+    stats_dict['connection_error_log'] = {}   # map filename to array of connection errors
+    stats_dict['transaction_error_log'] = {}  # map filename to array of transaction errors
+    return stats_dict
+
+
+def display_stats(stats, total_connections, total_transactions, total_queries):
+    stats_str = ""
+    stats_str += f"Queries executed: {stats['query_success'] + stats['query_error']} of {total_queries} ({percent(stats['query_success'] + stats['query_error'], total_queries):.1f}%)"
+    stats_str += "  ["
+    stats_str += f"Success: {stats['query_success']} ({percent(stats['query_success'], stats['query_success'] + stats['query_error']):.1f}%), "
+    stats_str += f"Error: {stats['query_error']} ({percent(stats['query_error'], stats['query_success'] + stats['query_error']):.1f}%)"
+    stats_str += "]"
+
+    logger.info(f"{stats_str}")
 
 
 def join_finished_threads(connection_threads, worker_stats):
@@ -675,7 +697,6 @@ def join_finished_threads(connection_threads, worker_stats):
     logger.debug(f"Joined {len(finished_threads)} threads, {len(connection_threads)} still active.")
     return len(finished_threads)
 
-      
 
 def replay_worker(process_idx, replay_start_time, first_event_time, queue, worker_stats, default_interface, odbc_driver):
     """ Worker process to distribute the work among several processes.  Each
@@ -691,27 +712,26 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
 
     try:
         # prepend the process index to all log messages in this worker
-        for handler in logging.root.handlers[:]:
-            handler.setFormatter(logging.Formatter(fmt=get_log_formatter(process_idx), datefmt=LOG_DATE_FORMAT))
-    
+        prepend_ids_to_logs(process_idx)
+
         # stagger worker startup to not hammer the get_cluster_credentials api
         time.sleep(random.randrange(1, 3))
-        logger.info(f"Worker {process_idx} ready for jobs")
-    
+        logger.debug(f"Worker {process_idx} ready for jobs")
+
         # time to block waiting for jobs on the queue
         timeout_sec = 10
 
         last_empty_queue_time = None
-    
+
         # get the next job off the queue and wait until its due
         # loop terminates when a False is received over the queue
         while True:
             try:
                 job = queue.get(timeout=timeout_sec)
             except Empty:
-                elapsed = int(time.time()-last_empty_queue_time) if last_empty_queue_time else 0
+                elapsed = int(time.time() - last_empty_queue_time) if last_empty_queue_time else 0
                 # take into account the initial timeout
-                elapsed += timeout_sec  
+                elapsed += timeout_sec
                 empty_queue_timeout_sec = g_config.get("empty_queue_timeout_sec", 120)
                 logger.debug(f"No jobs for {elapsed} seconds (timeout {empty_queue_timeout_sec})")
                 # normally processes exit when they get a False on the queue,
@@ -724,28 +744,22 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
                 continue
 
             last_empty_queue_time = None
-      
+
             if job is False:
-                logger.debug(f"Got termination signal, finishing up.")
+                logger.debug("Got termination signal, finishing up.")
                 break
-    
-            thread_stats = {'connection_diff_sec': 0,
-                            'transaction_success': 0,
-                            'transaction_error': 0,
-                            'query_success': 0,
-                            'query_error': 0,
-                            'connection_error_log': {},   # map filename to array of connection errors
-                            'transaction_error_log': {}}  # map filename to array of transaction errors
-      
+
+            thread_stats = init_stats({})
+
             # how much time has elapsed since the replay started
             time_elapsed_ms = current_offset_ms(replay_start_time)
-    
+
             # what is the time offset of this connection job relative to the first event
             connection_offset_ms = job['connection'].offset_ms(first_event_time)
-            delay_sec = (connection_offset_ms - time_elapsed_ms)/1000.0
-    
+            delay_sec = (connection_offset_ms - time_elapsed_ms) / 1000.0
+
             logger.debug(f"Got job {job['job_id']+1}, delay {delay_sec:+.3f} sec (extracted connection time: {job['connection'].session_initiation_time})")
-    
+
             # if connection time is more than a few ms in the future, sleep until its due.
             # this is approximate and we use "a few ms" here due to the imprecision of
             # sleep as well as the time for the remaining code to spawn a thread and actually
@@ -754,7 +768,7 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
                 time.sleep(delay_sec)
 
             logger.debug(f"Starting job {job['job_id']+1} (extracted connection time: {job['connection'].session_initiation_time}). {len(threading.enumerate())}, {threading.active_count()} connections active.")
-    
+
             connection_thread = ConnectionThread(
                 process_idx,
                 job['job_id'],
@@ -768,19 +782,16 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
             connection_thread.name = f"{job['job_id']}"
             connection_thread.start()
             connection_threads[connection_thread] = thread_stats
-    
+
             join_finished_threads(connection_threads, worker_stats)
-    
+
             connections_processed += 1
-      
+
         logger.debug(f"Waiting for {len(connection_threads)} connections to finish...")
-        for t in connection_threads:
-            logger.debug(f"Joining thread {t.connection_log.session_initiation_time}")
-            t.join()
-            collect_stats(worker_stats, connection_threads[t])
-        
+        join_finished_threads(connection_threads, worker_stats)
     except Exception as e:
         logger.error(f"Process {process_idx} threw exception: {e}")
+        logger.debug("".join(traceback.format_exception(*sys.exc_info())))
 
     if connections_processed:
         logger.debug(f"Max connection offset for this process: {worker_stats['connection_diff_sec']:.3f} sec")
@@ -808,12 +819,25 @@ def put_and_retry(job, queue, timeout=10, non_workers=0):
     return True
 
 
+def sigint_handler(signum, frame):
+    logger.error("Received SIGINT, shutting down...")
 
-def start_replay(connection_logs, default_interface, odbc_driver, first_event_time, last_event_time, num_workers, manager):
+    for worker in g_workers:
+        worker.terminate()
+
+    for worker in g_workers:
+        worker.join()
+    logger.info("Workers terminated")
+
+    raise KeyboardInterrupt
+
+
+def start_replay(connection_logs, default_interface, odbc_driver, first_event_time, last_event_time,
+                 num_workers, manager, per_process_stats, total_transactions, total_queries):
     """ create a queue for passing jobs to the workers.  the limit will cause
     put() to block if the queue is full """
 
-    queue = multiprocessing.Queue(maxsize=1000000)
+    queue = manager.Queue(maxsize=1000000)
 
     if not num_workers:
         # get number of available cpus, leave 1 for main thread and manager
@@ -826,54 +850,76 @@ def start_replay(connection_logs, default_interface, odbc_driver, first_event_ti
 
     replay_start_time = datetime.datetime.now(tz=datetime.timezone.utc)
     logger.info(f"Replay start time: {replay_start_time}")
-    logger.info(f"Running with {num_workers} workers")
+    logger.debug(f"Running with {num_workers} workers")
 
     # find out how many processes we started with.  This is probably 1, due to the Manager
     initial_processes = len(multiprocessing.active_children())
     logger.debug(f"Initial child processes: {initial_processes}")
 
-    stats = {}
-    workers = []
-    for idx in range(num_workers):
-        stats[idx] = manager.dict()
-        workers.append(multiprocessing.Process(target=replay_worker,
-                                               args=(idx, replay_start_time, first_event_time, queue, stats[idx],
-                                                     default_interface, odbc_driver)))
-        workers[-1].start()
+    global g_workers
 
-    logger.info(f"Total connections in the connection log: {len(connection_logs)}")
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    for idx in range(num_workers):
+        per_process_stats[idx] = manager.dict()
+        init_stats(per_process_stats[idx])
+        g_workers.append(multiprocessing.Process(target=replay_worker,
+                                                 args=(idx, replay_start_time, first_event_time, queue,
+                                                       per_process_stats[idx], default_interface, odbc_driver)))
+        g_workers[-1].start()
+
+    signal.signal(signal.SIGINT, sigint_handler)
+
+    logger.debug(f"Total connections in the connection log: {len(connection_logs)}")
 
     # add all the jobs to the work queue
     for idx, connection in enumerate(connection_logs):
         if not put_and_retry({"job_id": idx, "connection": connection}, queue, non_workers=initial_processes):
             break
 
-    # and add one termination "job"/signal for each worker so signal them to exit when 
+    # and add one termination "job"/signal for each worker so signal them to exit when
     # there is no more work
     for idx in range(num_workers):
         if not put_and_retry(False, queue, non_workers=initial_processes):
             break
 
     active_processes = len(multiprocessing.active_children()) - initial_processes
-    logger.info("Active processes: {}".format(active_processes))
+    logger.debug("Active processes: {}".format(active_processes))
 
     # and wait for the work to get done.
-    logger.info(f"Waiting for {active_processes} processes to finish")
+    logger.debug(f"{active_processes} processes running")
     cnt = 0
-    while active_processes:
-        cnt += 1
-        active_processes = len(multiprocessing.active_children()) - initial_processes
-        if cnt % 60 == 0:
-            logger.info(f"Waiting for {active_processes} processes to finish")
-            try:
-                queue_length = queue.qsize()
-            except NotImplementedError:
-                # support for qsize is platform-dependent
-                queue_length = "unavailable"
 
-            if not queue.empty():
-                logger.info(f"Queue not empty, jobs on queue: {queue_length}")
-        time.sleep(1)
+    disable_progress_bar = None
+
+    bar_format = '{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]'
+    with tqdm(total=total_queries, disable=disable_progress_bar, unit='q', desc='Queries replayed', bar_format=bar_format) as pbar:
+        while active_processes:
+            cnt += 1
+            active_processes = len(multiprocessing.active_children()) - initial_processes
+            if cnt % 60 == 0:
+                logger.debug(f"Waiting for {active_processes} processes to finish")
+                try:
+                    queue_length = queue.qsize()
+                    logger.debug(f"Remaining connections: {queue_length-num_workers}")
+                except NotImplementedError:
+                    # support for qsize is platform-dependent
+                    logger.debug("Queue length not supported.")
+
+            # aggregate stats across all threads so far
+            try:
+                aggregated_stats = init_stats({})
+                for idx, stat in per_process_stats.items():
+                    collect_stats(aggregated_stats, stat)
+                if disable_progress_bar and cnt % 5 == 0:
+                    display_stats(aggregated_stats, len(connection_logs), total_transactions, total_queries)
+                pbar.update(aggregated_stats['query_success'] + aggregated_stats['query_error'] - pbar.n)
+                pbar.set_postfix(OrderedDict([('success', aggregated_stats['query_success']),
+                                              ('error', aggregated_stats['query_error'])]))
+            except KeyError:
+                logger.debug("No stats to display yet.")
+
+            time.sleep(1)
 
     # cleanup in case of error
     remaining_events = 0
@@ -892,7 +938,7 @@ def start_replay(connection_logs, default_interface, odbc_driver, first_event_ti
     if remaining_events > 0:
         logger.error("Not all jobs processed, replay unsuccessful")
 
-    return stats
+    return True
 
 
 def export_errors(connection_errors, transaction_errors, workload_location, replay_name):
@@ -925,9 +971,9 @@ def export_errors(connection_errors, transaction_errors, workload_location, repl
     for filename, connection_error_text in connection_errors.items():
         if workload_location.startswith("s3://"):
             if prefix:
-                key_loc = "%s/%s/connection_errors/%s.txt" % (prefix, replay_name,filename)
+                key_loc = "%s/%s/connection_errors/%s.txt" % (prefix, replay_name, filename)
             else:
-                key_loc = "%s/connection_errors/%s.txt" % (replay_name,filename)
+                key_loc = "%s/connection_errors/%s.txt" % (replay_name, filename)
             s3_client.put_object(
                 Body=connection_error_text,
                 Bucket=bucket_name,
@@ -945,9 +991,9 @@ def export_errors(connection_errors, transaction_errors, workload_location, repl
 
         if workload_location.startswith("s3://"):
             if prefix:
-                key_loc = "%s/%s/transaction_errors/%s.txt" % (prefix, replay_name,filename)
+                key_loc = "%s/%s/transaction_errors/%s.txt" % (prefix, replay_name, filename)
             else:
-                key_loc = "%s/transaction_errors/%s.txt" % (replay_name,filename)
+                key_loc = "%s/transaction_errors/%s.txt" % (replay_name, filename)
             s3_client.put_object(
                 Body=error_file_text,
                 Bucket=bucket_name,
@@ -964,17 +1010,17 @@ def assign_copy_replacements(connection_logs, replacements):
         for transaction in connection_log.transactions:
             for query in transaction.queries:
                 if "copy " in query.text.lower() and "from 's3:" in query.text.lower():
-                    
+
                     from_text = re.search(r"from 's3:\/\/[^']*", query.text, re.IGNORECASE)
                     if from_text:
                         existing_copy_location = from_text.group()[6:]
-                        
+
                         try:
                             replacement_copy_location = replacements[existing_copy_location][0]
-                        except KeyError as ke:
+                        except KeyError:
                             logger.info(f"No COPY replacement found for {existing_copy_location}")
                             continue
-                        
+
                         if not replacement_copy_location:
                             replacement_copy_location = existing_copy_location
 
@@ -988,12 +1034,12 @@ def assign_copy_replacements(connection_logs, replacements):
                         )
 
                         iam_replacements = [
-                          (r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'", f" IAM_ROLE '{replacement_copy_iam_role}'"),
-                          (r"credentials ''", f" IAM_ROLE '{replacement_copy_iam_role}'"),
-                          (r"with credentials as ''", f" IAM_ROLE '{replacement_copy_iam_role}'"),
-                          (r"IAM_ROLE ''", f" IAM_ROLE '{replacement_copy_iam_role}'"),
-                          (r"ACCESS_KEY_ID '' SECRET_ACCESS_KEY '' SESSION_TOKEN ''", f" IAM_ROLE '{replacement_copy_iam_role}'"),
-                          (r"ACCESS_KEY_ID '' SECRET_ACCESS_KEY ''", f" IAM_ROLE '{replacement_copy_iam_role}'")
+                            (r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'", f" IAM_ROLE '{replacement_copy_iam_role}'"),
+                            (r"credentials ''", f" IAM_ROLE '{replacement_copy_iam_role}'"),
+                            (r"with credentials as ''", f" IAM_ROLE '{replacement_copy_iam_role}'"),
+                            (r"IAM_ROLE ''", f" IAM_ROLE '{replacement_copy_iam_role}'"),
+                            (r"ACCESS_KEY_ID '' SECRET_ACCESS_KEY '' SESSION_TOKEN ''", f" IAM_ROLE '{replacement_copy_iam_role}'"),
+                            (r"ACCESS_KEY_ID '' SECRET_ACCESS_KEY ''", f" IAM_ROLE '{replacement_copy_iam_role}'")
                         ]
 
                         for r in iam_replacements:
@@ -1004,7 +1050,7 @@ def assign_unloads(connection_logs, replay_output, replay_name, unload_iam_role)
     for connection_log in connection_logs:
         for transaction in connection_log.transactions:
             for query in transaction.queries:
-                
+
                 if "unload" in query.text.lower() and "to 's3:" in query.text.lower():
                     to_text = re.search(r"to 's3:\/\/[^']*", query.text, re.IGNORECASE).group()[9:]
 
@@ -1017,7 +1063,7 @@ def assign_unloads(connection_logs, replay_output, replay_name, unload_iam_role)
                             + "/UNLOADs/"
                             + to_text
                         )
-                        
+
                         new_query_text = query.text.replace(
                             existing_unload_location, replacement_unload_location
                         )
@@ -1059,8 +1105,8 @@ def assign_unloads(connection_logs, replay_output, replay_name, unload_iam_role)
                                 query.text,
                                 flags=re.IGNORECASE,
                             )
-                            
-                            
+
+
 def assign_time_intervals(connection_logs):
     for connection_log in connection_logs:
         for transaction in connection_log.transactions:
@@ -1127,27 +1173,44 @@ def get_connection_string(username, max_attempts=10, skip_cache=False):
 
     additional_args = {}
     if os.environ.get('ENDPOINT_URL'):
-        additional_args = { 'endpoint_url': os.environ.get('ENDPOINT_URL'),
-                            'verify': False }
+        import urllib3
+        # disable insecure warnings when testing endpoint is used
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        additional_args = {'endpoint_url': os.environ.get('ENDPOINT_URL'),
+                           'verify': False}
 
     response = None
-    for attempt in range(1, max_attempts+1):
-        response = client("redshift", **additional_args).get_cluster_credentials(
-            DbUser=username, ClusterIdentifier=cluster_id, AutoCreate=False, DurationSeconds=credentials_timeout_sec
-        )
+    rs_client = client("redshift", **additional_args)
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = rs_client.get_cluster_credentials(
+                DbUser=username, ClusterIdentifier=cluster_id, AutoCreate=False, DurationSeconds=credentials_timeout_sec
+            )
+        except NoCredentialsError:
+            raise CredentialsException("No credentials found")
+        except rs_client.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'ExpiredToken':
+                logger.error(f"Error retrieving credentials for {cluster_id}: IAM credentials have expired.")
+                exit(-1)
+            else:
+                raise e
+        except rs_client.exceptions.ClusterNotFoundFault:
+            logger.error(f"Cluster {cluster_id} not found. Please confirm cluster endpoint, account, and region.")
+            exit(-1)
+
         if response is None or response.get('DbPassword') is None:
-            logger.warning(f"Failed to retrieve credentials for {username} (attempt {attempt}/{max_attempts})")
+            logger.warning(f"Failed to retrieve credentials for user {username} (attempt {attempt}/{max_attempts})")
             logger.debug(response)
             response = None
-            time.sleep(retry_delay_sec)
+            if attempt < max_attempts:
+                time.sleep(retry_delay_sec)
         else:
             break
 
     if response is None:
         msg = f"Failed to retrieve credentials for {username}"
-        logger.error(msg)
         raise CredentialsException(msg)
-    
+
     cluster_odbc_url = (
         "Driver={}; Server={}; Database={}; IAM=1; DbUser={}; DbPassword={}; Port={}".format(
             odbc_driver,
@@ -1167,9 +1230,9 @@ def get_connection_string(username, max_attempts=10, skip_cache=False):
         "database": cluster_database,
     }
 
-    target_cluster_urls = { 'odbc': cluster_odbc_url,
-                            'psql': cluster_psql }
-    logger.info("Successfully retrieved database credentials for {}".format(username))
+    target_cluster_urls = {'odbc': cluster_odbc_url,
+                           'psql': cluster_psql}
+    logger.debug("Successfully retrieved database credentials for {}".format(username))
     g_credentials_cache[username] = {'last_update': datetime.datetime.now(tz=datetime.timezone.utc),
                                      'target_cluster_urls': target_cluster_urls}
     return target_cluster_urls
@@ -1182,6 +1245,7 @@ def unload_system_table(
     unload_iam_role,
 ):
 
+    # TODO: wrap this in retries and proper logging
     target_cluster_urls = get_connection_string(g_config["master_username"], max_attempts=3)
 
     conn = None
@@ -1241,12 +1305,12 @@ def validate_config(config):
         logger.error(
             'Config file value for "target_cluster_endpoint" is not a valid endpoint. Endpoints must be in the format of <cluster-hostname>:<port>/<database-name>.'
         )
-        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+        exit(-1)
     if not config["master_username"]:
         logger.error(
             'Config file missing value for "master_username". Please provide a value for "master_username".'
         )
-        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+        exit(-1)
     if not config["odbc_driver"]:
         config["odbc_driver"] = None
         logger.debug(
@@ -1259,7 +1323,7 @@ def validate_config(config):
             logger.error(
                 'Import of pyodbc failed. Please install pyodbc library to use ODBC as default driver. Please refer to REAME.md'
             )
-            exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+            exit(-1)
     if not (
         config["default_interface"] == "psql"
         or config["default_interface"] == "odbc"
@@ -1267,7 +1331,7 @@ def validate_config(config):
         logger.error(
             'Config file value for "default_interface" must be either "psql" or "odbc". Please change the value for "default_interface" to either "psql" or "odbc".'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     if not (
         config["time_interval_between_transactions"] == ""
         or config["time_interval_between_transactions"] == "all on"
@@ -1276,7 +1340,7 @@ def validate_config(config):
         logger.error(
             'Config file value for "time_interval_between_transactions" must be either "", "all on", or "all off". Please change the value for "time_interval_between_transactions" to be "", "all on", or "all off".'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     if not (
         config["time_interval_between_queries"] == ""
         or config["time_interval_between_queries"] == "all on"
@@ -1285,7 +1349,7 @@ def validate_config(config):
         logger.error(
             'Config file value for "time_interval_between_queries" must be either "", "all on", or "all off". Please change the value for "time_interval_between_queries" to be "", "all on", or "all off".'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     if not (
         config["execute_copy_statements"] == "true"
         or config["execute_copy_statements"] == "false"
@@ -1293,7 +1357,7 @@ def validate_config(config):
         logger.error(
             'Config file value for "execute_copy_statements" must be either "true" or "false". Please change the value for "execute_copy_statements" to either "true" or "false".'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     if not (
         config["execute_unload_statements"] == "true"
         or config["execute_unload_statements"] == "false"
@@ -1301,19 +1365,19 @@ def validate_config(config):
         logger.error(
             'Config file value for "execute_unload_statements" must be either "true" or "false". Please change the value for "execute_unload_statements" to either "true" or "false".'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     if config["replay_output"] and not config["replay_output"].startswith(
         "s3://"
     ):
         logger.error(
             'Config file value for "replay_output" must be an S3 location (starts with "s3://"). Please remove this value or put in an S3 location.'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     if not config["replay_output"] and config["execute_unload_statements"] == "true":
         logger.error(
             'Config file value for "replay_output" is not provided while "execute_unload_statements" is set to true. Please provide a valid S3 location for "replay_output".'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     if (
         config["replay_output"]
         and config["target_cluster_system_table_unload_iam_role"]
@@ -1322,7 +1386,7 @@ def validate_config(config):
         logger.error(
             'Config file missing value for "unload_system_table_queries". Please provide a value for "unload_system_table_queries", or remove the value for "target_cluster_system_table_unload_iam_role".'
         )
-        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+        exit(-1)
     if (
         config["replay_output"]
         and config["target_cluster_system_table_unload_iam_role"]
@@ -1332,12 +1396,12 @@ def validate_config(config):
         logger.error(
             'Config file value for "unload_system_table_queries" does not end with ".sql". Please ensure the value for "unload_system_table_queries" ends in ".sql". See the provided "unload_system_tables.sql" as an example.'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     if not config["workload_location"]:
         logger.error(
             'Config file missing value for "workload_location". Please provide a value for "workload_location".'
         )
-        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+        exit(-1)
 
     config['filters'] = validate_and_normalize_filters(ConnectionLog, config.get('filters', {}))
 
@@ -1352,10 +1416,13 @@ def print_stats(stats):
         if abs(stats[process_idx].get('connection_diff_sec', 0)) > abs(max_connection_diff):
             max_connection_diff = stats[process_idx]['connection_diff_sec']
         logger.debug(f"[{process_idx}] Max connection offset: {stats[process_idx].get('connection_diff_sec', 0):+.3f} sec")
-    logger.info(f"Max connection offset: {max_connection_diff:+.3f} sec")
+    logger.debug(f"Max connection offset: {max_connection_diff:+.3f} sec")
 
 
 def main():
+    global logger
+    logger = init_logging(logging.INFO)
+
     global g_config
 
     parser = argparse.ArgumentParser()
@@ -1371,22 +1438,37 @@ def main():
     validate_config(g_config)
 
     level = logging.getLevelName(g_config.get('log_level', 'INFO').upper())
-    logger.setLevel(level)
+    set_log_level(level)
+
+    if g_config.get("logfile_level") != "none":
+        level = logging.getLevelName(g_config.get('logfile_level', 'DEBUG').upper())
+        log_file = 'replay.log'
+        add_logfile(log_file, level=level, preamble=yaml.dump(g_config), backup_count=g_config.get("backup_count", 2))
+
+    # print the version
+    log_version()
 
     replay_name = f'Replay_{g_config["target_cluster_endpoint"].split(".")[0]}_{datetime.datetime.now(tz=datetime.timezone.utc).isoformat()}'
 
     # use a manager to share the stats dict to all processes
-    manager = multiprocessing.Manager()
-    
+#    manager = multiprocessing.Manager()
+    global g_manager
+    g_manager = SyncManager()
+
+    def init_manager():
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    g_manager.start(init_manager)
+
     if not g_config["replay_output"]:
         g_config["replay_output"] = None
-    
+
     (connection_logs, total_connections) = parse_connections(
         g_config["workload_location"],
         g_config["time_interval_between_transactions"],
         g_config["time_interval_between_queries"],
     )
-    logger.info(f"Found {total_connections} total connections, {total_connections - len(connection_logs)} don't match filters. Replaying {len(connection_logs)}.")
+    logger.info(f"Found {total_connections} total connections, {total_connections - len(connection_logs)} are excluded by filters. Replaying {len(connection_logs)}.")
 
     # Associate transactions with connections
     logger.info(
@@ -1422,10 +1504,10 @@ def main():
         connection_logs[best_match_idx].transactions.append(t)
         query_count += len(t.queries)
 
-    logger.info(f"Found {transaction_count} transactions ({query_count} queries)")
+    logger.info(f"Found {transaction_count} transactions, {query_count} queries")
     connection_logs = [_ for _ in connection_logs if len(_.transactions) > 0]
-    logger.info(f"Only {len(connection_logs)} connections with transactions will be replayed ")
-    
+    logger.info(f"{len(connection_logs)} connections contain transactions and will be replayed ")
+
     global g_total_connections
     g_total_connections = len(connection_logs)
 
@@ -1450,7 +1532,7 @@ def main():
             first_event_time = connection.transactions[0].queries[0].start_time
         if connection.transactions[-1].queries[-1].end_time and connection.transactions[-1].queries[-1].end_time > last_event_time:
             last_event_time = connection.transactions[-1].queries[-1].end_time
-            
+
     logger.info(
         "Estimated original workload execution time: "
         + str((last_event_time - first_event_time))
@@ -1488,8 +1570,8 @@ def main():
     try:
         # use the first user as a test
         get_connection_string(connection_logs[0].username, max_attempts=1)
-    except CredentialsException:
-        logger.error(f"Unable to retrieve credentials using GetClusterCredentials.  Please verify that an IAM policy exists granting access.  See the README for more details.")
+    except CredentialsException as e:
+        logger.error(f"Unable to retrieve credentials using GetClusterCredentials ({str(e)}).  Please verify that an IAM policy exists granting access.  See the README for more details.")
         sys.exit(-1)
 
     if len(connection_logs) == 0:
@@ -1497,23 +1579,25 @@ def main():
         sys.exit()
 
     # Actual replay
-    logger.info("Starting replay")
-    stats = {}
+    logger.debug("Starting replay")
+    per_process_stats = {}
     try:
-        stats = start_replay(connection_logs,
-                             g_config["default_interface"],
-                             g_config["odbc_driver"],
-                             first_event_time,
-                             last_event_time,
-                             g_config.get("num_workers"),
-                             manager)
+        start_replay(connection_logs,
+                     g_config["default_interface"],
+                     g_config["odbc_driver"],
+                     first_event_time,
+                     last_event_time,
+                     g_config.get("num_workers"),
+                     g_manager,
+                     per_process_stats,
+                     transaction_count,
+                     query_count)
     except KeyboardInterrupt:
-        logger.error("Got CTRL-C, exiting...")
-        raise
+        logger.warning("Got CTRL-C, exiting...")
 
-    logger.info("Aggregating stats")
-    aggregated_stats = {}
-    for idx, stat in stats.items():
+    logger.debug("Aggregating stats")
+    aggregated_stats = init_stats({})
+    for idx, stat in per_process_stats.items():
         collect_stats(aggregated_stats, stat)
 
     logger.info("Replay summary:")
@@ -1535,26 +1619,16 @@ def main():
     else:
         error_location = g_config["workload_location"]
 
-    # combine the errors from all the subprocesses
-    connection_errors = {}
-    transaction_errors = {}
-    for stat in stats.values():
-        connection_errors.update(stat.get('connection_error_log', {}))
-        transaction_errors.update(stat.get('transaction_error_log', {}))
-
-    level = logging.getLevelName('INFO')
-    if len(connection_errors) > 0 or len(transaction_errors) > 0:
-        level = logging.getLevelName('WARNING')
-    logger.log(level, f"Encountered {len(connection_errors)} connection errors and {len(transaction_errors)} transaction errors")
+    logger.info(f"Encountered {len(aggregated_stats['connection_error_log'])} connection errors and {len(aggregated_stats['transaction_error_log'])} transaction errors")
 
     # and save them
     export_errors(
-        connection_errors,
-        transaction_errors,
+        aggregated_stats['connection_error_log'],
+        aggregated_stats['transaction_error_log'],
         error_location,
         replay_name,
     )
-    
+
     logger.info(f"Replay finished in {datetime.datetime.now(tz=datetime.timezone.utc) - replay_start_time}.")
 
     if (
@@ -1573,7 +1647,8 @@ def main():
 
         logger.info(f'Exported system tables to {g_config["replay_output"]}')
 
-    print_stats(stats)
+    print_stats(per_process_stats)
+    g_manager.shutdown()
 
 
 if __name__ == "__main__":
