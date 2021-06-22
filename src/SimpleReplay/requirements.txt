@@ -3,3 +3,4 @@ pyodbc
 redshift_connector
 PyYAML
 python-dateutil==2.8.1
+tqdm==4.59.0

@@ -7,6 +7,7 @@ import threading
 import time
 import yaml
 import datetime
+from tqdm import tqdm
 from contextlib import contextmanager
 import logging
 
@@ -14,15 +15,9 @@ import boto3
 from boto3 import client
 import dateutil.parser
 
-EXIT_MISSING_VALUE_CONFIG_FILE = 100
-EXIT_INVALID_VALUE_CONFIG_FILE = 101
+from util import init_logging, set_log_level, prepend_ids_to_logs, add_logfile, log_version
 
-logger = logging.getLogger("ExtractionLogger")
-FORMAT = "[%(levelname)s] %(asctime)s %(message)s"
-logging.Formatter.converter = time.gmtime
-logging.basicConfig(format=FORMAT, datefmt="%Y-%m-%d %H:%M:%S")
-logger.setLevel(logging.INFO)
-
+logger = None
 
 class Log:
     def __init__(self):
@@ -251,31 +246,6 @@ def initiate_connection(cluster_urls, interface, database_name):
                 conn.close()
 
 
-def get_local_logs(log_directory_path, start_time, end_time):
-    connections = {}
-    last_connections = {}
-    logs = {}
-    databases = set()
-
-
-    unsorted_list = os.listdir(log_directory_path)         
-    log_directory = sorted(unsorted_list)                  
-
-    for filename in log_directory:
-        if "start_node" in filename:
-            log_file = gzip.open(
-                log_directory_path + "/" + filename, "rt", encoding="ISO-8859-1"
-            )
-        else:
-            log_file = gzip.open(log_directory_path + "/" + filename, "r")
-        parse_log(
-            log_file, filename, connections, last_connections, logs, databases, start_time, end_time,
-        )
-        log_file.close()
-
-    return (connections, logs, databases, last_connections)
-
-
 def parse_log(
     log_file, filename, connections, last_connections, logs, databases, start_time, end_time,         
 ):
@@ -306,28 +276,8 @@ def parse_connection_log(file, connections, last_connections, start_time, end_ti
             username = connection_information[6].strip()
         application_name = connection_information[15]
 
-
-#        if username != "rdsdb":
-#            if connection_event == "initiating session ":
-#                if not start_time or (start_time and event_time > start_time):
-#                    connections[connection_key] = connection_log
-#            elif connection_event == "set application_name ":
-#                if connection_key in connections:
-#                    connections[connection_key].application_name = " ".join(
-#                        application_name.split()
-#                    )
-#            elif connection_event == "disconnecting session ":
-#                if connection_key in connections:
-#                    if end_time and event_time > end_time:
-#                        del connections[connection_key]
-#                    else:
-#                        connection = connections[connection_key]
-#                        connection.disconnection_time = event_time
-
         if username != "rdsdb" and event_time >= start_time and event_time <= end_time:
-
             connection_log = ConnectionLog(event_time, end_time, database_name, username, pid)
-
             if connection_event == "initiating session ":
                 connection_key = connection_log.get_pk()
                 # create a new connection
@@ -339,7 +289,9 @@ def parse_connection_log(file, connections, last_connections, start_time, end_ti
                     if connection_key in connections:
                         # set the latest connection with application name
                         connections[connection_key].application_name = " ".join( application_name.split())
-                    else: # create new connection if there's no one yet with start time equals to start of extraction
+                    else:
+		        # create new connection if there's no one yet with start
+                        # time equals to start of extraction
                         connection_log.session_initiation_time = start_time
                         connection_key = connection_log.get_pk()
                         connections[connection_key] = connection_log
@@ -350,7 +302,9 @@ def parse_connection_log(file, connections, last_connections, start_time, end_ti
                     if connection_key in connections:
                         # set the latest connection with disconnection time
                         connections[connection_key].disconnection_time = event_time
-                else: # create new connection if there's no one yet with start time equals to start of extraction
+                else:
+		    # create new connection if there's no one yet with start
+                    # time equals to start of extraction
                     connection_log.session_initiation_time = start_time
                     connection_log.disconnection_time = event_time
                     connection_key = connection_log.get_pk()
@@ -579,7 +533,7 @@ def remove_line_comments(query):
    
     return removed_string
 
-def save_logs(logs, last_connections, output_directory):
+def save_logs(logs, last_connections, output_directory, connections, start_time, end_time):
     num_queries = 0
     for filename, transaction in logs.items():
         num_queries += len(transaction)
@@ -615,7 +569,7 @@ def save_logs(logs, last_connections, output_directory):
                 header_info += f"--Pid: {query.pid}\n"
                 header_info += f"--Xid: {query.xid}\n"
             except AttributeError:
-                logger.error(f'Query is missing header info, skipping: {query}')
+                logger.error(f'Query is missing header info, skipping {filename}: {query}')
                 continue
 
             if "copy " in query.text.lower() and "from 's3:" in query.text.lower(): #Raj
@@ -662,13 +616,14 @@ def save_logs(logs, last_connections, output_directory):
     logger.info(f"Generating {len(missing_audit_log_connections)} missing connections.")
     for missing_audit_log_connection_info in missing_audit_log_connections:
         connection = ConnectionLog(
-            start_time,end_time, # for missing connections set start_time and end_time
+            start_time,
+            end_time, # for missing connections set start_time and end_time to our extraction range
             missing_audit_log_connection_info[0],
             missing_audit_log_connection_info[1],
             missing_audit_log_connection_info[2],
         )
         pk = connection.get_pk()
-        connections[pk]=connection
+        connections[pk] = connection
     logger.info(
         f"Exporting a total of {len(connections.values())} connections to {output_directory}"
     )
@@ -676,7 +631,6 @@ def save_logs(logs, last_connections, output_directory):
     sorted_connections = connections.values()
     connections_dict = connection_time_replacement([connection.__dict__ for connection in sorted_connections])
     connections_string = json.dumps(
-        #connections_dict,
         [connection.__dict__ for connection in sorted_connections],
         indent=4,
         default=str,
@@ -712,17 +666,67 @@ def save_logs(logs, last_connections, output_directory):
 
 
 def get_cluster_log_location(source_cluster_endpoint):
-    logging_status = client("redshift").describe_logging_status(
+    """ Get the audit log location for the cluster via the API """
+    logger.debug(f"Retrieving log location for {source_cluster_endpoint}")
+    result = client("redshift").describe_logging_status(
         ClusterIdentifier=source_cluster_endpoint.split(".")[0]
     )
-    if logging_status["LoggingEnabled"]:
-        bucket_name = logging_status["BucketName"]
 
-        if "S3KeyPrefix" in logging_status:
-            return (bucket_name, logging_status["S3KeyPrefix"])
+    if not result["LoggingEnabled"]:
+       logger.warning(f"Cluster {source_cluster_endpoint} does not appear to have audit logging enabled.  Please confirm logging is enabled.")
+       return None
+
+    location = "s3://{}/{}".format(result["BucketName"], result.get('S3KeyPrefix', ''))
+    logger.debug(f"Log location: {location}")
+    return location
+
+
+def get_logs(log_location, start_time, end_time):
+    logger.info(f"Extracting and parsing logs from {log_location}")
+    logger.info(f"Time range: {start_time or '*'} to {end_time or '*'}")
+    logger.info(f"This may take several minutes...")
+    if log_location.startswith("s3://"):
+        match = re.search(r's3://([^/]+)/(.*)', log_location)
+        if not(match):
+            logger.error(f"Failed to parse log location {log_location}")
+            return None
+        return get_s3_logs(match.group(1), match.group(2), start_time, end_time)
+    else:
+        return get_local_logs(log_location, start_time, end_time)
+
+
+def get_local_logs(log_directory_path, start_time, end_time):
+    connections = {}
+    last_connections = {}
+    logs = {}
+    databases = set()
+
+    unsorted_list = os.listdir(log_directory_path)         
+    log_directory = sorted(unsorted_list)                  
+
+    # disable_progress_bar should be None if user sets to False, to disable writing to
+    # non-tty (i.e. log file)
+    disable_progress_bar = None
+    if g_config.get('disable_progress_bar') ==  True:
+        disable_progress_bar = True
+
+
+    bar_format = '{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]'
+    for filename in tqdm(log_directory, disable=disable_progress_bar, unit='files', desc='Files processed', bar_format=bar_format):
+        if disable_progress_bar:
+            logger.info(f"Processing {filename}")
+        if "start_node" in filename:
+            log_file = gzip.open(
+                log_directory_path + "/" + filename, "rt", encoding="ISO-8859-1"
+            )
         else:
-            return (bucket_name, "")
-    return ("", "")
+            log_file = gzip.open(log_directory_path + "/" + filename, "r")
+        parse_log(
+            log_file, filename, connections, last_connections, logs, databases, start_time, end_time,
+        )
+        log_file.close()
+
+    return (connections, logs, databases, last_connections)
 
 
 def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
@@ -883,7 +887,7 @@ def get_connection_string(cluster_endpoint, username, odbc_driver):
         }
         return {"odbc": cluster_odbc_url, "psql": cluster_psql}
     except Exception as err:
-        logger.error("ERROR: Failed to generate connection string. " + str(err))
+        logger.error("Failed to generate connection string: " + str(err))
         return ""
 
 
@@ -954,23 +958,23 @@ def validate_config_file(config_file):
             logger.error(
                 'Config file value for "source_cluster_endpoint" is not a valid endpoint. Endpoints must be in the format of <cluster-name>.<identifier>.<region>.redshift.amazonaws.com:<port>/<database-name>.'
             )
-            exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+            exit(-1)
         if not config_file["master_username"]:
             logger.error(
                 'Config file missing value for "master_username". Please provide a value or remove the "source_cluster_endpoint" value.'
             )
-            exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+            exit(-1)
     else:
         if not config_file["log_location"]:
             logger.error(
                 'Config file missing value for "log_location". Please provide a value for "log_location", or provide a value for "source_cluster_endpoint".'
             )
-            exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+            exit(-1)
     if not config_file["start_time"]:
         logger.error(
             'Config file is missing "start_time". Please provide a valid "start_time" for extract.'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     else:
         try:
             dateutil.parser.isoparse(config_file["start_time"])
@@ -978,12 +982,12 @@ def validate_config_file(config_file):
             logger.error(
                 'Config file "start_time" value not formatted as ISO 8601. Please format "start_time" as ISO 8601 or remove its value.'
             )
-            exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+            exit(-1)
     if not config_file["end_time"]:
         logger.error(
             'Config file is missing "end_time". Please provide a valid "end_time" for extract.'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     else:
         try:
             dateutil.parser.isoparse(config_file["end_time"])
@@ -991,36 +995,36 @@ def validate_config_file(config_file):
             logger.error(
                 'Config file "end_time" value not formatted as ISO 8601. Please format "end_time" as ISO 8601 or remove its value.'
             )
-            exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+            exit(-1)
     if not config_file["start_time"]:
         logger.error(
             'Config file missing value for "start_time". Please provide a value for "start_time".'
         )
-        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+        exit(-1)
     if not config_file["end_time"]:
         logger.error(
             'Config file missing value for "end_time". Please provide a value for "end_time".'
         )
-        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+        exit(-1)
     if not config_file["workload_location"]:
         logger.error(
             'Config file missing value for "workload_location". Please provide a value for "workload_location".'
         )
-        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+        exit(-1)
     if not config_file["workload_location"].startswith("s3://") and os.path.exists(
         config_file["workload_location"]
     ):
         logger.error(
-            f'Output already exists at "{config_file["workload_location"]}". Please move or delete the existing output, or change the "workload_location" value.'
+            f'Output already exists in "{config_file["workload_location"]}". Please move or delete the existing directory, or change the "workload_location" value.'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     if config_file["source_cluster_system_table_unload_location"] and not config_file[
         "source_cluster_system_table_unload_location"
     ].startswith("s3://"):
         logger.error(
             'Config file value for "source_cluster_system_table_unload_location" must be an S3 location (starts with "s3://"). Please remove this value or put in an S3 location.'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
     if (
         config_file["source_cluster_system_table_unload_location"]
         and not config_file["source_cluster_system_table_unload_iam_role"]
@@ -1028,7 +1032,7 @@ def validate_config_file(config_file):
         logger.error(
             'Config file missing value for "source_cluster_system_table_unload_iam_role". Please provide a value for "source_cluster_system_table_unload_iam_role", or remove the value for "source_cluster_system_table_unload_location".'
         )
-        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+        exit(-1)
     if (
         config_file["source_cluster_system_table_unload_location"]
         and not config_file["unload_system_table_queries"]
@@ -1036,17 +1040,44 @@ def validate_config_file(config_file):
         logger.error(
             'Config file missing value for "unload_system_table_queries". Please provide a value for "unload_system_table_queries", or remove the value for "source_cluster_system_table_unload_location".'
         )
-        exit(EXIT_MISSING_VALUE_CONFIG_FILE)
+        exit(-1)
     if config_file["unload_system_table_queries"] and not config_file[
         "unload_system_table_queries"
     ].endswith(".sql"):
         logger.error(
             'Config file value for "unload_system_table_queries" does not end with ".sql". Please ensure the value for "unload_system_table_queries" ends in ".sql". See the provided "unload_system_tables.sql" as an example.'
         )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
+        exit(-1)
 
 
-if __name__ == "__main__":
+def load_driver():
+    interface = None
+    if g_config["odbc_driver"]:
+        try:
+            import pyodbc
+            interface = "odbc"
+        except Exception as err:
+            logger.error(
+                'Error importing pyodbc. Please ensure pyodbc is correctly installed or remove the value for "odbc_driver" to use pg8000.'
+            )
+    else:
+        try:
+            import pg8000
+            interface = "psql"
+        except Exception as err:
+            logger.error(
+                'Error importing pg8000. Please ensure pg8000 is correctly installed or add an ODBC driver name value for "odbc_driver" to use pyodbc.'
+            )
+
+    return interface
+
+
+def main():
+    global logger
+    logger = init_logging(logging.INFO)
+
+    global g_config
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "config_file",
@@ -1055,85 +1086,74 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    config_file = {}
+    g_config = {}
     with args.config_file as stream:
         try:
-            config_file = yaml.safe_load(stream)
+            g_config = yaml.safe_load(stream)
         except yaml.YAMLError as exception:
-            logger.error(f"Failed to load extraction config yaml file.\n{exception}")
+            logger.error(f"Failed to parse extraction config yaml file: {exception}")
+            exit(-1)
 
-    validate_config_file(config_file)
+    validate_config_file(g_config)
 
-    if config_file["source_cluster_endpoint"]:
-        extraction_name = f'Extraction_{config_file["source_cluster_endpoint"].split(".")[0]}_{datetime.datetime.now().replace(tzinfo=datetime.timezone.utc).isoformat()}'
+    level = logging.getLevelName(g_config.get('log_level', 'INFO').upper())
+    set_log_level(level)
+
+    if g_config.get("logfile_level") != "none":
+        level = logging.getLevelName(g_config.get('logfile_level', 'DEBUG').upper())
+        log_file = 'extract.log'
+        add_logfile(log_file, level=level, preamble=yaml.dump(g_config), backup_count=g_config.get("backup_count", 2))
+
+    # print the version 
+    log_version()
+
+    interface = load_driver()
+    if not interface:
+        logger.error("Failed to load driver.")
+        exit(-1)
+
+    if g_config["source_cluster_endpoint"]:
+        extraction_name = f'Extraction_{g_config["source_cluster_endpoint"].split(".")[0]}_{datetime.datetime.now().replace(tzinfo=datetime.timezone.utc).isoformat()}'
     else:
         extraction_name = f"Extraction_{datetime.datetime.now().replace(tzinfo=datetime.timezone.utc).isoformat()}"
 
-    try:
-        if config_file["odbc_driver"]:
-            import pyodbc
-
-            interface = "odbc"
-        else:
-            import redshift_connector
-
-            interface = "psql"
-    except Exception as err:
-        if config_file["odbc_driver"]:
-            logger.error(
-                'Error while importing pyodbc. Please ensure pyodbc is correctly installed or remove the value for "odbc_driver" to use redshift_connector.'
-            )
-        else:
-            logger.error(
-                'Error while importing redshift_connector. Please ensure redshift_connector is correctly installed or add an ODBC driver name value for "odbc_driver" to use pyodbc.'
-            )
-        exit(EXIT_INVALID_VALUE_CONFIG_FILE)
-
-    if config_file["start_time"]:
-        start_time = dateutil.parser.parse(config_file["start_time"]).astimezone(
+    if g_config.get("start_time"):
+        start_time = dateutil.parser.parse(g_config["start_time"]).astimezone(
             dateutil.tz.tzutc()
         )
     else:
         start_time = ""
 
-    if config_file["end_time"]:
-        end_time = dateutil.parser.parse(config_file["end_time"]).astimezone(
+    if g_config.get("end_time"):
+        end_time = dateutil.parser.parse(g_config["end_time"]).astimezone(
             dateutil.tz.tzutc()
         )
     else:
         end_time = ""
 
-    if config_file["log_location"]:
-        logger.info(f'Retrieving logs from {config_file["log_location"]}')
-        if config_file["log_location"].startswith("s3://"):
-            log_bucket = config_file["log_location"][5:].split("/")[0]
-            log_prefix = config_file["log_location"][5:].partition("/")[2]
-            (connections, audit_logs, databases, last_connections) = get_s3_logs(
-                log_bucket, log_prefix, start_time, end_time,
-            )
-        else:
-            (connections, audit_logs, databases, last_connections) = get_local_logs(
-                config_file["log_location"], start_time, end_time,
-            )
+    # read the logs
+    if g_config.get("log_location"):
+        log_location = g_config["log_location"]
+    elif g_config.get("source_cluster_endpoint"):
+        log_location  = get_cluster_log_location(g_config["source_cluster_endpoint"])
     else:
-        logger.info(
-            f'Getting log location from {config_file["source_cluster_endpoint"]}'
-        )
-        (log_bucket, log_prefix) = get_cluster_log_location(
-            config_file["source_cluster_endpoint"]
-        )
+        logger.error("Either log_location or source_cluster_endpoint must be specified.")
+        exit(-1)
 
-        logger.info(f"Retrieving logs from s3://{log_bucket}/{log_prefix}")
-        (connections, audit_logs, databases,last_connections) = get_s3_logs(
-            log_bucket, log_prefix, start_time, end_time,
-        )
+    (connections, audit_logs, databases, last_connections) = get_logs(log_location, start_time, end_time)
 
-    if config_file["source_cluster_endpoint"]:
-        logger.info(f'Retrieving info from {config_file["source_cluster_endpoint"]}')
+    logger.debug(f"Found {len(connections)} connection logs, {len(audit_logs)} audit logs")
+
+    if(len(audit_logs) == 0 or len(connections) == 0):
+        logger.warning("No audit logs or connections logs found. Please verify that the audit log location or cluster endpoint is correct. Note, audit logs can take several hours to start appearing in S3 after logging is first enabled.")
+        exit(-1)
+
+    if g_config["source_cluster_endpoint"]:
+        logger.info(f'Retrieving info from {g_config["source_cluster_endpoint"]}')
         source_cluster_urls = get_connection_string(
-            config_file["source_cluster_endpoint"],
-            config_file["master_username"],
-            config_file["odbc_driver"],
+            g_config["source_cluster_endpoint"],
+            g_config["master_username"],
+            g_config["odbc_driver"],
         )
 
         source_cluster_statement_text_logs = retrieve_source_cluster_statement_text(
@@ -1143,29 +1163,35 @@ if __name__ == "__main__":
         combine_logs(audit_logs, source_cluster_statement_text_logs)
 
         if (
-            config_file["source_cluster_system_table_unload_location"]
-            and config_file["unload_system_table_queries"]
-            and config_file["source_cluster_system_table_unload_iam_role"]
+            g_config["source_cluster_system_table_unload_location"]
+            and g_config["unload_system_table_queries"]
+            and g_config["source_cluster_system_table_unload_iam_role"]
         ):
             logger.info(
-                f'Exporting system tables to {config_file["source_cluster_system_table_unload_location"]}'
+                f'Exporting system tables to {g_config["source_cluster_system_table_unload_location"]}'
             )
 
             unload_system_table(
                 source_cluster_urls,
-                config_file["odbc_driver"],
-                config_file["unload_system_table_queries"],
-                config_file["source_cluster_system_table_unload_location"] + "/" + extraction_name,
-                config_file["source_cluster_system_table_unload_iam_role"],
+                g_config["odbc_driver"],
+                g_config["unload_system_table_queries"],
+                g_config["source_cluster_system_table_unload_location"] + "/" + extraction_name,
+                g_config["source_cluster_system_table_unload_iam_role"],
             )
 
             logger.info(
-                f'Exported system tables to {config_file["source_cluster_system_table_unload_location"]}'
+                f'Exported system tables to {g_config["source_cluster_system_table_unload_location"]}'
             )
 
     save_logs(
         audit_logs,
         last_connections,
-        config_file["workload_location"] + "/" + extraction_name,
+        g_config["workload_location"] + "/" + extraction_name,
+        connections,
+        start_time,
+        end_time
     )
 
+
+if __name__ == "__main__":
+    main()
