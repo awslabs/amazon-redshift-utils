@@ -21,7 +21,7 @@
         "email": "meyersi@amazon.com"
     },
     "main": "./snapshotManager.js",
-    "license" : "SEE LICENSE IN LICENSE.txt",
+    "license" : "Apache-2.0",
     "files": [   
         "index.js",
         "constants.js",
