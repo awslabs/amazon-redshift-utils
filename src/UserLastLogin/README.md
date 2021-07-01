@@ -12,6 +12,6 @@ This utility helps in tracking cluster's users last login information. For custo
 # License
 Amazon Redshift Utils - UserLastLogin
 
-Copyright 2017-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-Amazon Software License: https://aws.amazon.com/asl
+This project is licensed under the Apache-2.0 License.

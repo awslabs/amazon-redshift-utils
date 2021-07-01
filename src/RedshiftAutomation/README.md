@@ -188,6 +188,6 @@ Also, when you include a config.json, this function connects to only one Redshif
 
 Amazon Redshift Utils - Lambda Runner
 
-Copyright 2017-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-Amazon Software License: https://aws.amazon.com/asl
+This project is licensed under the Apache-2.0 License.

@@ -1,11 +1,5 @@
 # Amazon Redshift Utilities
 
-Copyright 2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-
-Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
-
-    http://aws.amazon.com/asl/
-
 Amazon Redshift is a fast, fully managed, petabyte-scale data warehouse solution 
 that uses columnar storage to minimise IO, provide high data compression rates, 
 and offer fast performance. This GitHub provides a collection of scripts and utilities
@@ -116,8 +110,8 @@ docker run --net host --rm -it --env-file .env .... amazon-redshift-utils analyz
 Please see the [entrypoint scripts](src/bin/) for the environment variable configuration references that are needed.
 
 ----
-Copyright 2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
+## License
 
-    http://aws.amazon.com/asl/
+This project is licensed under the Apache-2.0 License.
+
