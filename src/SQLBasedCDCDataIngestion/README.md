@@ -27,8 +27,8 @@ Before going over each step in detail, let’s deploy the resources from the sam
 3. In the terminal window, clone the GitHub repository.
 
 ```
-git clone https://github.com/AndrewShvedRepo/redshiftcdcelt
-cd redshiftcdcelt
+git clone https://github.com/awslabs/amazon-redshift-utils.git
+cd src/SQLBasedCDCDataIngestion
 ```
 
 1. Open the file `app.py` and adjust the `user_name` parameter to your current IAM user name and `email_address` to your email address. Save your changes.
