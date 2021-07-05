@@ -1,0 +1,1 @@
+create external schema cdc_database from data catalog database 'cdc_database' iam_role '<your-RedshiftSpectrumRole-arn>' create external database if not exists;
