@@ -21,7 +21,7 @@ Here are the steps to use this benchmark:
     Create 2 Redshift clusters with different configurations, one as a baseline and one as target
 
 
-* We have used this to assess the performance between Manual WLM and Auto WLM, here are the WLM configurations we have used:
+* We have used these WLM configurations to assess the performance between Manual WLM and Auto WLM:
 
 
 ### Manual Configuration	
@@ -74,6 +74,7 @@ This will start the workload in the background. Please note, you need python3.6 
 
 ## 5. Workload Stop: 
 The following script can kill all the back ground jobs. Please use the proper os user name.
+```
     for i in \`ps -fu ec2-user | grep "python3 ParallelExecute" | cut -d ' ' -f2\` ; do kill -9 "$i"; done
-
+```
 
