@@ -37,7 +37,6 @@ def execute(statement):
     print('Successfully Connected to Cluster with regular user')
     # create a new cursor for methods to run through
     try:
-        #print("Started: " + statement)
         print('starting to execute')
         cursor = conn.cursor()
         print('right before execute')
@@ -48,7 +47,6 @@ def execute(statement):
         print('starting to execute 02')
         result = cursor.execute(statement)
         print('Finished running query')
-        #print("Finished: " + statement)
         conn.close()
     except:
         logging.error("Query failed: " + statement)
@@ -66,7 +64,6 @@ if rcount >= 0:
 
         # create a new cursor for methods to run through
         cursorTables = conn.cursor()
-        #statementTables = "select " + sqlColumn + " from " + sqlTable + " where sql_type = '" + sqlWhere + "' limit 22 "
         statementTables = "select " + sqlColumn + " from " + sqlTable + " where sql_type = '" + sqlWhere + "'  "
         result = cursorTables.execute(statementTables)
         print('number of sql stmt: %s' % cursorTables.arraysize)
