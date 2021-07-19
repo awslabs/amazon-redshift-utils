@@ -20,7 +20,9 @@ Here are the steps to use this benchmark:
 ## 1. Cluster Set up: 
     Create 2 Redshift clusters with different configurations, one as a baseline and one as target
 
+
 * We have used this to assess the performance between Manual WLM and Auto WLM, here are the WLM configurations we have used:
+
 
 ### Manual Configuration	
 
