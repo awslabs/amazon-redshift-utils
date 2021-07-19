@@ -20,12 +20,14 @@ Here are the steps to use this benchmark:
 ## 1. Cluster Set up: 
     Create 2 Redshift clusters with different configurations, one as a baseline and one as target
 
+
 * We have used this to assess the performance between Manual WLM and Auto WLM, here are the WLM configurations we have used:
+
 
 ### Manual Configuration	
 
 Queues/Query Groups	|Memory %	|Max Concurrency	|Concurrency Scaling	|Priority		
----|----|---|---|---|----|---|---|--
+--------------------|--------|------------------|-----------------------|---------
 Dashboard	|24|	5	|Off	|NA	
 Report	|25	|6	|Off	|NA		
 DataScience	|25	|4	|Off	|NA	
@@ -35,7 +37,7 @@ Default	|1	|1	|Off	|NA
 ### Automatic Configuration
 
 Queues/Query Groups	|Memory %	|Max Concurrency	|Concurrency Scaling	|Priority
----|----|---|---|---|----|---|---|--
+------------------------|---------------|-----------------------|-----------------------|------
 Dashboard	|Auto	|Auto	|Off	|Normal
 Report	|Auto	|Auto	|Off	|Normal
 DataScience	|Auto	|Auto	|Off	|Normal
