@@ -1,4 +1,4 @@
-# Cloud Data Warehouse Mixed Read/Write Benchmark Derived from TPC-H
+# Synthetic Mixed Read/Write Benchmark Derived from TPC-H
 
 Amazon Redshift is a fast, scalable data warehouse that makes it simple and cost-effective to analyze all your data across your data warehouse and data lake. Redshift delivers faster performance than other data warehouses by using machine learning, massively parallel query execution, and columnar storage on high-performance disk. 
 We continuously improve the performance of the Redshift service. One workload that we use is the Cloud Data Warehouse Mixed Read/Write Benchmark Derived from TPC-H (http://www.tpc.org/tpch/default.asp).
@@ -11,8 +11,6 @@ Note: The TPC Benchmark and TPC-H are trademarks of the Transaction Processing P
         Examine large volumes of data;
         Execute queries with a high degree of complexity;
         Give answers to critical business questions."
-
-
 
 The main intention to create this benchmark is to mimic a real world mixed workload scenario, where some applications continuously read from datamart set of tables, Analysts run adhoc queries throughout the day, ingestions are happening against the larger data warehouse set of tables on a periodic manner. Also there are some pre-defined set of reports which run on a schedule. In this derived benchmark, we have broken down these 22 queries into 3 categories based on the run timings. The short ones we marked as DASHBOARD queries. The longest ones marked as DATASCIENCE and medium ones are categorized as REPORT. The corresponding queries would also be submitted with different speed (configurable) and concurrency. All these queries are submitted in an infinite loop with a finite wait between them. The wait time is introduced to mimic a scenario where data analysts process the query output data locally for next 30 mins before submitting another query. The concurrency is to represent the number of concurrent users. In real world, different group of users also uses different data sets. For example, API calls the datamart tables for quick lookup whereas analysts generally work against the larger data warehouse set of tables. Common practice that Data ingestion happens against the larger dataset frequently.
 
@@ -54,12 +52,10 @@ Run these once against each cluster... This will set up some users, tables, meta
 ```
     With sql, you can check if the tables are populated properly. select sql_type  ,  tpch_sql_number from tpc_h_sqls order by 1,2; Should return 28 rows.
 
-
-
 ## 3. Initial Data load: 
 Run these once against each cluster.
 Please note, you have to provide the access key and id for the COPY commands. 
-This steps would take time depending on the instance type. Suggest to run them in back ground. We recommend that you run them in the background.
+These steps would take time depending on the instance type. We recommend that you run them in the background.
 
     export PGPASSWORD=<masteruserpassword>
     nohup psql -h cluster1.ck0e91yaz.us-east-1.redshift.amazonaws.com -p \<portnumber\> -d \<database\> -U \<masteruser\> -f tpc-h-100g-create-tables.sql > tpc-h-100g-create-tables.sql.01.out & 
