@@ -46,7 +46,7 @@ Default	|Auto	|Auto	|Off	|Normal
 
 
 ## 2. Metadata Set up: 
-One time Run this set of commands against both clusters. This will set up some users, tables, metadata for the workload run  
+Run these once against each cluster... This will set up some users, tables, metadata for the workload run  
 ```
     export PGPASSWORD=<masteruserpassword>
     psql -h cluster1.ck0e91yaz.us-east-1.redshift.amazonaws.com -p \<portnumber\> -d \<database\> -U \<masteruser\> -f tpc-h-sqls.sql > tpc-h-sqls.sql.manua.log
@@ -57,7 +57,9 @@ One time Run this set of commands against both clusters. This will set up some u
 
 
 ## 3. Initial Data load: 
-One time run this against both clusters. Please note, you have to provide the access key and id for the COPY commands. This steps would take time depending on the instance type. Suggest to run them in back ground.
+Run these once against each cluster.
+Please note, you have to provide the access key and id for the COPY commands. 
+This steps would take time depending on the instance type. Suggest to run them in back ground. We recommend that you run them in the background.
 
     export PGPASSWORD=<masteruserpassword>
     nohup psql -h cluster1.ck0e91yaz.us-east-1.redshift.amazonaws.com -p \<portnumber\> -d \<database\> -U \<masteruser\> -f tpc-h-100g-create-tables.sql > tpc-h-100g-create-tables.sql.01.out & 

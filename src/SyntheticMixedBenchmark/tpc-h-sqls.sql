@@ -22,12 +22,6 @@ create table public.tpc_h_sqls (querytxt varchar(4000), sql_type varchar(100), t
 
 delete from public.tpc_h_sqls;
 
-/**
-continuously submitted sqls
-with built_list as ( select 1 rnk union select 2 union select 3 union select 4 union select 5 union select 6 union select 7 union select 8 union select 9 union select 10 union select 11 union select 12 union select 13 union select 14 union select 15 union select 16 union select 17 union select 18 union select 19 union select 20)
-select querytxt, sql_type from public.tpc_h_sqls  join built_list b1 on 1=1 join built_list b2 on 1=1 
-order by b1.rnk, b2.rnk, tpch_sql_number
-**/
 insert into public.tpc_h_sqls values ('
 /* Disable results caching 
 set enable_result_cache_for_session to off
@@ -721,56 +715,6 @@ GROUP BY CNTRYCODE
 ORDER BY CNTRYCODE
 ', 'DASH', 1.22);
 
-/*********************
-insert into public.tpc_h_sqls values ('
-copy region from ''s3://redshift-downloads/TPC-H/3TB/region/'' credentials
-''aws_access_key_id=$awskeyid ;aws_secret_access_key=$awssecretkey'' gzip
-delimiter ''|''; rollback;
-', 'COPY', 1.1);
-
-insert into public.tpc_h_sqls values ('
-copy nation from ''s3://redshift-downloads/TPC-H/3TB/nation/'' credentials
-''aws_access_key_id=$awskeyid ;aws_secret_access_key=$awssecretkey'' gzip
-delimiter ''|''; rollback;
-', 'COPY', 1.2);
-
-insert into public.tpc_h_sqls values ('
-copy lineitem from ''s3://redshift-downloads/TPC-H/3TB/lineitem/'' credentials
-''aws_access_key_id=$awskeyid ;aws_secret_access_key=$awssecretkey'' gzip
-delimiter ''|''; rollback;
-', 'COPY', 1.3);
-
-insert into public.tpc_h_sqls values ('
-copy orders from ''s3://redshift-downloads/TPC-H/3TB/orders/'' credentials
-''aws_access_key_id=$awskeyid ;aws_secret_access_key=$awssecretkey'' gzip
-delimiter ''|''; rollback;
-', 'COPY', 1.4);
-
-insert into public.tpc_h_sqls values ('
-copy part from ''s3://redshift-downloads/TPC-H/3TB/part/'' credentials
-''aws_access_key_id=$awskeyid ;aws_secret_access_key=$awssecretkey'' gzip
-delimiter ''|''; rollback;
-', 'COPY', 1.5);
-
-insert into public.tpc_h_sqls values ('
-copy supplier from ''s3://redshift-downloads/TPC-H/3TB/supplier/'' credentials
-''aws_access_key_id=$awskeyid ;aws_secret_access_key=$awssecretkey'' gzip
-delimiter ''|''; rollback;
-', 'COPY', 1.6);
-
-insert into public.tpc_h_sqls values ('
-copy partsupp from ''s3://redshift-downloads/TPC-H/3TB/partsupp/'' credentials
-''aws_access_key_id=$awskeyid ;aws_secret_access_key=$awssecretkey'' gzip
-delimiter ''|''; rollback;
-', 'COPY', 1.7);
-
-insert into public.tpc_h_sqls values ('
-copy customer from ''s3://redshift-downloads/TPC-H/3TB/customer/'' credentials
-''aws_access_key_id=$awskeyid ;aws_secret_access_key=$awssecretkey'' gzip
-delimiter ''|''; rollback;
-', 'COPY', 1.8);
-
-************************************/
 
 insert into public.tpc_h_sqls values ('copy lineitem from ''s3://tpc-h/100/lineitem.tbl.'' credentials ''aws_access_key_id=$awskeyid ;aws_secret_access_key=$awssecretkey'' gzip delimiter ''|''; ', 'COPY', 1.23);
 insert into public.tpc_h_sqls values ('copy orders from ''s3://tpc-h/100/orders.tbl.'' credentials ''aws_access_key_id=$awskeyid ;aws_secret_access_key=$awssecretkey'' gzip delimiter ''|''; ', 'COPY', 1.24);
@@ -785,16 +729,5 @@ insert into public.tpc_h_sqls values ('copy customer from ''s3://tpc-h/100/custo
 grant all on schema public to datascienceuser,reportuser,dashboarduser,copyuser;
 
 grant all on all tables in schema public to datascienceuser,reportuser,dashboarduser, copyuser;
-
-/**
-report sql
-select q.userid, q.label
-, w.query_priority, min(q.starttime), max(q.endtime) , 
-datediff('min',min(q.starttime), max(q.endtime)) elapsed_min, count(1) query_procesed, query_procesed/elapsed_min::decimal(10,2)*60 as throughput
-from stl_query q join stl_wlm_query w using (query)
-where (label ilike '%dash%' or label ilike '%REPORT%' or label ilike '%DATASCIENCE%')
-and starttime > '2019-10-17 17:35:05' 
-group by q.userid, q.label, w.query_priority
-**/
 
 

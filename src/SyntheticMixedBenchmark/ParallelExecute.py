@@ -76,9 +76,7 @@ if rcount >= 0:
                 break
 
             for query in queries:
-                #print('query statement %s' % query[0])
                 querytxt=query[0].replace("$awskeyid",awskeyid).replace("$awssecretkey",awssecretkey)
-                #thread = Thread(target=execute, args=(query[0],))
                 thread = Thread(target=execute, args=(querytxt,))
                 print('query statement after execution')
                 threads.append(thread)
@@ -93,8 +91,6 @@ if rcount >= 0:
             print('query statement before sleep start')
             time.sleep(int(sqlWait))
         
-            #if sqlWhere == "DATASCIENCE":
-            #    time.sleep(300)
         conn.close()
 
     except:

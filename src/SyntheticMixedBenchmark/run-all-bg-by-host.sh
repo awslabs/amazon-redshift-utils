@@ -13,9 +13,6 @@ awssecretkey=$7
 
 
 
-echo "hostname is :" $groupname
-echo " running against host:" $groupname
-#python3 call_aws_cli_restore_snapshot.py $groupname
 echo "cluster should be ready, now submit the queries"
 
 # 3 copy jobs. 3 is hard coded within the python script
