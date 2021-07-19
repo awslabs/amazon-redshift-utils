@@ -27,7 +27,7 @@ Here are the steps to use this benchmark:
 ### Manual Configuration	
 
 Queues/Query Groups	|Memory %	|Max Concurrency	|Concurrency Scaling	|Priority		
----|----|---|---|---|----|---|---|--
+--------------------|--------|------------------|-----------------------|---------
 Dashboard	|24|	5	|Off	|NA	
 Report	|25	|6	|Off	|NA		
 DataScience	|25	|4	|Off	|NA	
@@ -37,7 +37,7 @@ Default	|1	|1	|Off	|NA
 ### Automatic Configuration
 
 Queues/Query Groups	|Memory %	|Max Concurrency	|Concurrency Scaling	|Priority
----|----|---|---|---|----|---|---|--
+------------------------|---------------|-----------------------|-----------------------|------
 Dashboard	|Auto	|Auto	|Off	|Normal
 Report	|Auto	|Auto	|Off	|Normal
 DataScience	|Auto	|Auto	|Off	|Normal
