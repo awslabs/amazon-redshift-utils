@@ -932,9 +932,6 @@ def start_replay(connection_logs, default_interface, odbc_driver, first_event_ti
     except Empty:
         pass
 
-    queue.close()
-    queue.join_thread()
-
     if remaining_events > 0:
         logger.error("Not all jobs processed, replay unsuccessful")
 
