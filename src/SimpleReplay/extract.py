@@ -1,15 +1,16 @@
 import argparse
+import datetime
 import gzip
+import json
+import logging
 import os
 import re
-import json
+import redshift_connector
 import threading
 import time
 import yaml
-import datetime
 from tqdm import tqdm
 from contextlib import contextmanager
-import logging
 
 import boto3
 from boto3 import client
@@ -1058,15 +1059,15 @@ def load_driver():
             interface = "odbc"
         except Exception as err:
             logger.error(
-                'Error importing pyodbc. Please ensure pyodbc is correctly installed or remove the value for "odbc_driver" to use pg8000.'
+                'Error importing pyodbc. Please ensure pyodbc is correctly installed or remove the value for "odbc_driver" to use redshift_connector.'
             )
     else:
         try:
-            import pg8000
+            import redshift_connector
             interface = "psql"
         except Exception as err:
             logger.error(
-                'Error importing pg8000. Please ensure pg8000 is correctly installed or add an ODBC driver name value for "odbc_driver" to use pyodbc.'
+                'Error importing redshift_connector. Please ensure redshift_connector is correctly installed or add an ODBC driver name value for "odbc_driver" to use pyodbc.'
             )
 
     return interface
