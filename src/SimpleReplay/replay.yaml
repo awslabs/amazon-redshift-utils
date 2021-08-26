@@ -70,3 +70,9 @@ connection_tolerance_sec: 300
 
 # Number of simplereplay logfiles to maintain
 backup_count: 1
+
+# Should we discard the returned data 
+drop_return: true
+
+# Should connections in the replay be throttled
+limit_concurrent_connections: ~

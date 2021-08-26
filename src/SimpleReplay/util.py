@@ -3,6 +3,9 @@ import logging.handlers
 import time
 import os
 
+import redshift_connector
+
+
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
@@ -78,3 +81,36 @@ def log_version():
             logger.info(f"Version {fp.read().strip()}")
     except:
         logger.warning(f"Version unknown")
+
+
+def db_connect(interface="psql",
+               host=None, port=5439, username=None, password=None, database=None,
+               odbc_driver=None,
+               drop_return=False):
+    """ Connect to the database using the method specified by interface (either psql or odbc)
+      :param drop_return: if True, don't store returned value.
+    """
+    if interface == "psql":
+        conn = redshift_connector.connect(user=username,password=password,host=host,
+                        port=port, database=database)
+
+        # if drop_return is set, monkey patch driver to not store result set in memory
+        if drop_return:
+            def drop_data(self, data) -> None:
+                pass
+            # conn.handle_DATA_ROW = drop_data
+            conn.message_types[redshift_connector.core.DATA_ROW] = drop_data
+
+    elif interface == "odbc":
+        import pyodbc
+        if drop_return:
+            raise Exception("drop_return not supported for odbc")
+
+        odbc_connection_str = "Driver={}; Server={}; Database={}; IAM=1; DbUser={}; DbPassword={}; Port={}".format(
+            odbc_driver, host, database, username, password, port
+        )
+        conn = pyodbc.connect(odbc_connection_str)
+    else:
+        raise ValueError(f"Unknown Interface {interface}")
+    conn.autocommit = False
+    return conn

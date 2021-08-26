@@ -12,7 +12,6 @@ import threading
 import signal
 import multiprocessing
 from multiprocessing.managers import SyncManager
-from tqdm import tqdm
 from queue import Empty, Full
 import re
 from contextlib import contextmanager
@@ -21,7 +20,7 @@ import logging
 import copy
 import sys
 
-from util import init_logging, set_log_level, prepend_ids_to_logs, add_logfile, log_version
+from util import init_logging, set_log_level, prepend_ids_to_logs, add_logfile, log_version, db_connect
 
 from boto3 import client, resource
 from botocore.exceptions import NoCredentialsError
@@ -39,7 +38,6 @@ g_queries_executed = 0
 g_credentials_cache = {}
 
 g_workers = []
-g_manager = None
 g_exit = False
 
 g_copy_replacements_filename = 'copy_replacements.csv'
@@ -167,7 +165,10 @@ class ConnectionThread(threading.Thread):
         odbc_driver,
         replay_start,
         first_event_time,
-        thread_stats
+        thread_stats,
+        num_connections,
+        peak_connections,
+        connection_semaphore
     ):
         threading.Thread.__init__(self)
         self.process_idx = process_idx
@@ -178,6 +179,9 @@ class ConnectionThread(threading.Thread):
         self.replay_start = replay_start
         self.first_event_time = first_event_time
         self.thread_stats = thread_stats
+        self.num_connections = num_connections
+        self.peak_connections = peak_connections
+        self.connection_semaphore = connection_semaphore
 
         prepend_ids_to_logs(self.process_idx, self.job_id + 1)
 
@@ -189,8 +193,9 @@ class ConnectionThread(threading.Thread):
         expected_elapsed_sec = (self.connection_log.session_initiation_time - self.first_event_time).total_seconds()
         elapsed_sec = (datetime.datetime.now(tz=datetime.timezone.utc) - self.replay_start).total_seconds()
         connection_diff_sec = elapsed_sec - expected_elapsed_sec
+        connection_duration_sec = (self.connection_log.disconnection_time - self.connection_log.session_initiation_time).total_seconds()
 
-        logger.debug(f"Establishing connection {self.job_id+1} of {g_total_connections} at {elapsed_sec:.3f} (expected: {expected_elapsed_sec:.3f}, {connection_diff_sec:+.3f})")
+        logger.debug(f"Establishing connection {self.job_id+1} of {g_total_connections} at {elapsed_sec:.3f} (expected: {expected_elapsed_sec:.3f}, {connection_diff_sec:+.3f}).  Pid: {self.connection_log.pid}, Connection times: {self.connection_log.session_initiation_time} to {self.connection_log.disconnection_time}, {connection_duration_sec} sec")
 
         # save the connection difference
         self.thread_stats['connection_diff_sec'] = connection_diff_sec
@@ -211,30 +216,21 @@ class ConnectionThread(threading.Thread):
         else:
             interface = "psql"
 
-        target_cluster_urls = get_connection_string(username)
+        credentials = get_connection_string(username, database=self.connection_log.database_name)
 
         try:
             try:
-                if interface == "psql":
-                    conn = redshift_connector.connect(
-                        user=target_cluster_urls["psql"]["username"],
-                        password=target_cluster_urls["psql"]["password"],
-                        host=target_cluster_urls["psql"]["host"],
-                        port=int(target_cluster_urls["psql"]["port"]),
-                        database=self.connection_log.database_name,
-                    )
-                else:
-                    target_cluster_split = target_cluster_urls["odbc"].split(";")
-                    target_cluster_split[2] = (
-                        "Database=" + self.connection_log.database_name
-                    )
-                    target_cluster = ";".join(target_cluster_split)
-                    conn = pyodbc.connect(target_cluster)
-
-                conn.autocommit = False
+                conn = db_connect(interface,
+                                  host=credentials['host'], 
+                                  port=int(credentials['port']),
+                                  username=credentials['username'],
+                                  password=credentials['password'],
+                                  database=credentials['database'],
+                                  odbc_driver=credentials['odbc_driver'],
+                                  drop_return=g_config.get('drop_return'))
                 logger.debug(f"Connected using {interface} for PID: {self.connection_log.pid}")
             except Exception as err:
-                hashed_cluster_url = copy.deepcopy(target_cluster_urls["psql"])
+                hashed_cluster_url = copy.deepcopy(credentials)
                 hashed_cluster_url["password"] = "***"
                 logger.error(f'({self.job_id+1}) Failed to initiate connection for {self.connection_log.database_name}-{self.connection_log.username}-{self.connection_log.pid} ({hashed_cluster_url}): {err}')
                 self.thread_stats['connection_error_log'][f"{self.connection_log.database_name}-{self.connection_log.username}-{self.connection_log.pid}"] = f"{self.connection_log}\n\n{err}"
@@ -242,22 +238,29 @@ class ConnectionThread(threading.Thread):
         except Exception as e:
             logger.error(f"Exception in connect: {e}")
         finally:
+            logger.debug(f"Context closing for pid: {self.connection_log.pid}")
             if conn is not None:
                 conn.close()
+                logger.debug(f"Disconnected for PID: {self.connection_log.pid}")
+            self.num_connections.value -= 1
+            if self.connection_semaphore is not None:
+                logger.debug(f"Releasing semaphore ({self.num_connections.value} / {g_config['limit_concurrent_connections']} active connections)")
+                self.connection_semaphore.release()
 
     def run(self):
-        with self.initiate_connection(self.connection_log.username) as connection:
-            if connection:
-                self.execute_transactions(connection)
-
-                if self.connection_log.time_interval_between_transactions is True:
-                    time_until_disconnect_sec = (self.connection_log.disconnection_time - datetime.datetime.now(tz=datetime.timezone.utc)).total_seconds()
-                    if time_until_disconnect_sec > 0:
-                        time.sleep(time_until_disconnect_sec)
-            else:
-                logger.warning("Failed to connect")
-
-        logger.debug(f"Disconnected PID: {self.connection_log.pid}")
+        try:
+            with self.initiate_connection(self.connection_log.username) as connection:
+                if connection:
+                    self.execute_transactions(connection)
+                    if self.connection_log.time_interval_between_transactions is True:
+                        disconnect_offset_sec = (self.connection_log.disconnection_time - self.first_event_time).total_seconds()
+                        if disconnect_offset_sec > current_offset_ms(self.replay_start):
+                            logger.debug(f"Waiting to disconnect {time_until_disconnect_sec} sec (pid {self.connection_log.pid})")
+                            time.sleep(time_until_disconnect_sec)
+                else:
+                    logger.warning("Failed to connect")
+        except Exception as e:
+            logger.error(f"Exception thrown for pid {self.connection_log.pid}: {e}")
 
     def execute_transactions(self, connection):
         if self.connection_log.time_interval_between_transactions is True:
@@ -276,6 +279,7 @@ class ConnectionThread(threading.Thread):
 
                 # wait for the transaction to start
                 if time_until_start_ms > 10:
+                    logger.debug(f"Waiting {time_until_start_ms/1000:.1f} sec for transaction to start")
                     time.sleep(time_until_start_ms / 1000.0)
                 self.execute_transaction(transaction, connection)
         else:
@@ -288,6 +292,8 @@ class ConnectionThread(threading.Thread):
 
         for idx, query in enumerate(transaction.queries):
             time_until_start_ms = query.offset_ms(self.first_event_time) - current_offset_ms(self.replay_start)
+            truncated_query = (query.text[:60] + '...' if len(query.text) > 60 else query.text).replace("\n", " ")
+            logger.debug(f"Executing [{truncated_query}] in {time_until_start_ms/1000.0:.1f} sec")
             if time_until_start_ms > 10:
                 time.sleep(time_until_start_ms / 1000.0)
 
@@ -311,6 +317,7 @@ class ConnectionThread(threading.Thread):
                 )
 
             if query.time_interval > 0.0:
+                logger.debug(f"Waiting {query.time_interval} sec between queries")
                 time.sleep(query.time_interval)
 
         cursor.close()
@@ -669,22 +676,23 @@ def init_stats(stats_dict):
     return stats_dict
 
 
-def display_stats(stats, total_connections, total_transactions, total_queries):
+def display_stats(stats, total_connections, total_transactions, total_queries, peak_connections):
     stats_str = ""
     stats_str += f"Queries executed: {stats['query_success'] + stats['query_error']} of {total_queries} ({percent(stats['query_success'] + stats['query_error'], total_queries):.1f}%)"
     stats_str += "  ["
     stats_str += f"Success: {stats['query_success']} ({percent(stats['query_success'], stats['query_success'] + stats['query_error']):.1f}%), "
-    stats_str += f"Error: {stats['query_error']} ({percent(stats['query_error'], stats['query_success'] + stats['query_error']):.1f}%)"
+    stats_str += f"Failed: {stats['query_error']} ({percent(stats['query_error'], stats['query_success'] + stats['query_error']):.1f}%), "
+    stats_str += f"Peak connections: {peak_connections.value}"
     stats_str += "]"
 
     logger.info(f"{stats_str}")
 
 
-def join_finished_threads(connection_threads, worker_stats):
+def join_finished_threads(connection_threads, worker_stats, wait=False):
     # join any finished threads
     finished_threads = []
     for t in connection_threads:
-        if not t.is_alive():
+        if not t.is_alive() or wait:
             logger.debug(f"Joining thread {t.connection_log.session_initiation_time}")
             t.join()
             collect_stats(worker_stats, connection_threads[t])
@@ -698,7 +706,8 @@ def join_finished_threads(connection_threads, worker_stats):
     return len(finished_threads)
 
 
-def replay_worker(process_idx, replay_start_time, first_event_time, queue, worker_stats, default_interface, odbc_driver):
+def replay_worker(process_idx, replay_start_time, first_event_time, queue, worker_stats, default_interface, odbc_driver, connection_semaphore,
+                  num_connections, peak_connections):
     """ Worker process to distribute the work among several processes.  Each
         worker pulls a connection off the queue, waits until its time to start
         it, spawns a thread to execute the actual connection and associated
@@ -727,8 +736,18 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
         # loop terminates when a False is received over the queue
         while True:
             try:
+                if connection_semaphore is not None:
+                    logger.debug(f"Checking for connection throttling ({num_connections.value} / {g_config['limit_concurrent_connections']} active connections)")
+                    sem_start = time.time()
+                    connection_semaphore.acquire()
+                    sem_elapsed = time.time() - sem_start
+                    logger.debug(f"Waited {sem_elapsed} sec for semaphore")
+
                 job = queue.get(timeout=timeout_sec)
             except Empty:
+                if connection_semaphore is not None:
+                    connection_semaphore.release()
+
                 elapsed = int(time.time() - last_empty_queue_time) if last_empty_queue_time else 0
                 # take into account the initial timeout
                 elapsed += timeout_sec
@@ -777,18 +796,21 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
                 odbc_driver,
                 replay_start_time,
                 first_event_time,
-                thread_stats
+                thread_stats,
+                num_connections,
+                peak_connections,
+                connection_semaphore
             )
             connection_thread.name = f"{job['job_id']}"
             connection_thread.start()
             connection_threads[connection_thread] = thread_stats
 
-            join_finished_threads(connection_threads, worker_stats)
+            join_finished_threads(connection_threads, worker_stats, wait=False)
 
             connections_processed += 1
 
         logger.debug(f"Waiting for {len(connection_threads)} connections to finish...")
-        join_finished_threads(connection_threads, worker_stats)
+        join_finished_threads(connection_threads, worker_stats, wait=True)
     except Exception as e:
         logger.error(f"Process {process_idx} threw exception: {e}")
         logger.debug("".join(traceback.format_exception(*sys.exc_info())))
@@ -834,9 +856,9 @@ def sigint_handler(signum, frame):
 
 def start_replay(connection_logs, default_interface, odbc_driver, first_event_time, last_event_time,
                  num_workers, manager, per_process_stats, total_transactions, total_queries):
+
     """ create a queue for passing jobs to the workers.  the limit will cause
     put() to block if the queue is full """
-
     queue = manager.Queue(maxsize=1000000)
 
     if not num_workers:
@@ -857,18 +879,26 @@ def start_replay(connection_logs, default_interface, odbc_driver, first_event_ti
     logger.debug(f"Initial child processes: {initial_processes}")
 
     global g_workers
-
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    connection_semaphore = None
+    num_connections = manager.Value(int, 0)
+    peak_connections = manager.Value(int, 0)
+    if g_config.get('limit_concurrent_connections'):
+        # create an IPC semaphore to limit the total concurrency
+        connection_semaphore = manager.Semaphore(g_config.get('limit_concurrent_connections'))
 
     for idx in range(num_workers):
         per_process_stats[idx] = manager.dict()
         init_stats(per_process_stats[idx])
         g_workers.append(multiprocessing.Process(target=replay_worker,
                                                  args=(idx, replay_start_time, first_event_time, queue,
-                                                       per_process_stats[idx], default_interface, odbc_driver)))
+                                                       per_process_stats[idx], default_interface, odbc_driver,
+                                                       connection_semaphore, num_connections, peak_connections)))
         g_workers[-1].start()
 
     signal.signal(signal.SIGINT, sigint_handler)
+
 
     logger.debug(f"Total connections in the connection log: {len(connection_logs)}")
 
@@ -890,36 +920,30 @@ def start_replay(connection_logs, default_interface, odbc_driver, first_event_ti
     logger.debug(f"{active_processes} processes running")
     cnt = 0
 
-    disable_progress_bar = None
-
-    bar_format = '{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]'
-    with tqdm(total=total_queries, disable=disable_progress_bar, unit='q', desc='Queries replayed', bar_format=bar_format) as pbar:
-        while active_processes:
-            cnt += 1
-            active_processes = len(multiprocessing.active_children()) - initial_processes
-            if cnt % 60 == 0:
-                logger.debug(f"Waiting for {active_processes} processes to finish")
-                try:
-                    queue_length = queue.qsize()
-                    logger.debug(f"Remaining connections: {queue_length-num_workers}")
-                except NotImplementedError:
-                    # support for qsize is platform-dependent
-                    logger.debug("Queue length not supported.")
-
-            # aggregate stats across all threads so far
+    while active_processes:
+        cnt += 1
+        active_processes = len(multiprocessing.active_children()) - initial_processes
+        if cnt % 60 == 0:
+            logger.debug(f"Waiting for {active_processes} processes to finish")
             try:
-                aggregated_stats = init_stats({})
-                for idx, stat in per_process_stats.items():
-                    collect_stats(aggregated_stats, stat)
-                if disable_progress_bar and cnt % 5 == 0:
-                    display_stats(aggregated_stats, len(connection_logs), total_transactions, total_queries)
-                pbar.update(aggregated_stats['query_success'] + aggregated_stats['query_error'] - pbar.n)
-                pbar.set_postfix(OrderedDict([('success', aggregated_stats['query_success']),
-                                              ('error', aggregated_stats['query_error'])]))
-            except KeyError:
-                logger.debug("No stats to display yet.")
+                queue_length = queue.qsize()
+                logger.debug(f"Remaining connections: {queue_length-num_workers}")
+            except NotImplementedError:
+                # support for qsize is platform-dependent
+                logger.debug("Queue length not supported.")
 
-            time.sleep(1)
+        # aggregate stats across all threads so far
+        try:
+            aggregated_stats = init_stats({})
+            for idx, stat in per_process_stats.items():
+                collect_stats(aggregated_stats, stat)
+            if cnt % 5 == 0:
+                display_stats(aggregated_stats, len(connection_logs), total_transactions, total_queries, peak_connections)
+                peak_connections.value = num_connections.value
+        except KeyError:
+            logger.debug("No stats to display yet.")
+
+        time.sleep(1)
 
     # cleanup in case of error
     remaining_events = 0
@@ -1144,7 +1168,7 @@ def assign_create_user_password(connection_logs):
                     )
 
 
-def get_connection_string(username, max_attempts=10, skip_cache=False):
+def get_connection_string(username, database=None, max_attempts=10, skip_cache=False):
     credentials_timeout_sec = 3600
     retry_delay_sec = 10
 
@@ -1166,7 +1190,7 @@ def get_connection_string(username, max_attempts=10, skip_cache=False):
     cluster_id = cluster_endpoint_split[0]
     cluster_host = cluster_endpoint.split(":")[0]
     cluster_port = cluster_endpoint_split[5].split("/")[0][4:]
-    cluster_database = cluster_endpoint_split[5].split("/")[1]
+    cluster_database = database or cluster_endpoint_split[5].split("/")[1]
 
     additional_args = {}
     if os.environ.get('ENDPOINT_URL'):
@@ -1190,6 +1214,7 @@ def get_connection_string(username, max_attempts=10, skip_cache=False):
                 logger.error(f"Error retrieving credentials for {cluster_id}: IAM credentials have expired.")
                 exit(-1)
             else:
+                logger.error(f"Got exception retrieving credentials ({e.response['Error']['Code']})")
                 raise e
         except rs_client.exceptions.ClusterNotFoundFault:
             logger.error(f"Cluster {cluster_id} not found. Please confirm cluster endpoint, account, and region.")
@@ -1227,12 +1252,21 @@ def get_connection_string(username, max_attempts=10, skip_cache=False):
         "database": cluster_database,
     }
 
-    target_cluster_urls = {'odbc': cluster_odbc_url,
-                           'psql': cluster_psql}
+    credentials = {# old params
+                   'odbc': cluster_odbc_url,
+                   'psql': cluster_psql,
+                   # new params
+                   'username': response['DbUser'],
+                   'password': response['DbPassword'],
+                   'host': cluster_host,
+                   'port': cluster_port,
+                   'database': cluster_database,
+                   'odbc_driver': g_config["odbc_driver"]
+                  }
     logger.debug("Successfully retrieved database credentials for {}".format(username))
     g_credentials_cache[username] = {'last_update': datetime.datetime.now(tz=datetime.timezone.utc),
-                                     'target_cluster_urls': target_cluster_urls}
-    return target_cluster_urls
+                                     'target_cluster_urls': credentials}
+    return credentials
 
 
 def unload_system_table(
@@ -1243,23 +1277,14 @@ def unload_system_table(
 ):
 
     # TODO: wrap this in retries and proper logging
-    target_cluster_urls = get_connection_string(g_config["master_username"], max_attempts=3)
-
-    conn = None
-
-    if default_interface == "odbc":
-        conn = pyodbc.connect(target_cluster_urls["odbc"])
-    else:
-        conn = redshift_connector.connect(
-            user=target_cluster_urls["psql"]["username"],
-            password=target_cluster_urls["psql"]["password"],
-            host=target_cluster_urls["psql"]["host"],
-            port=int(target_cluster_urls["psql"]["port"]),
-            database=target_cluster_urls["psql"]["database"],
-
-        )
-
-    conn.autocommit = True
+    credentials = get_connection_string(g_config["master_username"], max_attempts=3)
+    conn = db_connect(default_interface,
+                      host=credentials['host'], 
+                      port=int(credentials['port']),
+                      username=credentials['username'],
+                      password=credentials['password'],
+                      database=credentials['database'],
+                      odbc_driver=credentials['odbc_driver'])
 
     unload_queries = {}
     table_name = ""
@@ -1449,13 +1474,12 @@ def main():
 
     # use a manager to share the stats dict to all processes
 #    manager = multiprocessing.Manager()
-    global g_manager
-    g_manager = SyncManager()
+    manager = SyncManager()
 
     def init_manager():
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-    g_manager.start(init_manager)
+    manager.start(init_manager)
 
     if not g_config["replay_output"]:
         g_config["replay_output"] = None
@@ -1566,7 +1590,7 @@ def main():
     # test connection
     try:
         # use the first user as a test
-        get_connection_string(connection_logs[0].username, max_attempts=1)
+        get_connection_string(connection_logs[0].username, database=connection_logs[0].database_name, max_attempts=1)
     except CredentialsException as e:
         logger.error(f"Unable to retrieve credentials using GetClusterCredentials ({str(e)}).  Please verify that an IAM policy exists granting access.  See the README for more details.")
         sys.exit(-1)
@@ -1585,7 +1609,7 @@ def main():
                      first_event_time,
                      last_event_time,
                      g_config.get("num_workers"),
-                     g_manager,
+                     manager,
                      per_process_stats,
                      transaction_count,
                      query_count)
@@ -1645,7 +1669,7 @@ def main():
         logger.info(f'Exported system tables to {g_config["replay_output"]}')
 
     print_stats(per_process_stats)
-    g_manager.shutdown()
+    manager.shutdown()
 
 
 if __name__ == "__main__":

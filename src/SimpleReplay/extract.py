@@ -711,7 +711,6 @@ def get_local_logs(log_directory_path, start_time, end_time):
     if g_config.get('disable_progress_bar') ==  True:
         disable_progress_bar = True
 
-
     bar_format = '{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]'
     for filename in tqdm(log_directory, disable=disable_progress_bar, unit='files', desc='Files processed', bar_format=bar_format):
         if disable_progress_bar:
