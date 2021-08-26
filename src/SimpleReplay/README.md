@@ -7,7 +7,7 @@ Customers are always trying to reproduce issues or workloads from clusters or to
 * Ability to mimic COPY and UNLOAD workloads. 
 * Ability to execute the transactions and queries in the same time interval as executed in the source cluster. 
 
-This enables the replay to be as close to the source run. It is **strongly recommended** to run Simple Replay from a cloud EC2 instance. 
+This enables the replay to be as close to the source run. It is **strongly recommended** to run Simple Replay from a cloud EC2 instance.  
 
 ## Preparation
 
@@ -42,7 +42,7 @@ sudo yum install python3-pip
 2.2 Install ODBC dependencies
 
 ```
-sudo yum install gcc gcc-c++ python36 python36-devel unixODBC unixODBC-devel
+sudo yum install gcc gcc-c++ python3 python3-devel unixODBC unixODBC-devel
 ```
 
 2.3 Clone Simple Replay scripts
@@ -114,6 +114,8 @@ This script extracts query and connection info from User Activity Log (audit) an
 | unload_system_table_queries    |Optional    |If provided, this SQL file will be run at the end of the Extraction to UNLOAD system tables to the location provided in source_cluster_system_table_unload_location.    |"unload_system_tables.sql"    |
 | source_cluster_system_table_unload_location    |Optional    |Amazon S3 location to unload system tables for later analysis. Used only if source_cluster_endpoint is provided.    |“s3://mybucket/myunload”    |
 | source_cluster_system_table_unload_iam_role    |Optional    |Required only if source_cluster_system_table_unload_location is provided. IAM role to perform system table unloads to Amazon S3 and should have required access to the S3 location. Used only if source_cluster_endpoint is provided.    |“arn:aws:iam::0123456789012:role/MyRedshiftUnloadRole”    |
+| log_level    |Optional    |Default will be INFO. DEBUG can be used for additional logging.  |debug   |
+| backup_count   |Optional    |Default is 1.  Simple Replay captures logs of the execution automatically in simplereplay_logs directly under current work directory at debug level.  This config can be used to retain logs for multiple runs.   |2  |
 
 ### Command
 
@@ -150,7 +152,6 @@ Takes an extracted workload and replays it against a target cluster.
 
 | Configuration value    |Required?     |Details    |Example    |
 | ---    |---    |---    |---    |
-| log_level    |Required    |Default will be INFO. DEBUG can be used for additional logging.   |debug    |
 | workload_location    |Required    |S3 or local. Location of the extracted workload to be replayed. Errors encountered during replay will be logged in a unique folder in the workload location.    |“s3://mybucket/myworkload”    |
 | target_cluster_endpoint    |Required    |Cluster that will be used to replay the extracted workload.    |“<redshift-cluster-name>.<identifier>.<region>.redshift.amazonaws.com:<port>/<databasename>”    |
 | master_username    |Required    |This is necessary so `set session_authorization` can be successfully executed to mimic users during replay.    |"awsuser"    |
@@ -165,8 +166,12 @@ Takes an extracted workload and replays it against a target cluster.
 | unload_system_table_queries    |Optional    |If provided, this SQL file will be run at the end of the Extraction to UNLOAD system tables to the location provided in replay_output.    |"unload_system_tables.sql"    |
 | target_cluster_system_table_unload_iam_role    |Optional    |IAM role to perform system table unloads to replay_output.    |“arn:aws:iam::0123456789012:role/MyRedshiftUnloadRole”    |
 | Include Exclude Filters    |Optional    |The process can replay a subset of queries, filtered by including one or more lists of "databases AND users AND pids", or excluding one or more lists of "databases OR users OR pids". |""   |
+| log_level    |Required    |Default will be INFO. DEBUG can be used for additional logging.   |debug    |
 | num_workers    |Optional    |Number of processes to use to parallelize the work. If omitted or null, uses one process per cpu - 1.     |“”    |
 | connection_tolerance_sec    |Optional    |Output warnings if connections are not within this number of seconds from their expected time.    |“300”    |
+| backup_count    |Optional    |Default is 1.  Simple Replay captures logs of the execution automatically in simplereplay_logs directly under current work directory at debug level.  This config can be used to retain logs for multiple runs.    |2   |
+| cdrop_return  |Optional    |Default is true. Enables Simple Replay to discard result sets at the driver level to  avoid OOMs on EC2 client.    |false    |
+| limit_concurrent_connections  |Optional    |This config sets an upper limit for concurrent connections that SimpleReplay can make. Incoming connections will be held if total concurrent sessions are over the set limit. Default is to mimic connections as they occured on the source cluster  |“300”    |
 
 ### Command
 
@@ -180,6 +185,10 @@ python3 replay.py replay.yaml
 * Any output from UNLOADs will be saved to the replay_output provided in the `replay.yaml`
 * Any system tables logs will be saved to the replay_output provided in the `replay.yaml`
 
+## Cloud Formation Template
+
+Cloud Formation Template https://github.com/awslabs/amazon-redshift-utils/tree/master/src/SimpleReplay/cloudformation can be used to automate Simple Replay to test RA3 migration. The blog post https://aws.amazon.com/blogs/big-data/simplify-amazon-redshift-ra3-migration-evaluation-with-simple-replay-utility/ details the steps to evaluate RA3 clusters. 
+
 ## Limitations 
 
 * Dependent SQL queries across connections are not guaranteed to run in the original order.
@@ -189,5 +198,7 @@ python3 replay.py replay.yaml
 * Replay using JDBC is not supported.
 * If a connection’s session initiation or disconnection time are not found in the audit connection logs (e.g. outside of the specified `start_time` and `end_time`), the connection’s time is assumed to be the overall workload’s time.
 * If a connection is not found in the audit connection log, but has queries associated with it in the user activity logs, the connection's `session_initiation_time` and `disconnection_time` are set to the overall workload's times. The connection will span the entire workload.
+* There cases where audit log capture internal Redshift re-writes of the queries. These queries might be replayed multiple times on the target as the duplicate entries in the logs are captured by the extract. 
+
 
 
