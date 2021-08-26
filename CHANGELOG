@@ -1,0 +1,9 @@
+## SimpleReplay 2.1.9
+- Limit connections
+- Drop resultset
+
+## SimpleReplay 2.1.8
+- Remove pg8000 dependency
+
+## SimpleReplay 2.1.5
+- Add Cloudformation template
