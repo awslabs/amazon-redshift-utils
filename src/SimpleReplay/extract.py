@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import re
+import sys
+
 import redshift_connector
 import threading
 import time
@@ -850,9 +852,15 @@ def get_s3_audit_logs(
         else:
             curr_index -= 1
 
-    logger.debug(
-        f'First audit log in start_time range: {audit_objects[curr_index]["Key"].split("/")[-1]}'
-    )
+    try:
+        logger.debug(
+            f'First audit log in start_time range: {audit_objects[curr_index]["Key"].split("/")[-1]}'
+        )
+    except IndexError:
+        logger.fatal(f"There was no user activity log available yet.")
+        logger.fatal("Make sure audit logging and user activity logging are enabled and await shipment of the logs.")
+        sys.exit(1)
+
     return (connections, logs, databases, last_connections)
 
 
