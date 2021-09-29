@@ -10,6 +10,8 @@ select
   , decode(charindex('w',split_part(split_part(array_to_string(t.relacl, '|'),pu.groname,2 ) ,'/',1)),0,false,true)  as upd
   , decode(charindex('a',split_part(split_part(array_to_string(t.relacl, '|'),pu.groname,2 ) ,'/',1)),0,false,true)  as ins
   , decode(charindex('d',split_part(split_part(array_to_string(t.relacl, '|'),pu.groname,2 ) ,'/',1)),0,false,true)  as del
+  , decode(charindex('D',split_part(split_part(array_to_string(t.relacl, '|'),pu.groname,2 ) ,'/',1)),0,false,true)  as drp
+  , decode(charindex('R',split_part(split_part(array_to_string(t.relacl, '|'),pu.groname,2 ) ,'/',1)),0,false,true)  as ref
 from
       (select
             use.usename as subject,
