@@ -1,8 +1,12 @@
 # Amazon Redshift Column Encoding Utility
 
-This utility is now deprecated. Instead, please use Redshift's Automatic Table Optimization features using
-* Distribution Key: `AUTO(EVEN)` for large tables or `AUTO(ALL)` for small tables
-* Sort Key: `AUTO(SORTKEY)`
+This utility is now deprecated. Instead, please use Redshift's Automatic Table Optimization features through:
+```
+ALTER TABLE table_name ALTER SORTKEY AUTO;
+ALTER TABLE table_name ALTER DISTSTYLE AUTO;
+```
+
+https://docs.aws.amazon.com/redshift/latest/dg/t_Creating_tables.html
 
 ----
 
