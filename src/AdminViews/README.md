@@ -28,6 +28,7 @@ All views assume you have a schema called admin.
 | v\_get\_obj\_priv\_by\_user.sql |   View to get the table/views that a user has access to | 
 | v\_get\_schema\_priv\_by\_user.sql |   View to get the schema that a user has access to | 
 | v\_get\_tbl\_priv\_by\_user.sql |   View to get the tables that a user has access to | 
+| v\_get\_tbl\_priv\_by\_group.sql |   View to get the tables that a user group has access to | 
 | v\_get\_tbl\_reads\_and\_writes.sql | View to get operations performed per table for transactions ID or query ID |
 | v\_get\_tbl\_scan\_frequency.sql |   View to get list of each permanent table's scan frequency | 
 | v\_get\_users\_in\_group.sql |   View to get all users in a group | 
