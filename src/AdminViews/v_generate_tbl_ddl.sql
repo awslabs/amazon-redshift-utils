@@ -112,6 +112,8 @@ FROM
       THEN REPLACE(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER VARYING', 'VARCHAR')
      WHEN STRPOS(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER') > 0
       THEN REPLACE(UPPER(format_type(a.atttypid, a.atttypmod)), 'CHARACTER', 'CHAR')
+     WHEN STRPOS(UPPER(format_type(a.atttypid, a.atttypmod)), 'NAME') > 0
+      THEN REPLACE(UPPER(format_type(a.atttypid, a.atttypmod)), 'NAME', 'VARCHAR(63)')
      ELSE UPPER(format_type(a.atttypid, a.atttypmod))
      END AS col_datatype
     ,CASE WHEN format_encoding((a.attencodingtype)::integer) = 'none'
