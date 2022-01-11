@@ -552,42 +552,48 @@ ss_sold_date_sk int4 ,
 ) distkey(ss_item_sk) sortkey(ss_sold_date_sk);
 
 /*
-	To load the sample data, you must provide authentication for your cluster to access Amazon S3 on your behalf.
-	You can provide either role-based authentication or key-based authentication.
-
+/*
 	Text files needed to load test data under s3://redshift-downloads/TPC-DS/2.13/100TB are publicly available.
-	Any valid credentials should have read access.
+	
+  To load the sample data, you must provide authentication for your cluster to access Amazon S3 on your behalf.
 
-	The COPY commands include a placeholder for the aws_access_key_id and aws_secret_access_key.
-	User must update the credentials clause below with valid credentials or the command will fail.
+  You can provide authentication by referencing an IAM role that you have created. You can set an IAM_Role as the default for your cluster or you can directly provide the ARN of an IAM_Role.  
+  For more information https://docs.aws.amazon.com/redshift/latest/mgmt/authorizing-redshift-service.html
 
-	For more information check samples in https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-create-sample-db.html
+  The COPY commands include a placeholder for IAM_Role, in this code IAM_Role clause is set to use the default IAM_Role. If your cluster does not have a IAM_Role set as default then please follow the instructions provided here:
+
+  https://docs.aws.amazon.com/redshift/latest/mgmt/default-iam-role.html
+
+  For more information check samples in https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-create-sample-db.html
+
+  **Note** another option to provide IAM_Role is to provide IAM_Role ARN in IAM_Role clause. For example
+  copy call_center from 's3://redshift-downloads/TPC-DS/2.13/100TB/call_center/' IAM_Role 'Replace text inside the quotes with Redshift cluster IAM_Role ARN' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
 */
 
-copy call_center from 's3://redshift-downloads/TPC-DS/2.13/100TB/call_center/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy catalog_page from 's3://redshift-downloads/TPC-DS/2.13/100TB/catalog_page/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy catalog_returns from 's3://redshift-downloads/TPC-DS/2.13/100TB/catalog_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy catalog_sales from 's3://redshift-downloads/TPC-DS/2.13/100TB/catalog_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy customer_address from 's3://redshift-downloads/TPC-DS/2.13/100TB/customer_address/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy customer_demographics from 's3://redshift-downloads/TPC-DS/2.13/100TB/customer_demographics/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy customer from 's3://redshift-downloads/TPC-DS/2.13/100TB/customer/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy date_dim from 's3://redshift-downloads/TPC-DS/2.13/100TB/date_dim/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy household_demographics from 's3://redshift-downloads/TPC-DS/2.13/100TB/household_demographics/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy income_band from 's3://redshift-downloads/TPC-DS/2.13/100TB/income_band/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy inventory from 's3://redshift-downloads/TPC-DS/2.13/100TB/inventory/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy item from 's3://redshift-downloads/TPC-DS/2.13/100TB/item/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy promotion from 's3://redshift-downloads/TPC-DS/2.13/100TB/promotion/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy reason from 's3://redshift-downloads/TPC-DS/2.13/100TB/reason/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy ship_mode from 's3://redshift-downloads/TPC-DS/2.13/100TB/ship_mode/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy store from 's3://redshift-downloads/TPC-DS/2.13/100TB/store/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy store_returns from 's3://redshift-downloads/TPC-DS/2.13/100TB/store_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy store_sales from 's3://redshift-downloads/TPC-DS/2.13/100TB/store_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy time_dim from 's3://redshift-downloads/TPC-DS/2.13/100TB/time_dim/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy warehouse from 's3://redshift-downloads/TPC-DS/2.13/100TB/warehouse/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy web_page from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_page/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy web_returns from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_returns/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy web_sales from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_sales/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
-copy web_site from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_site/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID>;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy call_center from 's3://redshift-downloads/TPC-DS/2.13/100TB/call_center/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy catalog_page from 's3://redshift-downloads/TPC-DS/2.13/100TB/catalog_page/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy catalog_returns from 's3://redshift-downloads/TPC-DS/2.13/100TB/catalog_returns/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy catalog_sales from 's3://redshift-downloads/TPC-DS/2.13/100TB/catalog_sales/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy customer_address from 's3://redshift-downloads/TPC-DS/2.13/100TB/customer_address/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy customer_demographics from 's3://redshift-downloads/TPC-DS/2.13/100TB/customer_demographics/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy customer from 's3://redshift-downloads/TPC-DS/2.13/100TB/customer/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy date_dim from 's3://redshift-downloads/TPC-DS/2.13/100TB/date_dim/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy household_demographics from 's3://redshift-downloads/TPC-DS/2.13/100TB/household_demographics/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy income_band from 's3://redshift-downloads/TPC-DS/2.13/100TB/income_band/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy inventory from 's3://redshift-downloads/TPC-DS/2.13/100TB/inventory/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy item from 's3://redshift-downloads/TPC-DS/2.13/100TB/item/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy promotion from 's3://redshift-downloads/TPC-DS/2.13/100TB/promotion/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy reason from 's3://redshift-downloads/TPC-DS/2.13/100TB/reason/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy ship_mode from 's3://redshift-downloads/TPC-DS/2.13/100TB/ship_mode/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy store from 's3://redshift-downloads/TPC-DS/2.13/100TB/store/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy store_returns from 's3://redshift-downloads/TPC-DS/2.13/100TB/store_returns/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy store_sales from 's3://redshift-downloads/TPC-DS/2.13/100TB/store_sales/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy time_dim from 's3://redshift-downloads/TPC-DS/2.13/100TB/time_dim/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy warehouse from 's3://redshift-downloads/TPC-DS/2.13/100TB/warehouse/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy web_page from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_page/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy web_returns from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_returns/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy web_sales from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_sales/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
+copy web_site from 's3://redshift-downloads/TPC-DS/2.13/100TB/web_site/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
 
 select count(*) from call_center; -- 60
 select count(*) from catalog_page; -- 50000
