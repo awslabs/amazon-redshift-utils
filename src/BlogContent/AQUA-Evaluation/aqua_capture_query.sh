@@ -15,9 +15,6 @@
 #./aqua_capture_query.sh -h 34.226.44.240 -p 5439 -d dev -U test_user -s "2021-09-06 00:00:00" -e "2021-09-09 23:00:00"
 #######################################################################################################################
 
-
-
-
 while getopts h:p:U:d:s:e:t:  option; do
       case "${option}"
       in
@@ -43,10 +40,10 @@ echo 'date' >> dates.txt
 
 if [[ -z $PGHOST ]] || [[ -z $PGPORT ]] || [[ -z $PGDATABASE ]] || [[ -z $PGUSER ]] ; then
       echo "connection parameters required and cannot be empty, please enter correct  hostname, dbname, port-number, username to connect"
-      exit -1
+ exit -1
 fi
 
-#"If user doesn't provide start and endtime, default to current time as start time and use queries from first 3 hours."
+#If user doesn't provide start and endtime,defaults to current time as start time and use queries from first 3 hours
 if [[ -z $STARTTIME ]]; then
       STARTTIME=$(date "+%Y-%m-%d")
 fi    

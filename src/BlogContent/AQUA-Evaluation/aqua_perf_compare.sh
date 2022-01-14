@@ -168,30 +168,25 @@ echo $CAPTUREQUERY
 RESULT=$(psql -c "$RUNTIMEQUERY" -A --tuples-only)
 CONN_STATUS=$?
 if [ $CONN_STATUS -eq 2 ]; then
-echo "Connection failed. Please try again with correct connection parameters"
-exit $CONN_STATUS
+  echo "Connection failed. Please try again with correct connection parameters"
+  exit $CONN_STATUS
 fi
-echo $RESULT
+   echo $RESULT
 if [[  -z $RESULT ]]; then
-echo "Please run the script with date interval on the test cluster where  you have executed queries with AQUA on and off"
+   echo "Please run the script with date interval on the test cluster where  you have executed queries with AQUA on and off"
 else 
-echo 'Query ID Redshift with AQUA turned on,Query ID Redshift with AQUA turned off,Runtime in seconds - AQUA turned on,Runtime in seconds - AQUA turned off,Speedup(colum C/Column B)' > output_file.csv
-echo $RESULT | tr ' ' '\n' | tr '|' ',' >> output_file.csv
-BOOST=$(echo "$RESULT" | awk -F'|' -v RS='\n' '{print $NF}' | sort -n);
-#echo $BOOST
-BOOST_MIN_RUNTIME=$(echo "$BOOST" | sed -n '1p')
-BOOST_MAX_RUNTIME=$(echo "$BOOST" | sed -n '$p')
-#echo $BOOST_MIN_RUNTIME
-#echo $BOOST_MAX_RUNTIME
-RESULT_RUNTIME=$(psql -c "$RUNTIMEQUERY" -A --tuples-only)
+   echo 'Query ID Redshift with AQUA turned on,Query ID Redshift with AQUA turned off,Runtime in seconds - AQUA turned on,Runtime in seconds - AQUA turned off,Speedup(colum C/Column B)' > output_file.csv
+  echo $RESULT | tr ' ' '\n' | tr '|' ',' >> output_file.csv
+  BOOST=$(echo "$RESULT" | awk -F'|' -v RS='\n' '{print $NF}' | sort -n);
+  BOOST_MIN_RUNTIME=$(echo "$BOOST" | sed -n '1p')
+  BOOST_MAX_RUNTIME=$(echo "$BOOST" | sed -n '$p')
+  RESULT_RUNTIME=$(psql -c "$RUNTIMEQUERY" -A --tuples-only)
 if [ $CONN_STATUS -eq 2 ]; then
-echo "Connection failed. Please try again"
-exit $CONN_STATUS
-fi
-X=$(echo "$RESULT_RUNTIME" | awk -F'|' '{print $1F}')
-Y=$(echo "$RESULT_RUNTIME" | awk -F'|' '{print $NF}')
-#echo $X
-#echo $Y
-echo " The set of queries executed took $X in RedShift and took $Y in AQUA+RS.  The  performance gain AQUA for Redshift provided ranges from $BOOST_MIN_RUNTIME  to $BOOST_MAX_RUNTIME"
-echo "There is also output_file.csv generated under current directory (from where aqua_perf_compare script got executed)."
+  echo "Connection failed. Please try again"
+  exit $CONN_STATUS
+fi 
+   X=$(echo "$RESULT_RUNTIME" | awk -F'|' '{print $1F}')
+   Y=$(echo "$RESULT_RUNTIME" | awk -F'|' '{print $NF}')
+   echo "The set of queries executed took $X in RedShift and took $Y in AQUA+RS.The performance gain AQUA for Redshift provided ranges from $BOOST_MIN_RUNTIME to $BOOST_MAX_RUNTIME"
+   echo "There is also output_file.csv generated under current directory (from where aqua_perf_compare script got executed)."
 fi
