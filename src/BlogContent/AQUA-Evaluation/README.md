@@ -1,4 +1,4 @@
-The scripts in here are to support the log give below. 
+The scripts in here are to support the blog give below. 
 Blog Name : How to evaluate the benefits of AQUA for your Amazon Redshift workloads
 Link to blog:
 https://quip-amazon.com/EmveAhrwjUdr/How-to-evaluate-the-benefits-of-AQUA-for-your-Amazon-Redshift-workloads
