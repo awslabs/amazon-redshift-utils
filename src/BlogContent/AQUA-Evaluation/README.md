@@ -1,14 +1,14 @@
-<<<<<<< HEAD
-The scripts in here are to support the blog given below.
-=======
 The scripts in here are to support the blog give below. 
->>>>>>> e0118a9ee365e1ce5323feb9c8a99ea6d829c2b4
 Blog Name : How to evaluate the benefits of AQUA for your Amazon Redshift workloads
 Link to blog:
 https://quip-amazon.com/EmveAhrwjUdr/How-to-evaluate-the-benefits-of-AQUA-for-your-Amazon-Redshift-workloads
 
 How to install/setup:
 Download the scripts from GitHub and copy to a machine from where you would like to execute the scripts. The machine should have proper network communication enabled to reach your Amazon Redshift clusters as described in the accompanying blogpost.
+Permission Requirements:
+User for DB should have access read, write access to all user tables and system
+catalog tables
+
 
 Script Short Description and Outcome:
  aqua_capture_query.sh -- Capture aqua-eligible queries from your cluster and save the output to aqua_eligible_queries.sql
