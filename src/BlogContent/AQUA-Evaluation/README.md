@@ -1,11 +1,11 @@
-The scripts in here are to support the blog give below. 
+The scripts in here are to support the blog given below. 
 Blog Name : How to evaluate the benefits of AQUA for your Amazon Redshift workloads
 Link to blog:
 https://quip-amazon.com/EmveAhrwjUdr/How-to-evaluate-the-benefits-of-AQUA-for-your-Amazon-Redshift-workloads
 
 How to install/setup:
 Download the scripts from GitHub and copy to a machine from where you would like to execute the scripts. The machine should have proper network communication enabled to reach your Amazon Redshift clusters as described in the accompanying blogpost.
-Pre Requests:
+Pre-requisites:
 User for DB should have access read, write access to all user tables and full read access to system
 catalog tables
 psql client libraries are in the path to execute scripts mentioned below
