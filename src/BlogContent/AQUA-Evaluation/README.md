@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 The scripts in here are to support the blog given below.
+=======
+The scripts in here are to support the blog give below. 
+>>>>>>> e0118a9ee365e1ce5323feb9c8a99ea6d829c2b4
 Blog Name : How to evaluate the benefits of AQUA for your Amazon Redshift workloads
 Link to blog:
 https://quip-amazon.com/EmveAhrwjUdr/How-to-evaluate-the-benefits-of-AQUA-for-your-Amazon-Redshift-workloads

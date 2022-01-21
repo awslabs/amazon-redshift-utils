@@ -93,23 +93,28 @@ create table supplier (
 ;
 
 /*
-	To load the sample data, you must provide authentication for your cluster to access Amazon S3 on your behalf.
-	You can provide either role-based authentication or key-based authentication.
+Text files needed to load test data under s3://redshift-downloads/TPC-H/3TB are publicly available. Any valid credentials can be used to access the files.
 
-	Text files needed to load test data under s3://redshift-downloads/TPC-H/3TB are publicly available.
-	Any valid credentials should have read access.
+To load the sample data, you must provide authentication for your cluster to access Amazon S3 on your behalf.
 
-	The COPY commands include a placeholder for the aws_access_key_id and aws_secret_access_key.
-	User must update the credentials clause below with valid credentials or the command will fail.
+You can provide authentication by referencing an IAM role that you have created. You can set an IAM_Role as the default for your cluster or you can directly provide the ARN of an IAM_Role.  
+For more information https://docs.aws.amazon.com/redshift/latest/mgmt/authorizing-redshift-service.html
 
-	For more information check samples in https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-create-sample-db.html
+The COPY commands include a placeholder for IAM_Role, in this code IAM_Role clause is set to use the default IAM_Role. If your cluster does not have a IAM_Role set as default then please follow the instructions provided here:
+
+https://docs.aws.amazon.com/redshift/latest/mgmt/default-iam-role.html
+
+For more information check samples in https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-create-sample-db.html
+
+**Note** another option to provide IAM_Role is to provide IAM_Role ARN in IAM_Role clause. For example
+copy region from's3://redshift-downloads/TPC-H/3TB/region/' IAM_Role 'Replace text inside the quotes with Redshift cluster IAM_Role ARN' gzip delimiter '|';
 */
 
-copy region from 's3://redshift-downloads/TPC-H/3TB/region/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
-copy nation from 's3://redshift-downloads/TPC-H/3TB/nation/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
-copy lineitem from 's3://redshift-downloads/TPC-H/3TB/lineitem/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
-copy orders from 's3://redshift-downloads/TPC-H/3TB/orders/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
-copy part from 's3://redshift-downloads/TPC-H/3TB/part/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
-copy supplier from 's3://redshift-downloads/TPC-H/3TB/supplier/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
-copy partsupp from 's3://redshift-downloads/TPC-H/3TB/partsupp/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
-copy customer from 's3://redshift-downloads/TPC-H/3TB/customer/' credentials 'aws_access_key_id=<USER_ACCESS_KEY_ID> ;aws_secret_access_key=<USER_SECRET_ACCESS_KEY>' gzip delimiter '|';
+copy region from 's3://redshift-downloads/TPC-H/3TB/region/' iam_role default gzip delimiter '|';
+copy nation from 's3://redshift-downloads/TPC-H/3TB/nation/' iam_role default gzip delimiter '|';
+copy lineitem from 's3://redshift-downloads/TPC-H/3TB/lineitem/' iam_role default gzip delimiter '|';
+copy orders from 's3://redshift-downloads/TPC-H/3TB/orders/' iam_role default gzip delimiter '|';
+copy part from 's3://redshift-downloads/TPC-H/3TB/part/' iam_role default gzip delimiter '|';
+copy supplier from 's3://redshift-downloads/TPC-H/3TB/supplier/' iam_role default gzip delimiter '|';
+copy partsupp from 's3://redshift-downloads/TPC-H/3TB/partsupp/' iam_role default gzip delimiter '|';
+copy customer from 's3://redshift-downloads/TPC-H/3TB/customer/' iam_role default gzip delimiter '|';
