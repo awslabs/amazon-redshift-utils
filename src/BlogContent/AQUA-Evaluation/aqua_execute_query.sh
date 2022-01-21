@@ -1,7 +1,8 @@
 #!/bin/bash
 ####################################################################################################################
 #
-# This script execute  queries  from capture.sql file generated earlier with   AQUA turned On and Off
+# This script execute  queries  from capture.sql file generated earlier using
+# aqua_capture_query.sh with  AQUA turned On and Off
 # Arguments are: 
 #           -h PGHOST
 #           -p PGPORT
@@ -9,7 +10,7 @@
 #           -d PGDATABASE
 #           -t PGCONNECT_TIMEOUT
 # sample run with parameters below :
-#./aqua_execute_query.sh -h 3.88.94.167 -p 5439 -d dev -U test_user 
+#./aqua_execute_query.sh -h 1.11.11.111 -p 5439 -d testDB -U test_user 
 #######################################################################################################################
 
 while getopts h:p:U:d:t:  option; do
@@ -39,7 +40,7 @@ if [ ! -s ./capture.sql  ]; then
   echo "The capture.sql seems empty, please capture aqua eligible queries using aqua_capture_query.sh then execute aqua_execute_query.sh"
 else
    #log execution startime 
-    date +"%Y-%m-%d %T" > date.txt 
+    date +"%Y-%m-%d %T" > workload_datetime.txt 
    #execute in redhshift three times
    echo "set activate_aqua to off;
     set enable_result_cache_for_session to off;" > capture_tmp.sql
@@ -84,5 +85,5 @@ done
    rm -f cap.out
    rm -f tmp_capture.sql
    echo "All Queries executed successfully with AQUA and without AQUA, please go ahead and run comparision scripts"
-   date +"%Y-%m-%d %T" >> date.txt
+   date +"%Y-%m-%d %T" >> workload_datetime.txt
 fi

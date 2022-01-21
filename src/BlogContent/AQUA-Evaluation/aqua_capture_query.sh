@@ -2,7 +2,8 @@
 
 ####################################################################################################################
 #
-# This script captures queries with potential for AQUA acceleration.
+# This script captures queries with potential for AQUA acceleration. saves
+# output to your current working directory
 # Arguments are: 
 #           -h PGHOST
 #           -p PGPORT
@@ -12,7 +13,7 @@
 #           -e ENDTIME (FORMAT: YYYY-MM-DD hh:mm:ss)
 #           -t PGCONNECT_TIMEOUT
 # sample run with parameters below :
-#./aqua_capture_query.sh -h 34.226.44.240 -p 5439 -d dev -U test_user -s "2021-09-06 00:00:00" -e "2021-09-09 23:00:00"
+#./aqua_capture_query.sh -h 11.11.11.111 -p 5439 -d dev -U test_user -s "2021-09-06 00:00:00" -e "2021-09-09 23:00:00"
 #######################################################################################################################
 
 while getopts h:p:U:d:s:e:t:  option; do
@@ -290,7 +291,7 @@ exit $CONN_STATUS
 fi
 if  [[ ! -z "$RESULT" ]] ; then 
 
-OUTPUTSQLFILE='capture.sql'
+OUTPUTSQLFILE='aqua_eligible_queries'
 echo $RESULT > $OUTPUTSQLFILE
 echo " The AQUA eligible queries are captured for workload between $STARTTIME and $ENDTIME"
 else 

@@ -2,7 +2,7 @@
 
 #############################################################
 
-# This script compare AQUA And RS execution time and presents CSV output file
+# This script compare  RS execution time with/without AQUA  and presents CSV output file
 # Arguments are: 
 #           -h PGHOST
 #           -p PGPORT
@@ -11,7 +11,7 @@
 #           -s STARTTIME (FORMAT: YYYY-MM-DD HH:MI:SS)
 #           -e ENDTIME (FORMAT: YYYY-MM-DD HH:MI:SS)
 ## sample run with parameters below :
-# ./aqua_perf_compare.sh -h 3.88.94.167 -p 5439 -d dev -U test_user -s "2021-09-10 00:00:00" -e "2021-09-10 23:00:00"
+# ./aqua_perf_compare.sh -h 1.11.11.111 -p 5439 -d testDB -U test_user "
 ###########################################################
 
 
@@ -49,10 +49,10 @@ fi
 
 
 if [ -s date.txt  ]; then
-STARTTIME = head -n 1  date.txt
+STARTTIME = head -n 1  workload_datetime.txt
 fi
 if [ -s date.txt  ]; then
-ENDTIME  = tail  -n 1  date.txt
+ENDTIME  = tail  -n 1  workload_datetime.txt
 fi
 
 #echo $RUNTIMEQUERY
@@ -175,8 +175,8 @@ fi
 if [[  -z $RESULT ]]; then
    echo "Please run the script with date interval on the test cluster where  you have executed queries with AQUA on and off"
 else 
-   echo 'Query ID Redshift with AQUA turned on,Query ID Redshift with AQUA turned off,Runtime in seconds - AQUA turned on,Runtime in seconds - AQUA turned off,Speedup(colum C/Column B)' > output_file.csv
-  echo $RESULT | tr ' ' '\n' | tr '|' ',' >> output_file.csv
+   echo 'Query ID Redshift with AQUA turned on,Query ID Redshift with AQUA turned off,Runtime in seconds - AQUA turned on,Runtime in seconds - AQUA turned off,Speedup(colum C/Column B)' > aqua_benefit.csv
+  echo $RESULT | tr ' ' '\n' | tr '|' ',' >> aqua_benefit.csv
   BOOST=$(echo "$RESULT" | awk -F'|' -v RS='\n' '{print $NF}' | sort -n);
   BOOST_MIN_RUNTIME=$(echo "$BOOST" | sed -n '1p')
   BOOST_MAX_RUNTIME=$(echo "$BOOST" | sed -n '$p')
