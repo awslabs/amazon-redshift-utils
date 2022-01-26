@@ -8,8 +8,6 @@
 #           -p PGPORT
 #           -U PGUSR
 #           -d PGDATABASE
-#           -s STARTTIME (FORMAT: YYYY-MM-DD HH:MI:SS)
-#           -e ENDTIME (FORMAT: YYYY-MM-DD HH:MI:SS)
 ## sample run with parameters below :
 # ./aqua_perf_compare.sh -h 1.11.11.111 -p 5439 -d testDB -U test_user "
 ###########################################################
@@ -24,8 +22,6 @@ while getopts h:p:U:d:s:e:w:t:  option; do
       p) export PGPORT=${OPTARG};;
       d) export PGDATABASE=${OPTARG};;
       U) export PGUSER=${OPTARG};;
-      s) STARTTIME=${OPTARG};;
-      e) ENDTIME=${OPTARG};;
       t) export PGCONNECT_TIMEOUT=${OPTARG};;
       esac
 done
@@ -48,14 +44,12 @@ fi
 # using the start time and end time logged during query execution
 
 
-if [ -s date.txt  ]; then
-STARTTIME = head -n 1  workload_datetime.txt
+if [ -s workload_datetime.txt ]; then
+    STARTTIME=$(head -n 1  workload_datetime.txt)
 fi
-if [ -s date.txt  ]; then
-ENDTIME  = tail  -n 1  workload_datetime.txt
+if [ -s workload_datetime.txt ]; then
+    ENDTIME=$(tail  -n 1  workload_datetime.txt)
 fi
-
-#echo $RUNTIMEQUERY
 
 CAPTUREQUERY=$(cat <<QUERYMARKER
 
@@ -109,7 +103,7 @@ order by speedup desc;
 QUERYMARKER
 )
 
-
+#echo $CAPTUREQUERY
 RUNTIMEQUERY=$(cat <<QQ
 
 with aqua_run as (select svl.query, q.starttime
@@ -163,9 +157,9 @@ from RS_total_exection rs
 QQ
 )
 
-echo $CAPTUREQUERY
+echo $RUNTIMEQUERY
 
-RESULT=$(psql -c "$RUNTIMEQUERY" -A --tuples-only)
+RESULT=$(psql -c "$CAPTUREQUERY" -A --tuples-only)
 CONN_STATUS=$?
 if [ $CONN_STATUS -eq 2 ]; then
   echo "Connection failed. Please try again with correct connection parameters"

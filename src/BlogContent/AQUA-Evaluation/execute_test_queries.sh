@@ -42,7 +42,7 @@
 AQUAQUERY=$(cat <<QUERYMARKER 
 set activate_aqua to on;
 set enable_result_cache_for_session to off;
-SELECT customer_id , product_title  FROM amazon_reviews  WHERE review_body
+SELECT /*test*/ customer_id , product_title  FROM amazon_reviews  WHERE review_body
 SIMILAR TO '%(good|bad)%';
 select count(*) from amazon_reviews WHERE product_title SIMILAR TO '%lap%';
 select  count(*) from amazon_reviews where product_title SIMILAR TO  '%lap%' or
@@ -57,6 +57,7 @@ QUERYMARKER
 )
 
 RSQUERY=$(cat <<TESTQ
+  set activate_aqua to off;
   set enable_result_cache_for_session to off;
   SELECT customer_id , product_title  FROM amazon_reviews  WHERE review_body
   SIMILAR TO '%(good|bad)%';

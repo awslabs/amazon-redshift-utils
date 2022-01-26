@@ -222,21 +222,21 @@ sct_q as
       query
 )
 select
-  aggqrytxt || ';' as querytxt
+  aggqrytxt || ';'  as querytxt
 from
 (
   select
     query,
     listagg(text) within group (order by sequence) || case when max(sequence)>=299 then ';'  else '' end as aggqrytxt,
     case
-        when aggqrytxt ~* '(\\s|^)(delete\|update\|create\|upload\|insert\|vaccum\|create table\|create view\|analyze\|copy)\\s' then 1
+        when aggqrytxt ~* '(\\\\s|^)(delete\|update\|create\|upload\|insert\|vaccum\|create table\|create view\|analyze\|copy)\\\\s' then 1
         else 0
     end as querytype
   from
   (
     select
       query,
-      (CASE WHEN LEN(RTRIM(text)) = 0 THEN text else replace(RTRIM(text), '\\n', '\n') END) as text,
+      (CASE WHEN LEN(RTRIM(text)) = 0 THEN text else replace(RTRIM(text), '\\\\n', ' ') END) as text,
       sequence,
       row_number() over (partition by query, sequence order by xid desc) rn
     from
@@ -250,8 +250,9 @@ from
               stl_querytext
             where
               query in (select query from sct_q)
-              and text ~* '\\s(like\|ilike\|similar to)\\s'
-              and text !~* '( delete \| update \| create \| upload \| insert \| vaccum \| create as \| analyze \| copy )'
+              and text ~* '\\\\s(like\|ilike\|similar to)\\\\s'
+              and text !~*
+              '\\\\s(delete\|update\|create\|upload\|insert\|vaccum\|create as\|analyze\|copy)\\\\s'
               and text !~* '(replace\|position\|strpos\|substr\|substring\|charindex\|regexp_replace\|regexp_substr\|left\|right\|upper\|lower\|lead\|lag\|greatest\|least\date\|trunc\|coalesce\|trim)\\s?'
              group by
               query
@@ -291,9 +292,10 @@ exit $CONN_STATUS
 fi
 if  [[ ! -z "$RESULT" ]] ; then 
 
-OUTPUTSQLFILE='aqua_eligible_queries'
+OUTPUTSQLFILE='aqua_eligible_queries.sql'
 echo $RESULT > $OUTPUTSQLFILE
 echo " The AQUA eligible queries are captured for workload between $STARTTIME and $ENDTIME"
 else 
 echo "Your workload history for given workload interval does not have enough AQUA eligible queries. Please run the script with different date/time parameters. If you still don’t  see any queries, please reach out to us to work together on this."
 fi
+rm -f capture_sql.log
