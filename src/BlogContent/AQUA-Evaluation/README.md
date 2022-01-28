@@ -6,8 +6,7 @@ https://quip-amazon.com/EmveAhrwjUdr/How-to-evaluate-the-benefits-of-AQUA-for-yo
 How to install/setup:
 Download the scripts from GitHub and copy to a machine from where you would like to execute the scripts. The machine should have proper network communication enabled to reach your Amazon Redshift clusters as described in the accompanying blogpost.
 Pre-requisites:
-User for DB should be  privileged superuser with full read access to system
-catalog tables
+User for DB should have cluster access as a privileged superuser.
 psql client libraries are in the path to execute scripts mentioned below
 
 
