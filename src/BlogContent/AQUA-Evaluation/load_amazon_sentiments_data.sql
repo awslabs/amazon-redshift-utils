@@ -1,4 +1,4 @@
-/* creates  table in default dev db  and loaded data into the table*/
+/*creates table in default dev db and loaded data into the table*/
 CREATE TABLE amazon_reviews(
   marketplace char(2), 
   customer_id varchar(10), 
