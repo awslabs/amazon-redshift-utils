@@ -1,6 +1,13 @@
+
+## SimpleReplay 2.2
+- Introduce analysis after each replay
+- Handle multi statement SQL to address driver limitations
+- Create one SQL.json during extract
+
 ## SimpleReplay 2.1.9
 - Limit connections
 - Drop resultset
+
 
 ## SimpleReplay 2.1.8
 - Remove pg8000 dependency

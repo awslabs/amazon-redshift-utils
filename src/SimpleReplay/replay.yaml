@@ -1,8 +1,12 @@
-# Directory for extracted workload, relative to current directory
+# Optional - Custom identifier for this replay run
+tag: ""
+
+# Directory location of extracted workload, relative to current directory
 workload_location: ""
 
-# Endpoint and username of cluster to replay again
-target_cluster_endpoint: ""
+# Endpoint and username of target cluster to replay queries on
+target_cluster_endpoint: "host:port/database"
+target_cluster_region: ""
 master_username: ""
 
 # Required only for playback using ODBC (pyodbc)
@@ -20,7 +24,7 @@ time_interval_between_transactions: "all on"
 # Optional - Leaving it empty defers to connections.json. "all on" preserves
 # time between queries. "all off" disregards time between queries, executing
 # them as a batch.
-time_interval_between_queries: "all on" 
+time_interval_between_queries: "all on"
 
 # Should COPY statements be executed?
 execute_copy_statements: "false"
@@ -28,12 +32,17 @@ execute_copy_statements: "false"
 # Should UNLOAD statements be executed?
 execute_unload_statements: "false"
 
-# Optional - Where the UNLOADs and system table unload goes
+# Optional - Where the UNLOADs and system table unload goes.
 replay_output: ""
 
-# Optional - Leaving this blank means UNLOADs will not be replayed. IAM role
-# for UNLOADs to be performed with.
+# Optional - Where the analysis data and summary report will be uploaded.  Example:  s3://bucket_name/path
+analysis_output: ""
+
+# Optional - Leaving this blank means UNLOADs will not be replayed. IAM role for UNLOADs to be performed with.
 unload_iam_role: ""
+
+# Optional - Leaving this blank means analysis will not be run. IAM role for analysis needs UNLOAD access.
+analysis_iam_role: ""
 
 # Location of the SQL file containing queries to unload system tables
 unload_system_table_queries: "unload_system_tables.sql"
@@ -76,3 +85,6 @@ drop_return: true
 
 # Should connections in the replay be throttled
 limit_concurrent_connections: ~
+
+# Should multistatement SQL be split
+split_multi: true

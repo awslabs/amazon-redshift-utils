@@ -129,8 +129,8 @@ python3 extract.py extract.yaml
 
 Simple Replay extract process produces the following outputs in the 
 
-* <workload_location>/SQLs/
-    * Contains the extracted SQL scripts named `<database>-<username>-<pid>-<xid>.sql`
+* sqls.json.gz
+    * Contains the extracted SQL scripts.
 * connections.json
     * Contains the extracted connections
 * copy_replacements.csv
@@ -152,26 +152,39 @@ Takes an extracted workload and replays it against a target cluster.
 
 | Configuration value    |Required?     |Details    |Example    |
 | ---    |---    |---    |---    |
+<<<<<<< HEAD
+=======
+| tag    |Optional  |Custom identifier for this replay run.   |   |
+>>>>>>> release-2.1.9
 | workload_location    |Required    |S3 or local. Location of the extracted workload to be replayed. Errors encountered during replay will be logged in a unique folder in the workload location.    |“s3://mybucket/myworkload”    |
 | target_cluster_endpoint    |Required    |Cluster that will be used to replay the extracted workload.    |“<redshift-cluster-name>.<identifier>.<region>.redshift.amazonaws.com:<port>/<databasename>”    |
 | master_username    |Required    |This is necessary so `set session_authorization` can be successfully executed to mimic users during replay.    |"awsuser"    |
-| default_interface    |Optional    |Currently, only playback using ODBC and psql are supported. If the connection log doesn’t specify the application name, or if an unsupported interface (e.g. JDBC) was used in the original workload, this interface will be used. Valid values are: **“psql”** or **"odbc". **Default value is set to** "psql"**    |"psql"    |
 | odbc_driver    |Optional    |Required only if ODBC connections are to be replayed, or if default_interface specifies “odbc”.    |""    |
+| default_interface    |Optional    |Currently, only playback using ODBC and psql are supported. If the connection log doesn’t specify the application name, or if an unsupported interface (e.g. JDBC) was used in the original workload, this interface will be used. Valid values are: **“psql”** or **"odbc". **Default value is set to** "psql"**    |"psql"    |
 | time_interval_between_transactions    |Optional    |Leaving it as **“”** defers to connections.json. **“all on”** preserves time interval between transactions. **“all off”** ignores time interval between transactions, and executes them as a batch, back to back.    |""    |
 | time_interval_between_queries    |Optional    |Leaving it as **“”** defers to connections.json. **“all on”** preserves time interval between queries. **“all off”** ignores time interval between queries, and executes them as a batch, back to back.    |""    |
 | execute_copy_statements    |Optional    |Whether or not COPY statements should be executed. Valid values are: **“true”** or **“false”**. Default value is **"false"**. Need to be set to **"true"** for copy to execute. Any UNLOAD/COPY command within stored procedures must be altered manually or removed to skip execution.     |“false”    |
 | execute_unload_statements    |Optional    |Whether or not UNLOAD statements should be executed. Valid values are: **“true”** or **“false”**. Any UNLOAD/COPY command within stored procedures must be altered manually or removed to skip execution.  |“false”    |
-| unload_iam_role    |Optional    |Leaving this blank means UNLOAD statements will not be replayed. IAM role for UNLOADs to be replayed with.    |“arn:aws:iam::0123456789012:role/MyRedshiftUnloadRole”    |
 | replay_output    |Optional    |S3 Location for UNLOADs (all UNLOAD locations will be appended to this given location) and system table UNLOADs. Any UNLOAD/COPY command within stored procedures must be altered manually.    |“s3://mybucket/myreplayoutput”    |
+| analysis_output    |Optional    |S3 Location for stl data to analyze the replay and produce analysis report    |“s3://mybucket/myreplayoutput”    |
+| unload_iam_role    |Optional    |Leaving this blank means UNLOAD statements will not be replayed. IAM role for UNLOADs to be replayed with.    |“arn:aws:iam::0123456789012:role/MyRedshiftUnloadRole”    |
+| analysis_iam_role    |Optional    |Leaving this blank means the replay will nto be analyzed.     |“arn:aws:iam::0123456789012:role/MyRedshiftUnloadRole”    |
 | unload_system_table_queries    |Optional    |If provided, this SQL file will be run at the end of the Extraction to UNLOAD system tables to the location provided in replay_output.    |"unload_system_tables.sql"    |
 | target_cluster_system_table_unload_iam_role    |Optional    |IAM role to perform system table unloads to replay_output.    |“arn:aws:iam::0123456789012:role/MyRedshiftUnloadRole”    |
 | Include Exclude Filters    |Optional    |The process can replay a subset of queries, filtered by including one or more lists of "databases AND users AND pids", or excluding one or more lists of "databases OR users OR pids". |""   |
 | log_level    |Required    |Default will be INFO. DEBUG can be used for additional logging.   |debug    |
 | num_workers    |Optional    |Number of processes to use to parallelize the work. If omitted or null, uses one process per cpu - 1.     |“”    |
 | connection_tolerance_sec    |Optional    |Output warnings if connections are not within this number of seconds from their expected time.    |“300”    |
+<<<<<<< HEAD
 | backup_count    |Optional    |Default is 1.  Simple Replay captures logs of the execution automatically in simplereplay_logs directly under current work directory at debug level.  This config can be used to retain logs for multiple runs.    |2   |
 | cdrop_return  |Optional    |Default is true. Enables Simple Replay to discard result sets at the driver level to  avoid OOMs on EC2 client.    |false    |
 | limit_concurrent_connections  |Optional    |This config sets an upper limit for concurrent connections that SimpleReplay can make. Incoming connections will be held if total concurrent sessions are over the set limit. Default is to mimic connections as they occured on the source cluster  |“300”    |
+=======
+| backup_count    |Optional    |Number of simplereplay logfiles to maintain    |1    |
+| drop_return    |Optional    |Discard the returned data from select statements at the driver level to avoid OOMs on EC2    | true    |
+| limit_concurrent_connections    |Optional    |To throtle the number of concurrent connections in the replay.   |“300”    |
+| split_multi    |Optional    |To split the multi statement SQLs to address limitation with redshift_connector driver.   |true    |
+>>>>>>> release-2.1.9
 
 ### Command
 

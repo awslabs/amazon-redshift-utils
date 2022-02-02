@@ -4,12 +4,14 @@ import gzip
 import json
 import logging
 import os
+import pathlib
 import re
 import redshift_connector
 import threading
 import time
 import yaml
 from tqdm import tqdm
+from collections import OrderedDict
 from contextlib import contextmanager
 
 import boto3
@@ -19,6 +21,9 @@ import dateutil.parser
 from util import init_logging, set_log_level, prepend_ids_to_logs, add_logfile, log_version
 
 logger = None
+g_disable_progress_bar = None
+
+g_bar_format = '{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]'
 
 class Log:
     def __init__(self):
@@ -31,14 +36,11 @@ class Log:
         self.xid = ""
         self.text = ""
 
-    def get_filename(self, query_index=None):
+    def get_filename(self):
         base_name = (
-            self.database_name + "-" + self.username + "-" + self.pid + "-" + self.xid
+            self.database_name + "-" + self.username + "-" + self.pid + "-" + self.xid + " (" + self.record_time.isoformat() + ")"
         )
-        if query_index == 0 or query_index == None:
-            return base_name + ".sql"
-        else:
-            return base_name + "-" + str(query_index) + ".sql"
+        return base_name
 
     def __str__(self):
         return (
@@ -277,7 +279,8 @@ def parse_connection_log(file, connections, last_connections, start_time, end_ti
             username = connection_information[6].strip()
         application_name = connection_information[15]
 
-        if username != "rdsdb" and event_time >= start_time and event_time <= end_time:
+        if username != "rdsdb" and (not start_time or event_time >= start_time) and (not end_time or event_time <= end_time):
+
             connection_log = ConnectionLog(event_time, end_time, database_name, username, pid)
             if connection_event == "initiating session ":
                 connection_key = connection_log.get_pk()
@@ -548,30 +551,41 @@ def save_logs(logs, last_connections, output_directory, connections, start_time,
         bucket_name = output_s3_location[0]
         output_prefix = output_s3_location[2]
         s3_client = boto3.client("s3")
+        archive_filename = "/tmp/SQLs.json.gz"
     else:
         is_s3 = False
-        os.makedirs(output_directory + "/SQLs/")
+        archive_filename = output_directory + "/SQLs.json.gz"
+        logger.info(f"Creating directory {output_directory} if it doesn't already exist")
+        pathlib.Path(output_directory).mkdir(parents=True, exist_ok=True)
+
+    # transactions has form { "xid": xxx, "pid": xxx, etc..., queries: [] }
+    sql_json = {"transactions": OrderedDict()}
+
     missing_audit_log_connections = set()
 
     # Save the main logs and find replacements
     replacements = set()
-    for filename, queries in logs.items():
-        file_text = "--Time interval: true\n\n"
-        for query in queries:
-            query.text = remove_line_comments(query.text).strip()
-            header_info = "--Record time: " + query.record_time.isoformat() + "\n"
-            if query.start_time:
-                header_info += "--Start time: " + query.start_time.isoformat() + "\n"
-            if query.end_time:
-                header_info += "--End time: " + query.end_time.isoformat() + "\n"
+
+    for filename, queries in tqdm(logs.items(), disable=g_disable_progress_bar, unit='files', desc='Files processed', bar_format=g_bar_format):
+        for idx, query in enumerate(queries):
             try:
-                header_info += f"--Database: {query.database_name}\n"
-                header_info += f"--Username: {query.username}\n"
-                header_info += f"--Pid: {query.pid}\n"
-                header_info += f"--Xid: {query.xid}\n"
+                if query.xid not in sql_json['transactions']:
+                    sql_json['transactions'][query.xid] = {"xid": query.xid,
+                                                           "pid": query.pid,
+                                                           "db": query.database_name,
+                                                           "user": query.username,
+                                                           "time_interval": True,
+                                                           "queries": []}
+                query_info = {
+                  "record_time": query.record_time.isoformat(),
+                  "start_time": query.start_time.isoformat() if query.start_time else None,
+                  "end_time": query.end_time.isoformat() if query.end_time else None
+                }
             except AttributeError:
                 logger.error(f'Query is missing header info, skipping {filename}: {query}')
                 continue
+
+            query.text = remove_line_comments(query.text).strip()
 
             if "copy " in query.text.lower() and "from 's3:" in query.text.lower(): #Raj
                 bucket = re.search(r"from 's3:\/\/[^']*", query.text, re.IGNORECASE).group()[6:]
@@ -589,30 +603,25 @@ def save_logs(logs, last_connections, output_directory, connections, start_time,
                     query.text,
                     flags=re.IGNORECASE,
                 )
+
+            query.text = f"{query.text.strip()}"
             if not len(query.text) == 0:
-                query.text = f"/* Replay source file: {filename} */ {query.text.strip()}"
                 if not query.text.endswith(";"):
                     query.text += ";"
-                file_text += header_info + query.text + "\n"
 
-            if (
-                not hash((query.database_name, query.username, query.pid)) in last_connections         
+            query_info['text'] = query.text
+            sql_json['transactions'][query.xid]['queries'].append(query_info)
 
-            ):
-                missing_audit_log_connections.add(
-                    (query.database_name, query.username, query.pid)
-                )
+            if not hash((query.database_name, query.username, query.pid)) in last_connections:
+                missing_audit_log_connections.add((query.database_name, query.username, query.pid))
 
-        if is_s3:
-            s3_client.put_object(
-                Body=file_text.strip(),
-                Bucket=bucket_name,
-                Key=output_prefix + "/SQLs/" + filename,
-            )
-        else:
-            f = open(output_directory + "/SQLs/" + filename, "w")
-            f.write(file_text.strip())
-            f.close()
+    with gzip.open(archive_filename, 'wb') as f:
+        f.write(json.dumps(sql_json, indent=2).encode('utf-8'))
+
+    if is_s3:
+        dest = output_prefix + "/SQLs.json.gz"
+        logger.info("Transferring SQL archive to {dest}")
+        s3_client.upload_file(archive_filename, bucket_name, dest)
 
     logger.info(f"Generating {len(missing_audit_log_connections)} missing connections.")
     for missing_audit_log_connection_info in missing_audit_log_connections:
@@ -705,15 +714,8 @@ def get_local_logs(log_directory_path, start_time, end_time):
     unsorted_list = os.listdir(log_directory_path)         
     log_directory = sorted(unsorted_list)                  
 
-    # disable_progress_bar should be None if user sets to False, to disable writing to
-    # non-tty (i.e. log file)
-    disable_progress_bar = None
-    if g_config.get('disable_progress_bar') ==  True:
-        disable_progress_bar = True
-
-    bar_format = '{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]'
-    for filename in tqdm(log_directory, disable=disable_progress_bar, unit='files', desc='Files processed', bar_format=bar_format):
-        if disable_progress_bar:
+    for filename in tqdm(log_directory, disable=g_disable_progress_bar, unit='files', desc='Files processed', bar_format=g_bar_format):
+        if g_disable_progress_bar:
             logger.info(f"Processing {filename}")
         if "start_node" in filename:
             log_file = gzip.open(
@@ -765,6 +767,7 @@ def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
         elif "useractivitylog" in filename:
             s3_user_activity_logs.append(log)
 
+    logger.info("Parsing connection logs")
     get_s3_audit_logs(
         log_bucket,
         log_prefix,
@@ -776,6 +779,7 @@ def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
         databases,
         last_connections,
     )
+    logger.info("Parsing user activity logs")
     get_s3_audit_logs(
         log_bucket,
         log_prefix,
@@ -788,7 +792,33 @@ def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
         last_connections,
     )
     return (connections, logs, databases, last_connections)
-    #return (connections, logs, databases)
+
+
+def get_logs_in_range(audit_objects, start_time, end_time):
+    start_idx = None
+    end_idx = None
+    filenames = []
+    for index, log in list(enumerate(audit_objects)):
+        filename = log["Key"].split("/")[-1]
+        file_datetime = dateutil.parser.parse(filename.split("_")[-1][:-3]).replace(
+            tzinfo=datetime.timezone.utc
+        )
+        if start_time and file_datetime < start_time:
+            continue
+
+        if end_time and file_datetime > end_time:
+            # make sure we've started
+            if len(filenames) > 0:
+                filenames.append(log["Key"])
+            break
+
+        # start with one before the first file to make sure we capture everything
+        if len(filenames) == 0 and index > 0:
+            filenames.append(audit_objects[index-1]["Key"])
+
+        filenames.append(log["Key"])
+
+    return filenames
 
 
 def get_s3_audit_logs(
@@ -803,52 +833,31 @@ def get_s3_audit_logs(
     last_connections,
 ):
     s3 = boto3.resource("s3")
-    #last_connections = {}
 
     index_of_last_valid_log = len(audit_objects) - 1
 
-    if end_time:
-        for index, log in reversed(list(enumerate(audit_objects))):
-            filename = log["Key"].split("/")[-1]
-            file_datetime = dateutil.parser.parse(filename.split("_")[-1][:-3]).replace(
-                tzinfo=datetime.timezone.utc
-            )
+    log_filenames = get_logs_in_range(audit_objects, start_time, end_time)
 
-            if file_datetime < end_time:
-                index_of_last_valid_log = min(index_of_last_valid_log, index + 2)
-                logger.debug(
-                    f'Last audit log file in end_time range: {audit_objects[index_of_last_valid_log]["Key"].split("/")[-1]}'
-                )
-                break
+    logger.info(f"Processing {len(log_filenames)} files")
 
     is_continue_parsing = True
     curr_index = index_of_last_valid_log
 
-    while is_continue_parsing and curr_index >= 0:
-        filename = audit_objects[curr_index]["Key"].split("/")[-1]
-        file_datetime = dateutil.parser.parse(filename.split("_")[-1][:-3]).replace(
-            tzinfo=datetime.timezone.utc
-        )
-
-        curr_connection_length = len(connections)
-        curr_logs_length = len(logs)
-
-        log_object = s3.Object(log_bucket, audit_objects[curr_index]["Key"])
-        log_file = gzip.GzipFile(fileobj=log_object.get()["Body"])
-
-        parse_log(
-            log_file, filename, connections, last_connections, logs, databases, start_time, end_time,
-        )
-
-        if (
-            start_time
-            and file_datetime < start_time
-            and len(connections) == curr_connection_length
-            and len(logs) == curr_logs_length
-        ):
-            is_continue_parsing = False
-        else:
-            curr_index -= 1
+    last = curr_index
+    for filename in tqdm(log_filenames, disable=g_disable_progress_bar, unit='files', desc='Files processed', bar_format=g_bar_format):
+          file_datetime = dateutil.parser.parse(filename.split("_")[-1][:-3]).replace(
+              tzinfo=datetime.timezone.utc
+          )
+  
+          curr_connection_length = len(connections)
+          curr_logs_length = len(logs)
+  
+          log_object = s3.Object(log_bucket, filename)
+          log_file = gzip.GzipFile(fileobj=log_object.get()["Body"])
+  
+          parse_log(
+              log_file, filename, connections, last_connections, logs, databases, start_time, end_time,
+          )
 
     logger.debug(
         f'First audit log in start_time range: {audit_objects[curr_index]["Key"].split("/")[-1]}'
@@ -970,12 +979,7 @@ def validate_config_file(config_file):
                 'Config file missing value for "log_location". Please provide a value for "log_location", or provide a value for "source_cluster_endpoint".'
             )
             exit(-1)
-    if not config_file["start_time"]:
-        logger.error(
-            'Config file is missing "start_time". Please provide a valid "start_time" for extract.'
-        )
-        exit(-1)
-    else:
+    if config_file["start_time"]:
         try:
             dateutil.parser.isoparse(config_file["start_time"])
         except ValueError:
@@ -983,12 +987,7 @@ def validate_config_file(config_file):
                 'Config file "start_time" value not formatted as ISO 8601. Please format "start_time" as ISO 8601 or remove its value.'
             )
             exit(-1)
-    if not config_file["end_time"]:
-        logger.error(
-            'Config file is missing "end_time". Please provide a valid "end_time" for extract.'
-        )
-        exit(-1)
-    else:
+    if config_file["end_time"]:
         try:
             dateutil.parser.isoparse(config_file["end_time"])
         except ValueError:
@@ -996,26 +995,9 @@ def validate_config_file(config_file):
                 'Config file "end_time" value not formatted as ISO 8601. Please format "end_time" as ISO 8601 or remove its value.'
             )
             exit(-1)
-    if not config_file["start_time"]:
-        logger.error(
-            'Config file missing value for "start_time". Please provide a value for "start_time".'
-        )
-        exit(-1)
-    if not config_file["end_time"]:
-        logger.error(
-            'Config file missing value for "end_time". Please provide a value for "end_time".'
-        )
-        exit(-1)
     if not config_file["workload_location"]:
         logger.error(
             'Config file missing value for "workload_location". Please provide a value for "workload_location".'
-        )
-        exit(-1)
-    if not config_file["workload_location"].startswith("s3://") and os.path.exists(
-        config_file["workload_location"]
-    ):
-        logger.error(
-            f'Output already exists in "{config_file["workload_location"]}". Please move or delete the existing directory, or change the "workload_location" value.'
         )
         exit(-1)
     if config_file["source_cluster_system_table_unload_location"] and not config_file[
@@ -1107,6 +1089,12 @@ def main():
     # print the version 
     log_version()
 
+    # disable_progress_bar should be None if user sets to False, to disable writing to
+    # non-tty (i.e. log file)
+    if g_config.get('disable_progress_bar') ==  True:
+        global g_disable_progress_bar
+        g_disable_progress_bar = True
+
     interface = load_driver()
     if not interface:
         logger.error("Failed to load driver.")
@@ -1117,19 +1105,17 @@ def main():
     else:
         extraction_name = f"Extraction_{datetime.datetime.now().replace(tzinfo=datetime.timezone.utc).isoformat()}"
 
+    start_time = ""
     if g_config.get("start_time"):
         start_time = dateutil.parser.parse(g_config["start_time"]).astimezone(
             dateutil.tz.tzutc()
         )
-    else:
-        start_time = ""
 
+    end_time = ""
     if g_config.get("end_time"):
         end_time = dateutil.parser.parse(g_config["end_time"]).astimezone(
             dateutil.tz.tzutc()
         )
-    else:
-        end_time = ""
 
     # read the logs
     if g_config.get("log_location"):
