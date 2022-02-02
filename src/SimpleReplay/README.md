@@ -152,10 +152,7 @@ Takes an extracted workload and replays it against a target cluster.
 
 | Configuration value    |Required?     |Details    |Example    |
 | ---    |---    |---    |---    |
-<<<<<<< HEAD
-=======
 | tag    |Optional  |Custom identifier for this replay run.   |   |
->>>>>>> release-2.1.9
 | workload_location    |Required    |S3 or local. Location of the extracted workload to be replayed. Errors encountered during replay will be logged in a unique folder in the workload location.    |“s3://mybucket/myworkload”    |
 | target_cluster_endpoint    |Required    |Cluster that will be used to replay the extracted workload.    |“<redshift-cluster-name>.<identifier>.<region>.redshift.amazonaws.com:<port>/<databasename>”    |
 | master_username    |Required    |This is necessary so `set session_authorization` can be successfully executed to mimic users during replay.    |"awsuser"    |
@@ -175,16 +172,11 @@ Takes an extracted workload and replays it against a target cluster.
 | log_level    |Required    |Default will be INFO. DEBUG can be used for additional logging.   |debug    |
 | num_workers    |Optional    |Number of processes to use to parallelize the work. If omitted or null, uses one process per cpu - 1.     |“”    |
 | connection_tolerance_sec    |Optional    |Output warnings if connections are not within this number of seconds from their expected time.    |“300”    |
-<<<<<<< HEAD
-| backup_count    |Optional    |Default is 1.  Simple Replay captures logs of the execution automatically in simplereplay_logs directly under current work directory at debug level.  This config can be used to retain logs for multiple runs.    |2   |
-| cdrop_return  |Optional    |Default is true. Enables Simple Replay to discard result sets at the driver level to  avoid OOMs on EC2 client.    |false    |
-| limit_concurrent_connections  |Optional    |This config sets an upper limit for concurrent connections that SimpleReplay can make. Incoming connections will be held if total concurrent sessions are over the set limit. Default is to mimic connections as they occured on the source cluster  |“300”    |
-=======
 | backup_count    |Optional    |Number of simplereplay logfiles to maintain    |1    |
 | drop_return    |Optional    |Discard the returned data from select statements at the driver level to avoid OOMs on EC2    | true    |
 | limit_concurrent_connections    |Optional    |To throtle the number of concurrent connections in the replay.   |“300”    |
 | split_multi    |Optional    |To split the multi statement SQLs to address limitation with redshift_connector driver.   |true    |
->>>>>>> release-2.1.9
+
 
 ### Command
 
