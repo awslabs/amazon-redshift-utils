@@ -4,7 +4,7 @@ workload_location: "s3://mybucketname/myworkload"
 # Optional. Providing this enables automatic log retrieval from S3 and system
 # table information retrieval (which allows query start and end times to be
 # extracted, rather than just record times)
-source_cluster_endpoint: "endpoint:port/dbname"
+source_cluster_endpoint: ""
 
 # Required only if source_cluster_endpoint is given.
 master_username: "awsuser"
