@@ -65,9 +65,7 @@ else
             exit $CONN_STATUS
         fi
         SQL_ERROR=$(cat sql_error.log |  grep -i "error\|failed\|timeout" | wc -l )
-        if [ $SQL_ERROR -ge  1 ]; then
-            echo "Please check the sql_error.log for erros, once SQL error's fixed and then re-run aqua_execute_query.sh"
-            echo $sql_error.log
+
             exit $SQL_ERROR
        fi
   done
@@ -86,10 +84,7 @@ else
             exit $CONN_STATUS
         fi
         SQL_ERROR=$(cat sql_error.log |  grep -i -q "error\|failed\|timeout" | wc -l )
-        if [ $SQL_ERROR -ge  1  ]; then
-            echo "Please check the sql_error.log for erros, once SQL error's fixed and then  re-run aqua_execute_query.sh"
-            rm -f sql_error.log
-            echo $sql_error.log
+
             exit $SQL_ERROR 
         fi
   done

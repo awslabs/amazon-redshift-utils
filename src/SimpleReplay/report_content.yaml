@@ -1,0 +1,89 @@
+# Replay Information and Report Details
+title: "Simple Replay Workload Analysis"
+subtitle: "<i>Replay ID: {REPLAY_ID}</i>"
+
+report_paragraph: "This report summarizes the performance of the replayed workload shown above."
+
+glossary_header: "Glossary"
+glossary_paragraph: "The following terms are used in this report:"
+glossary:
+  - "<b>Compile Time</b> is the total amount of time spent compiling a query."
+  - "<b>Queue Time</b> is the amount of time a query spends waiting before executing in a workload management (WLM) queue."
+  - "<b>Execution Time</b> is how long a query spends in the execution phase."
+  - "<b>Query Latency</b> is the total runtime of a query in Redshift."
+  - "<b>Commit Queue Time</b> is the time a transaction spent waiting before entering the commit phase."
+  - "<b>Commit Time</b> the time a transaction spent being committed."
+
+data_header: "Accessing the data"
+data_paragraph: >
+  All of the performance data collected for this report is available in S3 at the following location:
+  <br/><br/>s3://{S3_BUCKET}/replays/{REPLAY_ID}/
+  <br/><br/>The <font face='Courier'>raw_data</font> directory contains the following raw CSV files unloaded from the Redshift cluster:
+raw_data:
+  - "<font face='Courier'>statement_types000</font> Statement counts by type (e.g. SELECT, COPY, etc.)"
+  - "<font face='Courier'>query_metrics000</font> Query-level performance data."
+  - "<font face='Courier'>cluster_level_metrics000</font> Cluster-level summary of performance data. This is used to generate the Cluster Metrics table on page 2."
+  - "<font face='Courier'>query_distribution000</font> User-level summary of performance data and broken down by query execution phase. This is used to generate the latency, commit, queue, compile, and execution time tables that begin on page 3."
+
+agg_data_paragraph: "The <font face='Courier'>aggregated_data</font> directory in S3 contains CSV files of the aggregated table data used to generate this report."
+
+notes_header: "Workload Notes"
+notes_paragraph: >
+  SimpleReplay attempts to replay the source cluster workload as faithfully as possible on the target cluster.
+  However, the replayed workload may differ from the original workload in the following ways:
+notes:
+  - "The percentiles in this report exclude DDLs, Utility statements, and any leader node-only catalog queries."
+  - "The reports grouped by user show the top 100 users based on the count of queries executed per user during the replay. All additional users above the top 100 are rolled up as “Others.” Data for all users is available in S3."
+  - "Query compilation time is distributed evenly between queries that hop between service classes and can therefore occasionally result in execution or elapsed times that are less than zero for very short queries."
+
+
+# Query Breakdown and Cluster Level Performance
+query_breakdown:
+  table1:
+    title: "Query Breakdown"
+    paragraph: "The table below shows the total number of queries, number of aborted queries, and number of queries executed on concurrency scaling clusters broken down by statement type."
+    note: "* note that query counts are approximate and based on statement text"
+
+graph:
+  title: "Query Latency"
+  paragraph: "The histogram shows a breakdown of query latency on a log scale. The distribution show shorter running queries on the left and longer running queries on the right."
+
+cluster_metrics:
+  table2:
+    title: "Cluster Metrics"
+    paragraph: "The table below shows performance statistics broken down by cluster-level workload metric."
+    note: "* note that query latency excludes compile time"
+
+# Performance Breakdown
+measure_tables:
+  table3:
+    title: "Query Latency"
+    paragraph: "Query latency is the combined amount of time a query spends queued in WLM and executing. Note that this does not include query compilation time."
+
+  table4:
+    title: "Compile Time"
+    paragraph: >
+      Redshift compiles queries before executing them, and then caches the compiled result.  This table shows how much
+      time is spent compiling queries, broken down by user.  Note that a workload run on a new cluster may have higher
+      compile time than the original source cluster workload since it may not benefit from prior caching.
+
+  table5:
+    title: "Queue Time"
+    paragraph: >
+      Queue time shows how much time a query is spent waiting to start executing.  It should usually be
+      considered together with Execution Time (since high queue time + low execution time is the same to the user as low queue time + high execution time).
+
+
+  table6:
+    title: "Execution Time"
+    paragraph: >
+      Execution time shows how much time a query is spent executing. It should usually be considered together with
+      Queue Time (since high queue time + low execution time is the same to the user as low queue time + high execution time).
+
+  table7:
+    title: "Commit Queue Time"
+    paragraph: "Transactions may be queued before before the commit phase starts. This table summarize how much time each user’s transactions spend waiting to start the commit."
+
+  table8:
+    title: "Commit Time"
+    paragraph: "This table summarizes how much time is spent committing transactions, broken down by user."

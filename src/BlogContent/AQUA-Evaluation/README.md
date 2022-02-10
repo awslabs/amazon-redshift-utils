@@ -1,9 +1,3 @@
-The scripts in here are to support the blog given below.
-  
-Blog name: How to evaluate the benefits of AQUA for your Amazon Redshift workloads
-
-How to install/setup:
-    Download the scripts from GitHub and copy to a machine from where you would like to execute the scripts. The machine should have proper network communication enabled to reach your Amazon Redshift clusters as described in the accompanying blogpost.
 
 Pre-requisites:
     user for DB should have cluster access as a privileged superuser.
@@ -16,9 +10,6 @@ Script Short Description and Outcome:
     aqua_execute_query.sh -- executes queries captured in capture.sql on the specified cluster with/without AQUA. Saves script execution start and end times to workload_datetime.txt
     aqua_perf_compare.sh -- compares performance of captured aqua-eligible queries with/without AQUA and generates a CSV file named aqua_benefit.csv and also displays performance comparison to the terminal.
     execute_test_queries.sh --executes benchmarking queries against amazon sentiments test data with/without AQUA.
-    load_amazon_sentiments_data.sql --loads amazon sentiments data from public s3 bucket into test cluster.
-
-Mandatory Parameters Details:
 
     aqua_capture_query.sh, -h cluster hostname/IP, -d databasedame -s "start datetime of workload" -e "end datetime of workload" -p port.
     aqua_execute_query.sh, -h cluster hostname/IP, -d databasename -p port. 

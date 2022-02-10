@@ -45,32 +45,17 @@ if [[ -z $PGHOST ]] || [[ -z $PGPORT ]] || [[ -z $PGDATABASE ]] || [[ -z $PGUSER
 fi
  
 AQUAQUERY=$(cat <<QUERYMARKER 
-set activate_aqua to on;
-set enable_result_cache_for_session to off;
-select count(customer_id) from amazon_reviews where review_body  like '%(good)%';
-select count(*) from amazon_reviews where product_title SIMILAR TO '%lap%';
-select count(*) from amazon_reviews where product_title SIMILAR TO '%lap%' or product_title SIMILAR TO '%iph%';
-select count(*) from amazon_reviews where product_title SIMILAR TO '%lap%' or product_title SIMILAR TO '%iph%' or product_title SIMILAR TO '%soa%' or product_title SIMILAR TO '%nice%' or product_title SIMILAR TO '%hope%';
+
 QUERYMARKER
 )
 
 RSQUERY=$(cat <<TESTQ
-set activate_aqua to off;
-set enable_result_cache_for_session to off;
-select count(customer_id) from amazon_reviews where review_body  like '%(good)%';
-select count(*) from amazon_reviews where product_title SIMILAR TO '%lap%';
-select count(*) from amazon_reviews where product_title SIMILAR TO '%lap%' or product_title SIMILAR TO '%iph%';
-select count(*) from amazon_reviews where product_title SIMILAR TO '%lap%' or product_title SIMILAR TO '%iph%' or product_title SIMILAR TO '%soa%' or product_title SIMILAR TO '%nice%' or product_title SIMILAR TO '%hope%';
-TESTQ
-)
 
-echo $AQUAQUERY
-echo $RSQUERY
 date +"%Y-%m-%d %T" > workload_datetime.txt
      #execute in redhshift three times    
 for iter in {1..3}
   do
-     echo Iteration with AQUA on: $iter
+
      psql -c "$AQUAQUERY" -o cap.out > sql_error.log  2>&1 
      CONN_STATUS=$?
      if  [ $CONN_STATUS -eq 2 ]; then
@@ -78,7 +63,7 @@ for iter in {1..3}
             exit $CONN_STATUS
      fi
      SQL_ERROR=$(cat sql_error.log |  grep -i "error\|failed\|timeout" | wc -l )
-     if [ $SQL_ERROR -ge 1 ]; then
+
             echo "Please check the sql_error.log for erros, once SQL error's fixed and then re-run aqua_execute_query.sh"
             rm -f sql_error.log
             exit $SQL_ERROR
@@ -88,7 +73,7 @@ sleep 30
 #execute with AQUA on three times
 for iter in {1..3}
   do
-     echo Iteration with AQUA off: $iter
+
      psql -c "$RSQUERY" -o capa.out > sql_error.log  2>&1
      CONN_STATUS=$?
      if [ $CONN_STATUS -eq 2 ]; then
@@ -96,7 +81,7 @@ for iter in {1..3}
            exit $CONN_STATUS
       fi
       SQL_ERROR=$(cat sql_error.log |  grep -i -q "error\|failed\|timeout" | wc -l )
-      if [ $SQL_ERROR -ge 1  ]; then
+
            echo "Please check the sql_error.log for erros, once SQL error's fixed and then  re-run aqua_execute_query.sh"
            rm -f sql_error.log
            exit $SQL_ERROR

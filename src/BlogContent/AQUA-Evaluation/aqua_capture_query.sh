@@ -50,6 +50,7 @@ if [[ -z $PGCONNECT_TIMEOUT ]]; then
 fi
 
 
+
 if [[ -z $PGHOST ]] || [[ -z $PGPORT ]] || [[ -z $PGDATABASE ]] || [[ -z $PGUSER ]]; then
     echo "connection parameters required and cannot be empty, please enter correct  hostname, dbname, port-number, username to connect"
     exit -1
@@ -169,7 +170,7 @@ CAPTUREQUERY=$(cat <<QUERYMARKER
             segment,
             step
          having
-           step_scan_micros > 500000
+
             ) sc_sp
      group by
         userid,
@@ -275,31 +276,20 @@ from
        sct_q  using (query)
       inner join
        aq  using (query)
- where
+
      querytype = 0
   order by
     sct_q.scan_micros::float/aq.total_exec_micros desc
    limit 100;
 QUERYMARKER
 )
-#error handling to check psql
-RESULT=$(psql -c "$CAPTUREQUERY" -A  --tuples-only --log-file=capture_sql.log  2>&1 )
-CONN_STATUS=$?
-if [ $CONN_STATUS -eq 2 ]; then
-    echo "Connection failed. Please try again with correct connection parameters"
-    echo $RESULT   
-    exit $CONN_STATUS
-elif [ $CONN_STATUS -eq 1 ]; then
-    echo "Failed due to SQL  error, please check and run again"
-    echo $RESULT
+
     exit $CONN_STATUS
 fi
 
 if  [[ ! -z "$RESULT" ]]; then
     OUTPUTSQLFILE='aqua_eligible_queries.sql'
     echo $RESULT > $OUTPUTSQLFILE
-    echo -e  "\nThe AQUA eligible queries are captured for workload between $STARTTIME and $ENDTIME"
-else
-    echo "Your workload history for given workload interval does not have enough AQUA eligible queries. Please run the script with different date/time parameters. If you still don’t see any queries, please reach out to us to work together on this."
+
 fi
 rm -f capture_sql.log
