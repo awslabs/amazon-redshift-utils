@@ -1,3 +1,7 @@
+The scripts in here are to support the blog given below.
+  
+Blog name: How to evaluate the benefits of AQUA for your Amazon Redshift workloads
+
 How to install/setup:
     Download the scripts from GitHub and copy to a machine from where you would like to execute the scripts. The machine should have proper network communication enabled to reach your Amazon Redshift clusters as described in the accompanying blogpost.
 
