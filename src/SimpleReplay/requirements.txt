@@ -1,6 +1,13 @@
 boto3
-pyodbc
-redshift_connector
+botocore
+matplotlib
+moto
+numpy
+pandas
 PyYAML
 python-dateutil==2.8.1
+redshift_connector
+reportlab
+sqlparse
+tabulate
 tqdm==4.59.0
