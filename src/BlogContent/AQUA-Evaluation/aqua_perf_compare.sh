@@ -91,20 +91,25 @@ CAPTUREQUERY=$(cat <<QUERYMARKER
                   and endtime <=    to_timestamp('$ENDTIME','YYYY-MM-DD HH:MI:SS')
             group by qt.query, q.starttime
             ),
-    Rs_execution_time as 
-            (
-              select rs_query, 
-                    total_exec_time as rs_exec_time,
-                    md5, max(r_num) as r_num
-              from rs_run
-              group by rs_query, total_exec_time, md5, r_num
-              ),
-    aqua_execution_time as 
-              (
-                select aq.query,aq.rs_aqua_exec_time, md5, max(r_num) as r_num from aqua_run_md5 aq group by query, md5, r_num,rs_aqua_exec_time
-              )
+    max_rs_run as (select max(r_num) as r_num,md5 from rs_run group by md5),
+    rs_execution_time as
+           (
+              select rs_query, total_exec_time as rs_exec_time, rs.md5, max(rs.r_num) as r_num
+                           from rs_run rs
+                               inner join max_rs_run max 
+                               on max.r_num = rs.r_num and max.md5=rs.md5
+                           group by rs_query, total_exec_time, rs.md5, rs.r_num),
+   aqua_max_run as (select max(r_num) r_num , md5 from aqua_run_md5 group by md5),
+   aqua_execution_time as 
+          (
+             select aq.query,aq.rs_aqua_exec_time, aq.md5, max(aq.r_num) as r_num 
+             from aqua_run_md5 aq
+                     inner join aqua_max_run max
+                     on max.r_num=aq.r_num and  max.md5=aq.md5
+             group by aq.query,aq.md5,aq.r_num,aq.rs_aqua_exec_time
+          )
 
-     select distinct aq.query aqua_query,
+    select distinct aq.query aqua_query,
                 rs.rs_query,
                 aq.rs_aqua_exec_time rs_aqua_exec_time_in_S,
                 rs.rs_exec_time rs_exec_time_in_S,
@@ -116,7 +121,6 @@ CAPTUREQUERY=$(cat <<QUERYMARKER
      order by speedup desc;
 QUERYMARKER
 )
-
 RUNTIMEQUERY=$(cat <<QQ
     with aqua_run as
          (
@@ -129,7 +133,7 @@ RUNTIMEQUERY=$(cat <<QQ
                     and q.endtime <=  to_timestamp('$ENDTIME','YYYY-MM-DD HH:MI:SS')
              group by svl.query, q.starttime
          ),
-     aqua_run_md5 as 
+    aqua_run_md5 as 
         (
             select aq.query,
                    md5(listagg(qt.text) within group (order by sequence)) md5,
@@ -140,7 +144,7 @@ RUNTIMEQUERY=$(cat <<QQ
                      join stl_wlm_query w using (query)
            group by aq.query, aq.starttime
         ),
-     rs_run as
+    rs_run as
         (
           select qt.query rs_query,
                  max(w.total_exec_time) / 1000000.0  total_exec_time,
@@ -157,47 +161,54 @@ RUNTIMEQUERY=$(cat <<QQ
                  and endtime <=    to_timestamp('$ENDTIME','YYYY-MM-DD HH:MI:SS')
            group by qt.query, q.starttime
          ),
-     Rs_execution_time as 
-        (
-            select rs_query,
-                   total_exec_time as rs_exec_time, md5,
-                   max(r_num) as r_num
-            from rs_run
-            group by rs_query, total_exec_time, md5, r_num
-        ),
+
+     max_rs_run as (select max(r_num) as r_num,md5 from rs_run group by md5),
+     rs_execution_time as
+         (
+            select rs_query, total_exec_time as rs_exec_time, 
+                   rs.md5, max(rs.r_num) as r_num
+             from rs_run rs
+                  inner join max_rs_run max
+                   on max.r_num = rs.r_num and max.md5=rs.md5
+             group by rs_query, total_exec_time, rs.md5, rs.r_num
+          ),
+     aqua_max_run as (select max(r_num) r_num , md5   from aqua_run_md5 group by md5),
      aqua_execution_time as
-        (
-            select aq.query,
-                  aq.rs_aqua_exec_time, md5,
-                  max(r_num) as r_num 
+         (
+            select aq.query,aq.rs_aqua_exec_time, aq.md5, max(aq.r_num) as r_num
             from aqua_run_md5 aq
-            group by query, md5, r_num,rs_aqua_exec_time
-        ),
+                  inner join aqua_max_run max
+                   on max.r_num=aq.r_num and  max.md5=aq.md5
+            group by aq.query,aq.md5,aq.r_num,aq.rs_aqua_exec_time
+         ),
     aqua_total_exection as
-        (
+         (
             select sum(rs_aqua_exec_time)  as aq_tot_exec_sc,
                   aq.md5,aq.query
             from aqua_execution_time aq
             group by aq.query, aq.md5
-        ), 
-    RS_total_exection as
-        (
+         ), 
+    rs_total_exection as
+         (
             select sum(rs_exec_time) as tot_exec_sec, 
                   md5 as rs_md5 
-            from Rs_execution_time  
+            from rs_execution_time  
             group by md5
-        )
-            select sum(rs.tot_exec_sec) as total_secs_RS, sum(aq.aq_tot_exec_sc) as total_secs_RS_AQUA
-            from RS_total_exection rs
+         )
+     select sum(rs.tot_exec_sec) as total_secs_RS, sum(aq.aq_tot_exec_sc) as total_secs_RS_AQUA
+            from rs_total_exection rs
                join aqua_total_exection aq
                on rs.rs_md5 = aq.md5;
 QQ
 )
-
 RESULT=$(psql -c "$CAPTUREQUERY" -A --tuples-only)
 CONN_STATUS=$?
 if [ $CONN_STATUS -eq 2 ]; then
-    echo "Connection failed. Please try again with correct connection parameters"
+    echo "Connection failed. Please try again"
+    exit $CONN_STATUS
+elif [ $CONN_STATUS -eq 1 ]; then
+    echo "Failed due to SQL  error, please fix and run again"
+    echo $RESULT_RUNTIME
     exit $CONN_STATUS
 fi
 if [[  -z $RESULT ]]; then
@@ -208,13 +219,19 @@ else
 BOOST=$(echo "$RESULT" | awk -F'|' -v RS='\n' '{print $NF}' | sort -n);
 BOOST_MIN_RUNTIME=$(echo "$BOOST" | sed -n '1p')
 BOOST_MAX_RUNTIME=$(echo "$BOOST" | sed -n '$p')
-RESULT_RUNTIME=$(psql -c "$RUNTIMEQUERY" -A --tuples-only)
+RESULT_RUNTIME=$(psql -c "$RUNTIMEQUERY" -A --tuples-only -A --log-file=capture_sql.log  2>&1)
+CONN_STATUS=$? 
 if [ $CONN_STATUS -eq 2 ]; then
     echo "Connection failed. Please try again"
+    exit $CONN_STATUS  
+ elif [ $CONN_STATUS -eq 1 ]; then
+    echo "Failed due to SQL  error, please fix and run again"
+    echo $RESULT_RUNTIME
     exit $CONN_STATUS
-fi  
-X=$(echo "$RESULT_RUNTIME" | awk -F'|' '{print $1F}')
-Y=$(echo "$RESULT_RUNTIME" | awk -F'|' '{print $NF}')
-echo "The set of queries executed took $X in RedShift and took $Y in AQUA+RS.The performance gain AQUA for Redshift provided ranges from $BOOST_MIN_RUNTIME to $BOOST_MAX_RUNTIME"
-echo "There is also output_file.csv generated under current directory (from where aqua_perf_compare script got executed)."
+fi 
+    X=$(echo "$RESULT_RUNTIME" | awk -F'|' '{print $1F}')
+    Y=$(echo "$RESULT_RUNTIME" | awk -F'|' '{print $NF}')
+    echo -e "\nThe set of queries executed took $X in RedShift and took $Y in AQUA+RS.The performance gain AQUA for Redshift provided ranges from $BOOST_MIN_RUNTIME to $BOOST_MAX_RUNTIME"
+    echo -e "\nThere is also aqua_benefit.csv  generated under current directory (from where aqua_perf_compare script got executed)."
+ 
 fi
