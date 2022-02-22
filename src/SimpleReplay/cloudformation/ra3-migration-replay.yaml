@@ -97,7 +97,14 @@ Parameters:
     Description: AMI for the Amazon Linux 2 based EC2 instance
     Type: "AWS::SSM::Parameter::Value<String>"
     Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
-
+  GitOrigin:
+    Description: Git repository to source SimpleReplay utility from
+    Type: String
+    Default: "https://github.com/awslabs/amazon-redshift-utils.git"
+  GitBranch:
+    Description: Git branch to checkout
+    Type: String
+    Default: "master"
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -1159,7 +1166,7 @@ Resources:
               echo "region = ${AWS::Region}" >> /root/.aws/config
               mkdir /amazonutils
               cd /amazonutils
-              git clone https://github.com/awslabs/amazon-redshift-utils.git
+              git clone ${GitOrigin} -b ${GitBranch}
               pip3 install -r /amazonutils/amazon-redshift-utils/src/SimpleReplay/requirements.txt
               #
               # configure replay metadata
@@ -1230,7 +1237,7 @@ Resources:
               echo "region = ${AWS::Region}" >> /root/.aws/config
               mkdir /amazonutils
               cd /amazonutils
-              git clone https://github.com/awslabs/amazon-redshift-utils.git
+              git clone ${GitOrigin} -b ${GitBranch}
               pip3 install -r /amazonutils/amazon-redshift-utils/src/SimpleReplay/requirements.txt
               cd /amazonutils/amazon-redshift-utils/src/SimpleReplay
               mkdir -p cloudformation

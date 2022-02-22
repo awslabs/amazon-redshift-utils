@@ -1317,23 +1317,12 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
             return record['target_cluster_urls']
         del g_credentials_cache[username]
 
-    cluster_endpoint = g_config["target_cluster_endpoint"]
     odbc_driver = g_config["odbc_driver"]
 
-    cluster_endpoint_split = cluster_endpoint.split(".")
-    cluster_id = cluster_endpoint_split[0]
-    cluster_host = cluster_endpoint.split(":")[0]
-    cluster_port = cluster_endpoint_split[5].split("/")[0][4:]
-    cluster_database = database or cluster_endpoint_split[5].split("/")[1]
-    logger.info(f"cluster_id: {cluster_id}")
-    logger.info(f"cluster.id: {g_cluster.get('id')}")
-    logger.info(f"cluster_host: {cluster_host}")
-    logger.info(f"cluster.host: {g_cluster.get('host')}")
-    logger.info(f"cluster.endpoint: {g_cluster.get('endpoint')}")
-    logger.info(f"cluster_port: {cluster_port}")
-    logger.info(f"cluster.port: {g_cluster.get('port')}")
-    logger.info(f"cluster_database: {cluster_database}")
-    logger.info(f"cluster.database: {g_cluster.get('database')}")
+    cluster_id = g_cluster.get('id')
+    cluster_host = g_cluster.get('host')
+    cluster_port = g_cluster.get('port')
+    cluster_database = database or g_cluster.get('database')
 
     additional_args = {}
     if os.environ.get('ENDPOINT_URL'):
