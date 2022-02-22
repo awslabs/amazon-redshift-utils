@@ -39,7 +39,7 @@ limit 20;
 select customer_id , 
        product_title 
 from  amazon_reviews 
-where review_body similar to '%(good|bad)%';
+where review_body like '%(good|bad)%';
 
 select count(*) 
 from  amazon_reviews
