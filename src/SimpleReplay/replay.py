@@ -51,7 +51,7 @@ g_copy_replacements_filename = 'copy_replacements.csv'
 g_config = {}
 
 g_replay_timestamp = None
-
+g_cluster = {}
 
 class ConnectionLog:
     def __init__(
@@ -1325,6 +1325,15 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
     cluster_host = cluster_endpoint.split(":")[0]
     cluster_port = cluster_endpoint_split[5].split("/")[0][4:]
     cluster_database = database or cluster_endpoint_split[5].split("/")[1]
+    logger.info(f"cluster_id: {cluster_id}")
+    logger.info(f"cluster.id: {g_cluster.get('id')}")
+    logger.info(f"cluster_host: {cluster_host}")
+    logger.info(f"cluster.host: {g_cluster.get('host')}")
+    logger.info(f"cluster.endpoint: {g_cluster.get('endpoint')}")
+    logger.info(f"cluster_port: {cluster_port}")
+    logger.info(f"cluster.port: {g_cluster.get('port')}")
+    logger.info(f"cluster_database: {cluster_database}")
+    logger.info(f"cluster.database: {g_cluster.get('database')}")
 
     additional_args = {}
     if os.environ.get('ENDPOINT_URL'):
@@ -1335,7 +1344,7 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
                            'verify': False}
 
     response = None
-    rs_client = client("redshift", region_name=g_config.get("target_cluster_region", None), **additional_args)
+    rs_client = client("redshift", region_name=g_cluster.get("region"), **additional_args)
     for attempt in range(1, max_attempts + 1):
         try:
             response = rs_client.get_cluster_credentials(
@@ -1612,7 +1621,9 @@ def main():
 
     # print the version
     log_version()
-    cluster = cluster_dict(g_config["target_cluster_endpoint"])
+
+    global g_cluster
+    g_cluster = cluster_dict(g_config["target_cluster_endpoint"])
     # generate replay id/hash
     global g_replay_timestamp
     g_replay_timestamp = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -1620,9 +1631,9 @@ def main():
 
     id_hash = hashlib.sha1(g_replay_timestamp.isoformat().encode("UTF-8")).hexdigest()[:5]
     if g_config.get("tag", "") != "":
-        replay_id = f'{g_replay_timestamp.isoformat()}_{cluster.get("id")}_{g_config["tag"]}_{id_hash}'
+        replay_id = f'{g_replay_timestamp.isoformat()}_{g_cluster.get("id")}_{g_config["tag"]}_{id_hash}'
     else:
-        replay_id = f'{g_replay_timestamp.isoformat()}_{cluster.get("id")}_{id_hash}'
+        replay_id = f'{g_replay_timestamp.isoformat()}_{g_cluster.get("id")}_{id_hash}'
 
     manager = SyncManager()
 
