@@ -22,7 +22,7 @@ cd /amazonutils/amazon-redshift-utils/src/SimpleReplay
 mkdir -p $bucket_keyprefix
 aws s3 cp s3://$replay_bucket/config/replay.yaml ./$bucket_keyprefix/replay_target.yaml
 sed -i "s#workload_location: \"\"#workload_location: \"s3://$extract_bucket/$bucket_keyprefix/extract/$extract_output\"#g" ./$bucket_keyprefix/replay_target.yaml
-sed -i "s#target_cluster_endpoint: \"\"#target_cluster_endpoint: \"$cluster_endpoint\"#g"  ./$bucket_keyprefix/replay_target.yaml
+sed -i "s#target_cluster_endpoint: \"host:port/database\"#target_cluster_endpoint: \"$cluster_endpoint\"#g"  ./$bucket_keyprefix/replay_target.yaml
 #
 cp -f ./$bucket_keyprefix/replay_target.yaml ./$bucket_keyprefix/replay_replica.yaml
 sed -i "s#replay_output: \"\"#replay_output: \"s3://$replay_bucket/$bucket_keyprefix/replay/replay_output_target\"#g" ./$bucket_keyprefix/replay_target.yaml
