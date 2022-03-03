@@ -31,15 +31,13 @@ The files in each data scale directory are as follows:
 ### Power Run
 
 To execute the TPC-DS Power Run at a particular data scale (e.g. 3TB), perform the following steps:
-1. Edit `ddl.sql` and replace `<USER_ACCESS_KEY_ID>` and `<USER_SECRET_ACCESS_KEY>` with any valid S3 credentials.
+1. Create a new database to load the dataset into (e.g."CREATE DATABASE tpcds_3tb;")
 
-2. Create a new database to load the dataset into (e.g."CREATE DATABASE tpcds_3tb;")
+2. Connect to the database you created and execute `ddl.sql`.  This may take several hours, depending on the data scale and data warehouse size.
 
-3. Connect to the database you created and execute `ddl.sql`.  This may take several hours, depending on the data scale and data warehouse size.
+3. `ddl.sql` will execute `SELECT COUNT(*)` at the end against each table.  Verify that the resulting counts match the values at the end of `ddl.sql`.
 
-4. `ddl.sql` will execute `SELECT COUNT(*)` at the end against each table.  Verify that the resulting counts match the values at the end of `ddl.sql`.
-
-5. Execute `query_0.sql` several times sequentially (e.g. five times) and record the run time of each execution.
+4. Execute `query_0.sql` several times sequentially (e.g. five times) and record the run time of each execution.
 
 Note that the S3 data is located in US-EAST-1 so you may get faster load times if your test cluster is located in that region.
 
@@ -47,4 +45,4 @@ Note that the S3 data is located in US-EAST-1 so you may get faster load times i
 
 Once you have the data loaded and have executed the Power Run, you can then execute the Throughput Run using the same data:
 
-6. Simultaneously execute the query files that correspond to the number of concurrent streams you want.  For example, to execute 2 concurrent streams, simultaneously execute `query_1.sql` and `query_2.sql`.  To execute 5 concurrent streams simultaneously execute `query_1.sql` through `query_5.sql`.  The Throughput Run time will be the time elapsed from the start of the first query for the streams to the end of the last query of any stream.
+5. Simultaneously execute the query files that correspond to the number of concurrent streams you want.  For example, to execute 2 concurrent streams, simultaneously execute `query_1.sql` and `query_2.sql`.  To execute 5 concurrent streams simultaneously execute `query_1.sql` through `query_5.sql`.  The Throughput Run time will be the time elapsed from the start of the first query for the streams to the end of the last query of any stream.
