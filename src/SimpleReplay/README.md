@@ -198,7 +198,6 @@ Cloud Formation Template https://github.com/awslabs/amazon-redshift-utils/tree/m
 
 * Dependent SQL queries across connections are not guaranteed to run in the original order.
 * Spectrum queries are not replayed if the target cluster doesn’t have access to external tables
-* Queries with BIND variables are not replayed.
 * COPY and UNLOAD command within stored procedures must be altered manually by the customers. 
 * Replay using JDBC is not supported.
 * If a connection’s session initiation or disconnection time are not found in the audit connection logs (e.g. outside of the specified `start_time` and `end_time`), the connection’s time is assumed to be the overall workload’s time.
