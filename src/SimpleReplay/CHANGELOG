@@ -1,3 +1,6 @@
+## SimpleReplay 2.2.1
+- Ability to replay queries with bind variables
+- Remove CFT
 
 ## SimpleReplay 2.2
 - Introduce analysis after each replay

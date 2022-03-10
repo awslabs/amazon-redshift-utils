@@ -376,7 +376,7 @@ class ConnectionThread(threading.Thread):
                         cursor.execute(sql_text)
                     elif (g_config["execute_unload_statements"] == "true" and "to 's3:" in sql_text.lower() and g_config["replay_output"] is not None):
                         cursor.execute(sql_text)
-                    elif ("from 's3:" not in sql_text.lower()) and ("to 's3:" not in sql_text.lower()) and ("$1" not in sql_text):
+                    elif ("from 's3:" not in sql_text.lower()) and ("to 's3:" not in sql_text.lower()): ## removed condition to exclude bind variables
                         cursor.execute(sql_text)
                     else:
                         status = 'Not '
