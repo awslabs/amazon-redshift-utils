@@ -159,7 +159,8 @@ def snapshot(config_sources):
     aws_region = get_config_value(['AWS_REGION'], config_sources)
 
     set_debug = get_config_value(['DEBUG', 'debug', ], config_sources)
-    if set_debug is not None and (set_debug or set_debug.upper() == 'TRUE'):
+    
+    if set_debug is not None and set_debug:
         global debug
         debug = True
 
@@ -250,7 +251,7 @@ def snapshot(config_sources):
     try:
         if unload_s3_location is not None:
             unload_stats(cursor, table_config, cluster_name, unload_s3_location, unload_role_arn)
-    except e:
+    except Exception as e:
         print("Exception during System Table Detail unload to S3. This will not prevent automated cleanup.");
         print(traceback.format_exc())
 
