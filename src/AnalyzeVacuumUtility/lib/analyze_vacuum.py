@@ -628,7 +628,7 @@ def run_analyze_vacuum(**kwargs):
     global debug
     if config_constants.DEBUG in os.environ:
         debug = os.environ[config_constants.DEBUG]
-    if config_constants.DEBUG in kwargs and kwargs[config_constants.DEBUG]:
+    if config_constants.DEBUG in kwargs and kwargs[config_constants.DEBUG] != 'false':
         debug = True
 
     # connect to cloudwatch
