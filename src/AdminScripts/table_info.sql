@@ -48,9 +48,9 @@ SELECT TRIM(pgn.nspname) AS SCHEMA,
              0,0,
              ((b.mbytes/part.total::DECIMAL)*100)::DECIMAL(20,2)
        ) AS pct_of_total,
-       (CASE WHEN a.rows = 0 THEN NULL ELSE 
-          CASE WHEN pgc.reldiststyle = 8 THEN ((a.rows_all_dist - pgc.reltuples)::DECIMAL(20,3) / a.rows_all_dist::DECIMAL(20,3)*100)::DECIMAL(20,2)
-                ELSE ((a.rows - pgc.reltuples)::DECIMAL(20,3) / a.rows::DECIMAL(20,3)*100)::DECIMAL(20,2) END END
+       (CASE WHEN a.rows = 0 THEN NULL
+             WHEN pgc.reldiststyle = 8 THEN ((a.rows_all_dist - pgc.reltuples)::DECIMAL(20,3) / a.rows_all_dist::DECIMAL(20,3)*100)::DECIMAL(20,2)
+             ELSE ((a.rows - pgc.reltuples)::DECIMAL(20,3) / a.rows::DECIMAL(20,3)*100)::DECIMAL(20,2) END
        ) AS pct_stats_off,
        CASE WHEN pgc.reldiststyle = 8 
           THEN decode( det.n_sortkeys,0, NULL,DECODE( a.rows_all_dist,0,0, (a.unsorted_rows_all_dist::DECIMAL(32)/a.rows_all_dist)*100))::DECIMAL(20,2)
