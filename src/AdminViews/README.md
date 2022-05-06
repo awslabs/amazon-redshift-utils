@@ -28,6 +28,7 @@ All views assume you have a schema called admin.
 | v\_get\_obj\_priv\_by\_user.sql |   View to get the table/views that a user has access to | 
 | v\_get\_schema\_priv\_by\_user.sql |   View to get the schema that a user has access to | 
 | v\_get\_tbl\_priv\_by\_user.sql |   View to get the tables that a user has access to | 
+| v\_get\_tbl\_priv\_by\_group.sql |   View to get the tables that a user group has access to | 
 | v\_get\_tbl\_reads\_and\_writes.sql | View to get operations performed per table for transactions ID or query ID |
 | v\_get\_tbl\_scan\_frequency.sql |   View to get list of each permanent table's scan frequency | 
 | v\_get\_users\_in\_group.sql |   View to get all users in a group | 
@@ -39,4 +40,5 @@ All views assume you have a schema called admin.
 | v\_open\_session.sql |   View to monitor currently connected and disconnected sessions | 
 | v\_session\_leakage\_by\_cnt.sql |   View to monitor session leakage by remote host |   
 | v\_space\_used\_per\_tbl.sql |   View to get pull space used per table | 
-| v\_view\_dependency.sql |   View to get the names of the views that are dependent other tables/views |
+| v\_view\_dependency.sql |   View to get the names of the views that are dependent on other tables/views |
+| v\_view\_table\_column\_dependency.sql | View to get the views that are dependent on specific columns |

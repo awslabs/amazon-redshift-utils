@@ -1,560 +1,675 @@
-/* Disable results caching */
-set enable_result_cache_for_session to off;
+-- using default substitutions
 
-/* TPC_H  Query 1 - Pricing Summary Report */
- set query_group='RSPERF TPC-H 1.1';
-SELECT L_RETURNFLAG,
- L_LINESTATUS,
- SUM(L_QUANTITY)     AS SUM_QTY,
- SUM(L_EXTENDEDPRICE)    AS SUM_BASE_PRICE,
- SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))  AS SUM_DISC_PRICE,
- SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT)*(1+L_TAX)) AS SUM_CHARGE,
- AVG(L_QUANTITY)     AS AVG_QTY,
- AVG(L_EXTENDEDPRICE)    AS AVG_PRICE,
- AVG(L_DISCOUNT)     AS AVG_DISC,
- COUNT(*)     AS COUNT_ORDER
-FROM LINEITEM
-WHERE L_SHIPDATE <= cast ( date '1998-12-01' - interval '62 days' as date )
-GROUP BY L_RETURNFLAG,
-  L_LINESTATUS
-ORDER BY L_RETURNFLAG,
-  L_LINESTATUS
-;-- using 821113222 as a seed to the RNG
 
-/* TPC_H  Query 2 - Minimum Cost Supplier */
-set query_group='RSPERF TPC-H 1.2';
-SELECT	TOP 100
-	S_ACCTBAL,
-	S_NAME,
-	N_NAME,
-	P_PARTKEY,
-	P_MFGR,
-	S_ADDRESS,
-	S_PHONE,
-	S_COMMENT
-FROM	PART,
-	SUPPLIER,
-	PARTSUPP,
-	NATION,
-	REGION
-WHERE	P_PARTKEY	= PS_PARTKEY AND
-	S_SUPPKEY	= PS_SUPPKEY AND
-	P_SIZE		= 34 AND
-	P_TYPE		LIKE '%COPPER' AND
-	S_NATIONKEY	= N_NATIONKEY AND
-	N_REGIONKEY	= R_REGIONKEY AND
-	R_NAME		= 'MIDDLE EAST' AND
-	PS_SUPPLYCOST	= (	SELECT	MIN(PS_SUPPLYCOST)
-				FROM	PARTSUPP,
-					SUPPLIER,
-					NATION,
-					REGION
-				WHERE	P_PARTKEY	= PS_PARTKEY AND
-					S_SUPPKEY	= PS_SUPPKEY AND
-					S_NATIONKEY	= N_NATIONKEY AND
-					N_REGIONKEY	= R_REGIONKEY AND
-					R_NAME		= 'MIDDLE EAST'
-			  )
-ORDER	BY	S_ACCTBAL DESC,
-		N_NAME,
-		S_NAME,
-		P_PARTKEY
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 3 - Shipping Priority */
-set query_group='RSPERF TPC-H 1.3';
-SELECT	TOP 10
-	L_ORDERKEY,
-	SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))	AS REVENUE,
-	O_ORDERDATE,
-	O_SHIPPRIORITY
-FROM	CUSTOMER,
-	ORDERS,
-	LINEITEM
-WHERE	C_MKTSEGMENT	= 'FURNITURE' AND
-	C_CUSTKEY	= O_CUSTKEY AND
-	L_ORDERKEY	= O_ORDERKEY AND
-	O_ORDERDATE	< '1995-03-28' AND
-	L_SHIPDATE	> '1995-03-28'
-GROUP	BY	L_ORDERKEY,
-		O_ORDERDATE,
-		O_SHIPPRIORITY
-ORDER	BY	REVENUE DESC,
-		O_ORDERDATE
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 4 - Order Priority Checking */
-set query_group='RSPERF TPC-H 1.4';
-SELECT	O_ORDERPRIORITY,
-	COUNT(*)		AS ORDER_COUNT
-FROM	ORDERS
-WHERE	O_ORDERDATE	>= '1997-04-01' AND
-	O_ORDERDATE	< cast (date '1997-04-01' + interval '3 months' as date) AND
-	EXISTS		(	SELECT	*
-				FROM	LINEITEM
-				WHERE	L_ORDERKEY	= O_ORDERKEY AND
-					L_COMMITDATE	< L_RECEIPTDATE
-			)
-GROUP	BY	O_ORDERPRIORITY
-ORDER	BY	O_ORDERPRIORITY
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 5 - Local Supplier Volume */
-set query_group='RSPERF TPC-H 1.5';
-SELECT	N_NAME,
-	SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))	AS REVENUE
-FROM	CUSTOMER,
-	ORDERS,
-	LINEITEM,
-	SUPPLIER,
-	NATION,
-	REGION
-WHERE	C_CUSTKEY	= O_CUSTKEY AND
-	L_ORDERKEY	= O_ORDERKEY AND
-	L_SUPPKEY	= S_SUPPKEY AND
-	C_NATIONKEY	= S_NATIONKEY AND
-	S_NATIONKEY	= N_NATIONKEY AND
-	N_REGIONKEY	= R_REGIONKEY AND
-	R_NAME		= 'MIDDLE EAST' AND
-        o_orderdate >= date '1994-01-01' and 
-     o_orderdate < cast (date '1994-01-01' + interval '1 year' as date)
-GROUP	BY	N_NAME
-ORDER	BY	REVENUE DESC;
--- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 6 - Forecasting Revenue Change */
-set query_group='RSPERF TPC-H 1.6';
-SELECT	SUM(L_EXTENDEDPRICE*L_DISCOUNT)	AS REVENUE
-FROM	LINEITEM
-WHERE	L_SHIPDATE	>= '1994-01-01' AND
-	L_SHIPDATE	< cast (date '1994-01-01' + interval '1 year' as date)	 AND
-	L_DISCOUNT	BETWEEN 0.09 - 0.01 AND 0.09 + 0.01 AND
-	L_QUANTITY	< 24
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 7 - Volume Shipping */
-set query_group='RSPERF TPC-H 1.7';
-SELECT	SUPP_NATION,
-	CUST_NATION,
-	L_YEAR,
-	SUM(VOLUME)	AS REVENUE
-FROM	(	SELECT	N1.N_NAME			AS SUPP_NATION,
-			N2.N_NAME			AS CUST_NATION,
-			extract(year from L_SHIPDATE) as L_YEAR,
-			L_EXTENDEDPRICE*(1-L_DISCOUNT)	AS VOLUME
-		FROM	SUPPLIER,
-			LINEITEM,
-			ORDERS,
-			CUSTOMER,
-			NATION N1,
-			NATION N2
-		WHERE	S_SUPPKEY	= L_SUPPKEY AND
-			O_ORDERKEY	= L_ORDERKEY AND
-			C_CUSTKEY	= O_CUSTKEY AND
-			S_NATIONKEY	= N1.N_NATIONKEY AND
-			C_NATIONKEY	= N2.N_NATIONKEY AND
-			(	(N1.N_NAME	= 'UNITED STATES'	AND N2.N_NAME	= 'JAPAN')
-				OR
-				(N1.N_NAME	= 'JAPAN'	AND N2.N_NAME	= 'UNITED STATES')
-			) AND
-			L_SHIPDATE	BETWEEN '1995-01-01' AND '1996-12-31'
-	)	AS SHIPPING
-GROUP	BY	SUPP_NATION,
-		CUST_NATION,
-		L_YEAR
-ORDER	BY	SUPP_NATION,
-		CUST_NATION,
-		L_YEAR
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 8 - National Market Share */
-set query_group='RSPERF TPC-H 1.8';
-
-SELECT	O_YEAR,
-	SUM(CASE	WHEN	NATION	= 'JAPAN'
-			THEN	VOLUME
-			ELSE	0
-			END) / SUM(VOLUME)	AS MKT_SHARE
-FROM	(	SELECT	
-                  	extract(year from o_orderdate) as o_year,
-			L_EXTENDEDPRICE * (1-L_DISCOUNT)	AS VOLUME,
-			N2.N_NAME				AS NATION
-		FROM	PART,
-			SUPPLIER,
-			LINEITEM,
-			ORDERS,
-			CUSTOMER,
-			NATION N1,
-			NATION N2,
-			REGION
-		WHERE	P_PARTKEY	= L_PARTKEY AND
-			S_SUPPKEY	= L_SUPPKEY AND
-			L_ORDERKEY	= O_ORDERKEY AND
-			O_CUSTKEY	= C_CUSTKEY AND
-			C_NATIONKEY	= N1.N_NATIONKEY AND
-			N1.N_REGIONKEY	= R_REGIONKEY AND
-			R_NAME		= 'ASIA' AND
-			S_NATIONKEY	= N2.N_NATIONKEY AND
-			O_ORDERDATE	BETWEEN '1995-01-01' AND '1996-12-31' AND
-			P_TYPE		= 'MEDIUM ANODIZED COPPER'
-	)	AS	ALL_NATIONS
-GROUP	BY	O_YEAR
-ORDER	BY	O_YEAR
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 9 - Product Type Profit Measure */
-set query_group='RSPERF TPC-H 1.9';
-
-SELECT	NATION,
-	O_YEAR,
-	SUM(AMOUNT)	AS SUM_PROFIT
-FROM	(	SELECT	N_NAME							AS NATION,
-			extract(year from o_orderdate) as o_year,
-			L_EXTENDEDPRICE*(1-L_DISCOUNT)-PS_SUPPLYCOST*L_QUANTITY	AS AMOUNT
-		FROM	PART,
-			SUPPLIER,
-			LINEITEM,
-			PARTSUPP,
-			ORDERS,
-			NATION
-		WHERE	S_SUPPKEY	= L_SUPPKEY AND
-			PS_SUPPKEY	= L_SUPPKEY AND
-			PS_PARTKEY	= L_PARTKEY AND
-			P_PARTKEY	= L_PARTKEY AND
-			O_ORDERKEY	= L_ORDERKEY AND
-			S_NATIONKEY	= N_NATIONKEY AND
-			P_NAME		LIKE '%green%'
-	)	AS PROFIT
-GROUP	BY	NATION,
-		O_YEAR
-ORDER	BY	NATION,
-		O_YEAR	DESC;
--- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 10 - Returned Item Reporting */
-set query_group='RSPERF TPC-H 1.10';
-
-SELECT	TOP 20
-	C_CUSTKEY,
-	C_NAME,
-	SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))	AS REVENUE,
-	C_ACCTBAL,
-	N_NAME,
-	C_ADDRESS,
-	C_PHONE,
-	C_COMMENT
-FROM	CUSTOMER,
-	ORDERS,
-	LINEITEM,
-	NATION
-WHERE	C_CUSTKEY	= O_CUSTKEY		AND
-	L_ORDERKEY	= O_ORDERKEY		AND
-	O_ORDERDATE	>= '1994-01-01'			AND
-	O_ORDERDATE < cast (date '1994-01-01' + interval '3 months' as date) AND
-	L_RETURNFLAG	= 'R'			AND
-	C_NATIONKEY	= N_NATIONKEY
-GROUP	BY	C_CUSTKEY,
-		C_NAME,
-		C_ACCTBAL,
-		C_PHONE,
-		N_NAME,
-		C_ADDRESS,
-		C_COMMENT
-ORDER	BY	REVENUE	DESC
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 11 - Important Stock Indentification */
-set query_group='RSPERF TPC-H 1.11';
-
-SELECT	PS_PARTKEY,
-	SUM(PS_SUPPLYCOST*PS_AVAILQTY)	AS VALUE
-FROM	PARTSUPP,
-	SUPPLIER,
-	NATION
-WHERE	PS_SUPPKEY	= S_SUPPKEY	AND
-	S_NATIONKEY	= N_NATIONKEY	AND
-	N_NAME		= 'SAUDI ARABIA'
-GROUP	BY	PS_PARTKEY
-HAVING	SUM(PS_SUPPLYCOST*PS_AVAILQTY) >
-		(	SELECT	SUM(PS_SUPPLYCOST*PS_AVAILQTY) * 0.0000000333
-			FROM	PARTSUPP,
-				SUPPLIER,
-				NATION
-			WHERE	PS_SUPPKEY	= S_SUPPKEY	AND
-				S_NATIONKEY	= N_NATIONKEY	AND
-				N_NAME		= 'SAUDI ARABIA'
-		)
-ORDER	BY	VALUE	DESC
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 12 - Shipping Modes and Order Priority */
-set query_group='RSPERF TPC-H 1.12';
-
-SELECT	L_SHIPMODE,
-	SUM(	CASE	WHEN O_ORDERPRIORITY  = '1-URGENT'	OR
-			     O_ORDERPRIORITY  = '2-HIGH'
-			THEN 1
-			ELSE 0
-		END)	AS HIGH_LINE_COUNT,
-	SUM(	CASE	WHEN O_ORDERPRIORITY <> '1-URGENT'	AND
-			     O_ORDERPRIORITY <> '2-HIGH'
-			THEN 1
-			ELSE 0
-		END)	AS LOW_LINE_COUNT
-FROM	ORDERS,
-	LINEITEM
-WHERE	O_ORDERKEY	= L_ORDERKEY		AND
-	L_SHIPMODE	IN ('FOB','REG AIR')		AND
-	L_COMMITDATE	< L_RECEIPTDATE		AND
-	L_SHIPDATE	< L_COMMITDATE		AND
-	L_RECEIPTDATE	>= '1995-01-01'			AND
-	L_RECEIPTDATE < cast (date '1995-01-01' + interval '1 year' as date)
-GROUP	BY	L_SHIPMODE
-ORDER	BY	L_SHIPMODE
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 13 - Customer Distribution */
-set query_group='RSPERF TPC-H 1.13';
-
-SELECT	C_COUNT,
-	COUNT(*)	AS CUSTDIST
-FROM	(	SELECT	C_CUSTKEY,
-			COUNT(O_ORDERKEY)
-		FROM	CUSTOMER left outer join ORDERS on
-			C_CUSTKEY	= O_CUSTKEY		AND
-			O_COMMENT	not like '%special%requests%'
-		GROUP	BY	C_CUSTKEY
-	)	AS C_ORDERS (C_CUSTKEY, C_COUNT)
-GROUP	BY	C_COUNT
-ORDER	BY	CUSTDIST	DESC,
-		C_COUNT		DESC
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 14 - Promotion Effect */
-set query_group='RSPERF TPC-H 1.14';
-
-SELECT	100.00 * SUM	(	CASE	WHEN P_TYPE LIKE 'PROMO%'
-					THEN L_EXTENDEDPRICE*(1-L_DISCOUNT)
-					ELSE 0
-				END) / SUM(L_EXTENDEDPRICE*(1-L_DISCOUNT))	AS PROMO_REVENUE
-FROM	LINEITEM,
-	PART
-WHERE	L_PARTKEY	= P_PARTKEY	AND
-	L_SHIPDATE	>= '1995-01-01'		AND
-        L_SHIPDATE < cast (date '1995-01-01' + interval '1 month' as date)
-;-- using 821113222 as a seed to the RNG
-
-/* TPC_H  Query 15 - Create View for Top Supplier Query */
-set query_group='RSPERF TPC-H 1.15';
-WITH revenue1 AS (
-    select
-        l_suppkey as supplier_no,
-        sum(l_extendedprice * (1 - l_discount)) as total_revenue
-    from
-        lineitem
-    where
-        L_SHIPDATE	>= '1995-02-01' AND
-	L_SHIPDATE	< cast (date '1995-02-01' + interval '3 months' as date)
-    group by
-        l_suppkey)
-
-select /*  #RSPERF TPC-H 1.15  */
-    s_suppkey,
-    s_name,
-    s_address,
-    s_phone,
-    total_revenue
+select /* TPC-H Q14 */
+	100.00 * sum(case
+		when p_type like 'PROMO%'
+			then l_extendedprice * (1 - l_discount)
+		else 0
+	end) / sum(l_extendedprice * (1 - l_discount)) as promo_revenue
 from
-    supplier,
-    revenue1
+	lineitem,
+	part
 where
-    s_suppkey = supplier_no
-    and total_revenue = (
-        select
-            max(total_revenue)
-        from
-            revenue1
-    )
+	l_partkey = p_partkey
+	and l_shipdate >= date '1995-09-01'
+	and l_shipdate < dateadd(month, 1, cast('1995-09-01' as date))
+;
+
+
+select /* TPC-H Q2 */
+	s_acctbal,
+	s_name,
+	n_name,
+	p_partkey,
+	p_mfgr,
+	s_address,
+	s_phone,
+	s_comment
+from
+	part,
+	supplier,
+	partsupp,
+	nation,
+	region
+where
+	p_partkey = ps_partkey
+	and s_suppkey = ps_suppkey
+	and p_size = 15
+	and p_type like '%BRASS'
+	and s_nationkey = n_nationkey
+	and n_regionkey = r_regionkey
+	and r_name = 'EUROPE'
+	and ps_supplycost = (
+		select
+			min(ps_supplycost)
+		from
+			partsupp,
+			supplier,
+			nation,
+			region
+		where
+			p_partkey = ps_partkey
+			and s_suppkey = ps_suppkey
+			and s_nationkey = n_nationkey
+			and n_regionkey = r_regionkey
+			and r_name = 'EUROPE'
+	)
 order by
-    s_suppkey;
--- using 821113222 as a seed to the RNG
+	s_acctbal desc,
+	n_name,
+	s_name,
+	p_partkey
+limit 100;
 
-/* TPC_H  Query 16 - Parts/Supplier Relationship */
-set query_group='RSPERF TPC-H 1.16';
-SELECT	P_BRAND,
-	P_TYPE,
-	P_SIZE,
-	COUNT(DISTINCT PS_SUPPKEY)	AS SUPPLIER_CNT
-FROM	PARTSUPP,
-	PART
-WHERE	P_PARTKEY	= PS_PARTKEY				AND
-	P_BRAND		<> 'Brand#23'					AND
-	P_TYPE		NOT LIKE 'MEDIUM ANODIZED%'				AND
-	P_SIZE		IN (1, 32, 33, 46, 7, 42, 21, 40)	AND
-	PS_SUPPKEY	NOT IN	(	SELECT	S_SUPPKEY
-					FROM	SUPPLIER
-					WHERE	S_COMMENT	LIKE '%Customer%Complaints%'
-				)
-GROUP	BY	P_BRAND,
-		P_TYPE,
-		P_SIZE
-ORDER	BY	SUPPLIER_CNT	DESC,
-		P_BRAND,
-		P_TYPE,
-		P_SIZE
-;-- using 821113222 as a seed to the RNG
 
-/* TPC_H  Query 17 - Small-Quantity-Order Revenue */
-set query_group='RSPERF TPC-H 1.17';
-SELECT	SUM(L_EXTENDEDPRICE)/7.0	AS AVG_YEARLY
-FROM	LINEITEM,
-	PART
-WHERE	P_PARTKEY	= L_PARTKEY	AND
-	P_BRAND		= 'Brand#32'		AND
-	P_CONTAINER	= 'SM CASE'		AND
-	L_QUANTITY	<	(	SELECT	0.2 * AVG(L_QUANTITY)
-					FROM	LINEITEM
-					WHERE	L_PARTKEY	= P_PARTKEY
-				)
-;-- using 821113222 as a seed to the RNG
+select /* TPC-H Q9 */
+	nation,
+	o_year,
+	sum(amount) as sum_profit
+from
+	(
+		select
+			n_name as nation,
+			extract(year from o_orderdate) as o_year,
+			l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity as amount
+		from
+			part,
+			supplier,
+			lineitem,
+			partsupp,
+			orders,
+			nation
+		where
+			s_suppkey = l_suppkey
+			and ps_suppkey = l_suppkey
+			and ps_partkey = l_partkey
+			and p_partkey = l_partkey
+			and o_orderkey = l_orderkey
+			and s_nationkey = n_nationkey
+			and p_name like '%green%'
+	) as profit
+group by
+	nation,
+	o_year
+order by
+	nation,
+	o_year desc;
 
-/* TPC_H  Query 18 - Large Volume Customer */
-set query_group='RSPERF TPC-H 1.18';
-SELECT	TOP 100
-	C_NAME,
-	C_CUSTKEY,
-	O_ORDERKEY,
-	O_ORDERDATE,
-	O_TOTALPRICE,
-	SUM(L_QUANTITY)
-FROM	CUSTOMER,
-	ORDERS,
-	LINEITEM
-WHERE	O_ORDERKEY	IN	(	SELECT	L_ORDERKEY
-					FROM	LINEITEM
-					GROUP	BY	L_ORDERKEY HAVING SUM(L_QUANTITY) > 313
-				)	AND
-	C_CUSTKEY	= O_CUSTKEY	AND
-	O_ORDERKEY	= L_ORDERKEY
-GROUP	BY	C_NAME,
-		C_CUSTKEY,
-		O_ORDERKEY,
-		O_ORDERDATE,
-		O_TOTALPRICE
-ORDER	BY	O_TOTALPRICE	DESC,
-		O_ORDERDATE
-;-- using 821113222 as a seed to the RNG
 
-/* TPC_H  Query 19 - Discounted Revenue */
-set query_group='RSPERF TPC-H 1.19';
-SELECT 	SUM(L_EXTENDEDPRICE* (1 - L_DISCOUNT))	AS REVENUE
-FROM	LINEITEM,
-	PART
-WHERE	(	P_PARTKEY	= L_PARTKEY						AND
-		P_BRAND		= 'Brand#14'							AND
-		P_CONTAINER	IN ( 'SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')		AND
-		L_QUANTITY	>= 4							AND
-		L_QUANTITY	<= 4 + 10						AND
-		P_SIZE		BETWEEN 1 AND 5						AND
-		L_SHIPMODE	IN ('AIR', 'AIR REG')					AND
-		L_SHIPINSTRUCT	= 'DELIVER IN PERSON'
+select /* TPC-H Q20 */
+	s_name,
+	s_address
+from
+	supplier,
+	nation
+where
+	s_suppkey in (
+		select
+			ps_suppkey
+		from
+			partsupp
+		where
+			ps_partkey in (
+				select
+					p_partkey
+				from
+					part
+				where
+					p_name like 'forest%'
+			)
+			and ps_availqty > (
+				select
+					0.5 * sum(l_quantity)
+				from
+					lineitem
+				where
+					l_partkey = ps_partkey
+					and l_suppkey = ps_suppkey
+					and l_shipdate >= date '1994-01-01'
+					and l_shipdate < dateadd(year, 1, cast('1994-01-01' as date)) 
+			)
 	)
-	OR
-	(	P_PARTKEY	= L_PARTKEY						AND
-		P_BRAND		= 'Brand#45'							AND
-		P_CONTAINER	IN ( 'MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')	AND
-		L_QUANTITY	>= 18							AND
-		L_QUANTITY	<= 18 + 10						AND
-		P_SIZE		BETWEEN 1 AND 10					AND
-		L_SHIPMODE	IN ('AIR', 'AIR REG')					AND
-		L_SHIPINSTRUCT	= 'DELIVER IN PERSON'
+	and s_nationkey = n_nationkey
+	and n_name = 'CANADA'
+order by
+	s_name;
+
+
+select /* TPC-H Q6 */
+	sum(l_extendedprice * l_discount) as revenue
+from
+	lineitem
+where
+	l_shipdate >= date '1994-01-01'
+	and l_shipdate < dateadd(year, 1, cast('1994-01-01' as date)) 
+	and l_discount between .06 - 0.01 and .06 + 0.01
+	and l_quantity < 24;
+
+
+select /* TPC-H Q17 */
+	sum(l_extendedprice) / 7.0 as avg_yearly
+from
+	lineitem,
+	part
+where
+	p_partkey = l_partkey
+	and p_brand = 'Brand#23'
+	and p_container = 'MED BOX'
+	and l_quantity < (
+		select
+			0.2 * avg(l_quantity)
+		from
+			lineitem
+		where
+			l_partkey = p_partkey
+	);
+
+
+select /* TPC-H Q18 */
+	c_name,
+	c_custkey,
+	o_orderkey,
+	o_orderdate,
+	o_totalprice,
+	sum(l_quantity)
+from
+	customer,
+	orders,
+	lineitem
+where
+	o_orderkey in (
+		select
+			l_orderkey
+		from
+			lineitem
+		group by
+			l_orderkey having
+				sum(l_quantity) > 300
 	)
-	OR
-	(	P_PARTKEY	= L_PARTKEY						AND
-		P_BRAND		= 'Brand#15'							AND
-		P_CONTAINER	IN ( 'LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')		AND
-		L_QUANTITY	>= 20							AND
-		L_QUANTITY	<= 20 + 10						AND
-		P_SIZE		BETWEEN 1 AND 15					AND
-		L_SHIPMODE	IN ('AIR', 'AIR REG')					AND
-		L_SHIPINSTRUCT	= 'DELIVER IN PERSON'
+	and c_custkey = o_custkey
+	and o_orderkey = l_orderkey
+group by
+	c_name,
+	c_custkey,
+	o_orderkey,
+	o_orderdate,
+	o_totalprice
+order by
+	o_totalprice desc,
+	o_orderdate
+limit 100;
+
+
+select /* TPC-H Q8 */
+	o_year,
+	sum(case
+		when nation = 'BRAZIL' then volume
+		else 0
+	end) / sum(volume) as mkt_share
+from
+	(
+		select
+			extract(year from o_orderdate) as o_year,
+			l_extendedprice * (1 - l_discount) as volume,
+			n2.n_name as nation
+		from
+			part,
+			supplier,
+			lineitem,
+			orders,
+			customer,
+			nation n1,
+			nation n2,
+			region
+		where
+			p_partkey = l_partkey
+			and s_suppkey = l_suppkey
+			and l_orderkey = o_orderkey
+			and o_custkey = c_custkey
+			and c_nationkey = n1.n_nationkey
+			and n1.n_regionkey = r_regionkey
+			and r_name = 'AMERICA'
+			and s_nationkey = n2.n_nationkey
+			and o_orderdate between date '1995-01-01' and date '1996-12-31'
+			and p_type = 'ECONOMY ANODIZED STEEL'
+	) as all_nations
+group by
+	o_year
+order by
+	o_year;
+
+
+select /* TPC-H Q21 */
+	s_name,
+	count(*) as numwait
+from
+	supplier,
+	lineitem l1,
+	orders,
+	nation
+where
+	s_suppkey = l1.l_suppkey
+	and o_orderkey = l1.l_orderkey
+	and o_orderstatus = 'F'
+	and l1.l_receiptdate > l1.l_commitdate
+	and exists (
+		select
+			*
+		from
+			lineitem l2
+		where
+			l2.l_orderkey = l1.l_orderkey
+			and l2.l_suppkey <> l1.l_suppkey
 	)
-;-- using 821113222 as a seed to the RNG
+	and not exists (
+		select
+			*
+		from
+			lineitem l3
+		where
+			l3.l_orderkey = l1.l_orderkey
+			and l3.l_suppkey <> l1.l_suppkey
+			and l3.l_receiptdate > l3.l_commitdate
+	)
+	and s_nationkey = n_nationkey
+	and n_name = 'SAUDI ARABIA'
+group by
+	s_name
+order by
+	numwait desc,
+	s_name
+limit 100;
 
-/* TPC_H  Query 20 - Potential Part Promotion */
-set query_group='RSPERF TPC-H 1.20';
-SELECT	S_NAME,
-	S_ADDRESS
-FROM	SUPPLIER,
-	NATION
-WHERE	S_SUPPKEY	IN	(	SELECT	PS_SUPPKEY
-					FROM	PARTSUPP
-					WHERE	PS_PARTKEY in	(	SELECT	P_PARTKEY
-									FROM	PART
-									WHERE	P_NAME like 'olive%'
-								)	AND
-					PS_AVAILQTY	>	(	SELECT	0.5 * sum(L_QUANTITY)
-									FROM	LINEITEM
-									WHERE	L_PARTKEY	= PS_PARTKEY	AND
-										L_SUPPKEY 	= PS_SUPPKEY	AND
-										L_SHIPDATE	>= '1996-01-01'		AND
-										L_SHIPDATE	< cast (date '1996-01-01' + interval '1 year' as date)
-								)
-				)	AND
-	S_NATIONKEY	= N_NATIONKEY	AND
-	N_NAME		= 'RUSSIA'
-ORDER	BY	S_NAME
-;-- using 821113222 as a seed to the RNG
 
-/* TPC_H  Query 21 - Suppliers Who Kept Orders Waiting */
-set query_group='RSPERF TPC-H 1.21';
-SELECT	TOP 100
-	S_NAME,
-	COUNT(*)	AS NUMWAIT
-FROM	SUPPLIER,
-	LINEITEM L1,
-	ORDERS,
-	NATION
-WHERE	S_SUPPKEY		= L1.L_SUPPKEY		AND
-	O_ORDERKEY		= L1.L_ORDERKEY		AND
-	O_ORDERSTATUS		= 'F'			AND
-	L1.L_RECEIPTDATE	> L1.L_COMMITDATE	AND
-	EXISTS	(	SELECT	*
-			FROM	LINEITEM L2
-			WHERE	L2.L_ORDERKEY	= L1.L_ORDERKEY	AND
-				L2.L_SUPPKEY	<> L1.L_SUPPKEY
-		)	AND
-	NOT EXISTS	(	SELECT	*
-				FROM	LINEITEM L3
-				WHERE	L3.L_ORDERKEY		= L1.L_ORDERKEY		AND
-					L3.L_SUPPKEY		<> L1.L_SUPPKEY		AND
-					L3.L_RECEIPTDATE	> L3.L_COMMITDATE
-			)	AND
-	S_NATIONKEY	= N_NATIONKEY	AND
-	N_NAME		= 'MOROCCO'
-GROUP	BY	S_NAME
-ORDER	BY	NUMWAIT	DESC,
-		S_NAME
-;-- using 821113222 as a seed to the RNG
+select /* TPC-H Q13 */
+	c_count,
+	count(*) as custdist
+from
+	(
+		select
+			c_custkey,
+			count(o_orderkey)
+		from
+			customer left outer join orders on
+				c_custkey = o_custkey
+				and o_comment not like '%special%requests%'
+		group by
+			c_custkey
+	) as c_orders (c_custkey, c_count)
+group by
+	c_count
+order by
+	custdist desc,
+	c_count desc;
 
-/* TPC_H  Query 22 - Global Sales Opportunity */
-set query_group='RSPERF TPC-H 1.22';
-SELECT	CNTRYCODE,
-	COUNT(*)	AS NUMCUST,
-	SUM(C_ACCTBAL)	AS TOTACCTBAL
-FROM	(	SELECT	SUBSTRING(C_PHONE,1,2)	AS CNTRYCODE,
-			C_ACCTBAL
-		FROM	CUSTOMER
-		WHERE	SUBSTRING(C_PHONE,1,2)	IN	('32', '12', '30', '20', '29', '16', '13')	AND
-			C_ACCTBAL		>	(	SELECT	AVG(C_ACCTBAL)
-								FROM	CUSTOMER
-								WHERE	C_ACCTBAL	> 0.00	AND
-									SUBSTRING(C_PHONE,1,2)	IN	('32', '12', '30', '20', '29', '16', '13')
-							)	AND
-			NOT EXISTS	(	SELECT	*
-						FROM	ORDERS
-						WHERE	O_CUSTKEY	= C_CUSTKEY
-					)
-	)	AS CUSTSALE
-GROUP	BY	CNTRYCODE
-ORDER	BY	CNTRYCODE;
+
+select /* TPC-H Q3 */
+	l_orderkey,
+	sum(l_extendedprice * (1 - l_discount)) as revenue,
+	o_orderdate,
+	o_shippriority
+from
+	customer,
+	orders,
+	lineitem
+where
+	c_mktsegment = 'BUILDING'
+	and c_custkey = o_custkey
+	and l_orderkey = o_orderkey
+	and o_orderdate < date '1995-03-15'
+	and l_shipdate > date '1995-03-15'
+group by
+	l_orderkey,
+	o_orderdate,
+	o_shippriority
+order by
+	revenue desc,
+	o_orderdate
+limit 10;
+
+
+select /* TPC-H Q22 */
+	cntrycode,
+	count(*) as numcust,
+	sum(c_acctbal) as totacctbal
+from
+	(
+		select
+			substring(c_phone,1,2) as cntrycode,
+			c_acctbal
+		from
+			customer
+		where
+			substring(c_phone,1,2) in
+				('13', '31', '23', '29', '30', '18', '17')
+			and c_acctbal > (
+				select
+					avg(c_acctbal)
+				from
+					customer
+				where
+					c_acctbal > 0.00
+					and substring(c_phone,1,2) in
+						('13', '31', '23', '29', '30', '18', '17')
+			)
+			and not exists (
+				select
+					*
+				from
+					orders
+				where
+					o_custkey = c_custkey
+			)
+	) as custsale
+group by
+	cntrycode
+order by
+	cntrycode;
+
+
+select /* TPC-H Q16 */
+	p_brand,
+	p_type,
+	p_size,
+	count(distinct ps_suppkey) as supplier_cnt
+from
+	partsupp,
+	part
+where
+	p_partkey = ps_partkey
+	and p_brand <> 'Brand#45'
+	and p_type not like 'MEDIUM POLISHED%'
+	and p_size in (49, 14, 23, 45, 19, 3, 36, 9)
+	and ps_suppkey not in (
+		select
+			s_suppkey
+		from
+			supplier
+		where
+			s_comment like '%Customer%Complaints%'
+	)
+group by
+	p_brand,
+	p_type,
+	p_size
+order by
+	supplier_cnt desc,
+	p_brand,
+	p_type,
+	p_size;
+
+
+select /* TPC-H Q4 */
+	o_orderpriority,
+	count(*) as order_count
+from
+	orders
+where
+	o_orderdate >= date '1993-07-01'
+	and o_orderdate < dateadd(month, 3, cast('1993-07-01' as date)) 
+	and exists (
+		select
+			*
+		from
+			lineitem
+		where
+			l_orderkey = o_orderkey
+			and l_commitdate < l_receiptdate
+	)
+group by
+	o_orderpriority
+order by
+	o_orderpriority;
+
+
+select /* TPC-H Q11 */
+	ps_partkey,
+	sum(ps_supplycost * ps_availqty) as value
+from
+	partsupp,
+	supplier,
+	nation
+where
+	ps_suppkey = s_suppkey
+	and s_nationkey = n_nationkey
+	and n_name = 'GERMANY'
+group by
+	ps_partkey having
+		sum(ps_supplycost * ps_availqty) > (
+			select
+				sum(ps_supplycost * ps_availqty) * 0.0000000333
+			from
+				partsupp,
+				supplier,
+				nation
+			where
+				ps_suppkey = s_suppkey
+				and s_nationkey = n_nationkey
+				and n_name = 'GERMANY'
+		)
+order by
+	value desc;
+
+with revenue as (
+		select
+			l_suppkey as supplier_no,
+			sum(l_extendedprice * (1-l_discount)) as total_revenue
+		from
+			lineitem
+		where
+			l_shipdate >= date '1996-01-01'
+			and l_shipdate < dateadd(month, 3, cast('1996-01-01' as date)) 
+		group by
+			l_suppkey
+)
+select /* TPC-H Q15 */
+	s_suppkey,
+	s_name,
+	s_address,
+	s_phone,
+	total_revenue
+from
+	supplier,
+	revenue
+where
+	s_suppkey = supplier_no
+	and total_revenue = (
+		select
+			max(total_revenue)
+		from
+			revenue
+	)
+order by
+	s_suppkey;
+
+
+select /* TPC-H Q1 */
+	l_returnflag,
+	l_linestatus,
+	sum(l_quantity) as sum_qty,
+	sum(l_extendedprice) as sum_base_price,
+	sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+	sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
+	avg(l_quantity) as avg_qty,
+	avg(l_extendedprice) as avg_price,
+	avg(l_discount) as avg_disc,
+	count(*) as count_order
+from
+	lineitem
+where
+	l_shipdate <= dateadd(day, -90, cast('1998-12-01' as date)) 
+group by
+	l_returnflag,
+	l_linestatus
+order by
+	l_returnflag,
+	l_linestatus;
+
+
+select /* TPC-H Q10 */
+	c_custkey,
+	c_name,
+	sum(l_extendedprice * (1 - l_discount)) as revenue,
+	c_acctbal,
+	n_name,
+	c_address,
+	c_phone,
+	c_comment
+from
+	customer,
+	orders,
+	lineitem,
+	nation
+where
+	c_custkey = o_custkey
+	and l_orderkey = o_orderkey
+	and o_orderdate >= date '1993-10-01'
+	and o_orderdate < dateadd(month, 3, cast('1993-10-01' as date))
+	and l_returnflag = 'R'
+	and c_nationkey = n_nationkey
+group by
+	c_custkey,
+	c_name,
+	c_acctbal,
+	c_phone,
+	n_name,
+	c_address,
+	c_comment
+order by
+	revenue desc
+limit 20;
+
+
+select /* TPC-H Q19 */
+	sum(l_extendedprice* (1 - l_discount)) as revenue
+from
+	lineitem,
+	part
+where
+	(
+		p_partkey = l_partkey
+		and p_brand = 'Brand#12'
+		and p_container in ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+		and l_quantity >= 1 and l_quantity <= 1 + 10
+		and p_size between 1 and 5
+		and l_shipmode in ('AIR', 'AIR REG')
+		and l_shipinstruct = 'DELIVER IN PERSON'
+	)
+	or
+	(
+		p_partkey = l_partkey
+		and p_brand = 'Brand#23'
+		and p_container in ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+		and l_quantity >= 10 and l_quantity <= 10 + 10
+		and p_size between 1 and 10
+		and l_shipmode in ('AIR', 'AIR REG')
+		and l_shipinstruct = 'DELIVER IN PERSON'
+	)
+	or
+	(
+		p_partkey = l_partkey
+		and p_brand = 'Brand#34'
+		and p_container in ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+		and l_quantity >= 20 and l_quantity <= 20 + 10
+		and p_size between 1 and 15
+		and l_shipmode in ('AIR', 'AIR REG')
+		and l_shipinstruct = 'DELIVER IN PERSON'
+	);
+
+
+select /* TPC-H Q5 */
+	n_name,
+	sum(l_extendedprice * (1 - l_discount)) as revenue
+from
+	customer,
+	orders,
+	lineitem,
+	supplier,
+	nation,
+	region
+where
+	c_custkey = o_custkey
+	and l_orderkey = o_orderkey
+	and l_suppkey = s_suppkey
+	and c_nationkey = s_nationkey
+	and s_nationkey = n_nationkey
+	and n_regionkey = r_regionkey
+	and r_name = 'ASIA'
+	and o_orderdate >= date '1994-01-01'
+	and o_orderdate < dateadd(year, 1, cast('1994-01-01' as date))
+group by
+	n_name
+order by
+	revenue desc;
+
+
+select /* TPC-H Q7 */
+	supp_nation,
+	cust_nation,
+	l_year,
+	sum(volume) as revenue
+from
+	(
+		select
+			n1.n_name as supp_nation,
+			n2.n_name as cust_nation,
+			extract(year from l_shipdate) as l_year,
+			l_extendedprice * (1 - l_discount) as volume
+		from
+			supplier,
+			lineitem,
+			orders,
+			customer,
+			nation n1,
+			nation n2
+		where
+			s_suppkey = l_suppkey
+			and o_orderkey = l_orderkey
+			and c_custkey = o_custkey
+			and s_nationkey = n1.n_nationkey
+			and c_nationkey = n2.n_nationkey
+			and (
+				(n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
+				or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
+			)
+			and l_shipdate between date '1995-01-01' and date '1996-12-31'
+	) as shipping
+group by
+	supp_nation,
+	cust_nation,
+	l_year
+order by
+	supp_nation,
+	cust_nation,
+	l_year;
+
+
+select /* TPC-H Q12 */
+	l_shipmode,
+	sum(case
+		when o_orderpriority = '1-URGENT'
+			or o_orderpriority = '2-HIGH'
+			then 1
+		else 0
+	end) as high_line_count,
+	sum(case
+		when o_orderpriority <> '1-URGENT'
+			and o_orderpriority <> '2-HIGH'
+			then 1
+		else 0
+	end) as low_line_count
+from
+	orders,
+	lineitem
+where
+	o_orderkey = l_orderkey
+	and l_shipmode in ('MAIL', 'SHIP')
+	and l_commitdate < l_receiptdate
+	and l_shipdate < l_commitdate
+	and l_receiptdate >= date '1994-01-01'
+	and l_receiptdate < dateadd(year, 1, cast('1994-01-01' as date))
+group by
+	l_shipmode
+order by
+	l_shipmode;

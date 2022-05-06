@@ -1,5 +1,15 @@
 # Amazon Redshift Column Encoding Utility
 
+This utility is now deprecated. Instead, please use Redshift's Automatic Table Optimization features through:
+```
+ALTER TABLE table_name ALTER SORTKEY AUTO;
+ALTER TABLE table_name ALTER DISTSTYLE AUTO;
+```
+
+https://docs.aws.amazon.com/redshift/latest/dg/t_Creating_tables.html
+
+----
+
 In order to get the best performance from your Redshift Database, you must ensure
 that database tables have the correct Column Encoding applied (see [http://docs.aws.amazon.com/redshift/latest/dg/t\_Compressing\_data\_on\_disk.html](http://docs.aws.amazon.com/redshift/latest/dg/t_Compressing_data_on_disk.html)).
 Column Encoding specifies which algorithm is used to compress data within a column,
