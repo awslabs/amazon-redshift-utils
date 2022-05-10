@@ -12,7 +12,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 import boto3
 import base64
-import pg8000
+#import pg8000
 import datetime
 from datetime import timedelta
 import json
@@ -20,14 +20,15 @@ import config_constants
 import pgpasslib
 import traceback
 import re
+import redshift_connector
 
 #### Static Configuration
 ssl = True
 ##################
 
-__version__ = "1.0"
+__version__ = "1.6"
 debug = False
-pg8000.paramstyle = "qmark"
+#pg8000.paramstyle = "qmark"
 
 
 def run_command(cursor, statement):
@@ -218,7 +219,7 @@ def snapshot(config_sources):
         if debug:
             print('Connecting to Redshift: %s' % host)
 
-        conn = pg8000.connect(database=database, user=user, password=pwd, host=host, port=port, ssl=ssl)
+        conn = redshift_connector.connect(database=database, user=user, password=pwd, host=host, port=port, ssl=ssl)
         conn.autocommit = True
     except:
         print('Redshift Connection Failed: exception %s' % sys.exc_info()[1])
