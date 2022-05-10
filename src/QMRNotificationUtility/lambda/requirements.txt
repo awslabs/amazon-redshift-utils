@@ -1,1 +1,1 @@
-pg8000==1.10.5
+redshift_connector

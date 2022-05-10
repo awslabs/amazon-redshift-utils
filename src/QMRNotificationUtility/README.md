@@ -42,7 +42,7 @@ cd amazon-redshift-utils/src/QMRNotificationUtility
 #### 2. Copy the zipped python Deployment Package for the Lambda function to a location of your choosing in S3:
 
 ```bash
-aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.4.zip s3://yourbucket/qmr-action-notification-utility-1.4.zip
+aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.5.zip s3://yourbucket/qmr-action-notification-utility-1.5.zip
 ```
 
 #### 3. Gather the necessary identifiers noted in the prerequistes section above:
@@ -67,7 +67,7 @@ aws cloudformation create-stack \
 --template-body file://./cloudformation/qmr-action-notification-utility.yaml \
 --parameters \
   ParameterKey=S3Bucket,ParameterValue=yourbucket \
-  ParameterKey=S3Key,ParameterValue=qmr-action-notification-utility-1.4.zip \
+  ParameterKey=S3Key,ParameterValue=qmr-action-notification-utility-1.5.zip \
   ParameterKey=SNSEmailParameter,ParameterValue=test@email.com \
   ParameterKey=VPC,ParameterValue=vpc-abcd1234 \
   ParameterKey=SubnetIds,ParameterValue=subnet-abcd1234 \
@@ -117,7 +117,7 @@ aws cloudformation update-stack \
   ParameterKey=MonitoringDBPasswordCiphertext,ParameterValue=$CIPHERTEXT \
   ParameterKey=S3Bucket,UsePreviousValue=true \
   ParameterKey=S3Key,UsePreviousValue=true \
-  ParameterKey=SNSEmailParameter,UsePreviousValue=true \ 
+  ParameterKey=SNSEmailParameter,UsePreviousValue=true \
   ParameterKey=VPC,UsePreviousValue=true \
   ParameterKey=SubnetIds,UsePreviousValue=true \
   ParameterKey=SecurityGroupIds,UsePreviousValue=true \
