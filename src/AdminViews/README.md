@@ -40,4 +40,5 @@ All views assume you have a schema called admin.
 | v\_open\_session.sql |   View to monitor currently connected and disconnected sessions | 
 | v\_session\_leakage\_by\_cnt.sql |   View to monitor session leakage by remote host |   
 | v\_space\_used\_per\_tbl.sql |   View to get pull space used per table | 
-| v\_view\_dependency.sql |   View to get the names of the views that are dependent other tables/views |
+| v\_view\_dependency.sql |   View to get the names of the views that are dependent on other tables/views |
+| v\_view\_table\_column\_dependency.sql | View to get the views that are dependent on specific columns |

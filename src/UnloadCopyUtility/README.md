@@ -83,9 +83,24 @@ Please note that the bucket where the configuration is stored, and where the enc
 This utility uses PyGreSQL to connect to your Redshift Clusters. To install PyGreSQL (Python PostgreSQL Driver) on Amazon Linux, please ensure that you follow the below steps as the ec2-user:
 
 ```
-sudo easy_install pip
-sudo yum install postgresql postgresql-devel gcc python-devel libffi-devel
-sudo pip install PyGreSQL boto3 pytz
+wget https://bootstrap.pypa.io/pip/2.7/get-pip.py
+python get-pip.py
+sudo yum install git postgresql postgresql-devel gcc python-devel libffi-devel PyGreSQL
+sudo pip install boto3 pytz
+git clone https://github.com/awslabs/amazon-redshift-utils.git
+cd amazon-redshift-utils/src/UnloadCopyUtility
+```
+
+Confirm the versions of the following packages on your EC2 instance:
+
+```
+[ec2-user@ip-10-0-0-1 UnloadCopyUtility]$ python -V
+Python 2.7.18
+[ec2-user@ip-10-0-0-1 UnloadCopyUtility]$ pip -V
+pip 20.3.4 from /usr/lib/python2.7/site-packages/pip (python 2.7)
+[ec2-user@ip-10-0-0-1 UnloadCopyUtility]$ gcc -v
+... 
+gcc version 7.3.1 20180712 (Red Hat 7.3.1-13) (GCC)
 ```
 
 On other Linux distributions, make sure that you install the PostgreSQL client version 9.0 or higher.
