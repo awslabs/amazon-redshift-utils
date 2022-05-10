@@ -11,7 +11,6 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 
 import base64
-#import pg8000
 import datetime
 import boto3
 import json
@@ -29,7 +28,6 @@ interval = '5 minutes'
 debug = False
 
 ##################
-#pg8000.paramstyle = "qmark"
 
 def get_env_var(name):
     return os.environ[name] if name in os.environ else None
@@ -135,7 +133,6 @@ def lambda_handler(event, context):
     try:
         if debug:
             print('Connect to Redshift: %s' % host)
-        #conn = pg8000.connect(database=database, user=user, password=password, host=host, port=port, ssl=ssl)
         conn = redshift_connector.connect(
                 host=host,
                 database=database,
