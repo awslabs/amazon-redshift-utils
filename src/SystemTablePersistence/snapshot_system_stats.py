@@ -12,7 +12,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 import boto3
 import base64
-#import pg8000
 import datetime
 from datetime import timedelta
 import json
@@ -28,7 +27,6 @@ ssl = True
 
 __version__ = "1.6"
 debug = False
-#pg8000.paramstyle = "qmark"
 
 
 def run_command(cursor, statement):
