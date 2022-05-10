@@ -39,7 +39,6 @@ import traceback
 from multiprocessing import Pool
 
 import boto3
-#import pg8000
 import pgpasslib
 import shortuuid
 import redshift_connector
