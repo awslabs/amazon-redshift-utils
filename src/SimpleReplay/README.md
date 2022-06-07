@@ -9,6 +9,9 @@ Customers are always trying to reproduce issues or workloads from clusters or to
 
 This enables the replay to be as close to the source run. It is **strongly recommended** to run Simple Replay from a cloud EC2 instance.  
 
+If you want to experiment with different Amazon Redshift cluster configurations to evaluate and compare how your workload performs you can use Amazon Redshift Node Configuration Comparison utility (https://github.com/aws-samples/amazon-redshift-config-compare) which invokes Simple Replay utility. It provides ability to configure the necessary resources and will automatically execute the workload across N number of clusters.
+For more details about this utility please check https://aws.amazon.com/blogs/big-data/compare-different-node-types-for-your-workload-using-amazon-redshift/
+
 ## Preparation
 
 ### Step 1 - Amazon Redshift production cluster setup
