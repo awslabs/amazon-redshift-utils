@@ -15,14 +15,13 @@ from io import StringIO
 from report_gen import pdf_gen
 from report_util import Report, styles
 from tabulate import tabulate
-from util import db_connect, init_logging, cluster_dict, bucket_dict
+from util import db_connect, init_logging, cluster_dict, bucket_dict, get_secret
 
 g_stylesheet = styles()
 g_columns = g_stylesheet.get('columns')
 
-
 def run_replay_analysis(replay, cluster_endpoint, start_time, end_time, bucket_url, iam_role, user, tag='',
-                        complete=True, summary=None):
+                        is_serverless=False, secret_name=None, nlb_nat_dns = None, complete=True, summary=None):
     """End to end data collection, parsing, analysis and pdf generation
 
     @param replay: str, replay id from replay.py
@@ -33,51 +32,62 @@ def run_replay_analysis(replay, cluster_endpoint, start_time, end_time, bucket_u
     @param iam_role: str, IAM ARN for unload
     @param user: str, master username for cluster
     @param tag: str, optional identifier
+    @param is_serverless: bool, serverless or provisioned cluster
+    @param secret_name: str, name of the secret that stores admin username and password
+    @param nlb_nat_dns: str, dns endpoint if specified will be used to connect instead of target cluster endpoint
     @param complete: bool, complete/incomplete replay run
     @param summary: str list, replay output summary from replay.py
     """
 
     logger = logging.getLogger("SimpleReplayLogger")
     s3_client = boto3.client('s3')
-    cluster = cluster_dict(cluster_endpoint, start_time, end_time)
+    cluster = cluster_dict(cluster_endpoint, is_serverless, start_time, end_time)
+    cluster["is_serverless"] = is_serverless
+    cluster["secret_name"] = secret_name
+    cluster["host"] = nlb_nat_dns if nlb_nat_dns != None else cluster["host"]
 
     if type(bucket_url) is str:
         bucket = bucket_dict(bucket_url)
 
     logger.debug(bucket)
-    logger.debug(type(bucket))
+
     logger.info(f"Running analysis for replay: {replay}")
     replay_path = f"{bucket.get('prefix')}analysis/{replay}"
+
     # unload from cluster
     queries = unload(bucket, iam_role, cluster, user, replay)
-    report = Report(cluster, replay, bucket, replay_path, tag, complete)
 
-    try:
-        # iterate through query csv results and import
-        for q in queries:
-            get_raw_data(report, bucket, replay_path, q)
+    if is_serverless:
+        exit(0)
+    else:
+        report = Report(cluster, replay, bucket, replay_path, tag, complete)
 
-    except s3_client.exceptions.NoSuchKey as e:
-        logger.error(f"{e} Raw data does not exist in S3. Error in replay analysis.")
-        exit(-1)
-    except Exception as e:
-        logger.error(f"{e}: Data read failed. Error in replay analysis.")
-        exit(-1)
+        try:
+            # iterate through query csv results and import
+            for q in queries:
+                get_raw_data(report, bucket, replay_path, q)
 
-    # generate replay_id_report.pdf and info.json
-    logger.info(f"Generating report.")
-    pdf = pdf_gen(report, summary)
-    info = create_json(report)
+        except s3_client.exceptions.NoSuchKey as e:
+            logger.error(f"{e} Raw data does not exist in S3. Error in replay analysis.")
+            exit(-1)
+        except Exception as e:
+            logger.error(f"{e}: Data read failed. Error in replay analysis.")
+            exit(-1)
 
-    s3_resource = boto3.resource('s3')
-    # upload to s3 and output presigned urls
-    try:
-        s3_resource.Bucket(bucket.get('bucket_name')).upload_file(pdf, f"{replay_path}/out/{pdf}")
-        s3_resource.Bucket(bucket.get('bucket_name')).upload_file(info, f"{replay_path}/out/{info}")
-        analysis_summary(bucket.get('url'), replay)
-    except ClientError as e:
-        logger.error(f"{e} Could not upload report. Confirm IAM permissions include S3::PutObject.")
-        exit(-1)
+        # generate replay_id_report.pdf and info.json
+        logger.info(f"Generating report.")
+        pdf = pdf_gen(report, summary)
+        info = create_json(report)
+
+        s3_resource = boto3.resource('s3')
+        # upload to s3 and output presigned urls
+        try:
+            s3_resource.Bucket(bucket.get('bucket_name')).upload_file(pdf, f"{replay_path}/out/{pdf}")
+            s3_resource.Bucket(bucket.get('bucket_name')).upload_file(info, f"{replay_path}/out/{info}")
+            analysis_summary(bucket.get('url'), replay)
+        except ClientError as e:
+            logger.error(f"{e} Could not upload report. Confirm IAM permissions include S3::PutObject.")
+            exit(-1)
 
 
 def run_comparison_analysis(bucket, replay1, replay2):
@@ -106,24 +116,29 @@ def initiate_connection(username, cluster):
     """
 
     response = None
-    rs_client = client('redshift', region_name=cluster.get("region"))
     logger = logging.getLogger("SimpleReplayLogger")
-    # get response from redshift to get cluster credentials using provided cluster info
-    try:
-        response = rs_client.get_cluster_credentials(
-            DbUser=username,
-            DbName=cluster.get("database"),
-            ClusterIdentifier=cluster.get("id"),
-            DurationSeconds=900,
-            AutoCreate=False,
-        )
-    except rs_client.exceptions.ClusterNotFoundFault:
-        logger.error(f"Cluster {cluster.get('id')} not found. Please confirm cluster endpoint, account, and region.")
-        exit(-1)
-    except Exception as e:
-        logger.error(f"Unable to connect to Redshift. Confirm IAM permissions include Redshift::GetClusterCredentials."
-                     f" {e}")
-        exit(-1)
+
+    if cluster.get("is_serverless"):
+        secret_name = get_secret(cluster.get('secret_name'), cluster.get("region"))
+        response = {'DbUser': secret_name["admin_username"], 'DbPassword': secret_name["admin_password"]}
+    else:
+        rs_client = client('redshift', region_name=cluster.get("region"))
+        # get response from redshift to get cluster credentials using provided cluster info
+        try:
+            response = rs_client.get_cluster_credentials(
+                DbUser=username,
+                DbName=cluster.get("database"),
+                ClusterIdentifier=cluster.get("id"),
+                DurationSeconds=900,
+                AutoCreate=False,
+            )
+        except rs_client.exceptions.ClusterNotFoundFault:
+            logger.error(f"Cluster {cluster.get('id')} not found. Please confirm cluster endpoint, account, and region.")
+            exit(-1)
+        except Exception as e:
+            logger.error(f"Unable to connect to Redshift. Confirm IAM permissions include Redshift::GetClusterCredentials."
+                         f" {e}")
+            exit(-1)
 
     if response is None or response.get('DbPassword') is None:
         logger.error(f"Failed to retrieve credentials for user {username} ")
@@ -169,7 +184,9 @@ def unload(unload_location, iam_role, cluster, user, replay):
     """
 
     logger = logging.getLogger("SimpleReplayLogger")
-    directory = r'sql'
+
+    directory = r'sql' if not cluster.get("is_serverless") else r'sql/serverless'
+
     queries = []  # used to return query names
     with initiate_connection(username=user, cluster=cluster) as conn:  # initiate connection
         cursor = conn.cursor()

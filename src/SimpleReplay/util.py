@@ -9,6 +9,8 @@ import redshift_connector
 import time
 from urllib.parse import urlparse
 import yaml
+import base64
+from botocore.exceptions import ClientError
 
 logger = logging.getLogger("SimpleReplayLogger")
 
@@ -42,7 +44,7 @@ def add_logfile(filename, dir="simplereplay_logs", level=logging.DEBUG, backup_c
     file_exists = os.path.isfile(filename)
     fh = logging.handlers.RotatingFileHandler(filename, backupCount=backup_count)
 
-    # if the file exists from a previous run, rotate it 
+    # if the file exists from a previous run, rotate it
     if file_exists:
         fh.doRollover()
 
@@ -162,7 +164,7 @@ def load_config(location):
     return config_yaml
 
 
-def cluster_dict(endpoint, start_time=None, end_time=None):
+def cluster_dict(endpoint, is_serverless=False, start_time=None, end_time=None):
     '''Create a object-like dictionary from cluster endpoint'''
     parsed = urlparse(endpoint)
     url_split = parsed.scheme.split(".")
@@ -182,17 +184,23 @@ def cluster_dict(endpoint, start_time=None, end_time=None):
     if end_time is not None:
         cluster["end_time"] = end_time
 
-    rs_client = boto3.client('redshift', region_name=cluster.get("region"))
     logger = logging.getLogger("SimpleReplayLogger")
-    try:
-        response = rs_client.describe_clusters(ClusterIdentifier=cluster.get('id'))
-        cluster["num_nodes"] = (response['Clusters'][0]['NumberOfNodes'])
-        cluster["instance"] = (response['Clusters'][0]['NodeType'])
-    except Exception as e:
-        logger.warning(f"Unable to get cluster information. Please ensure IAM permissions include "
-                       f"Redshift:DescribeClusters. {e}")
+
+    if not is_serverless:
+        rs_client = boto3.client('redshift', region_name=cluster.get("region"))
+        try:
+            response = rs_client.describe_clusters(ClusterIdentifier=cluster.get('id'))
+            cluster["num_nodes"] = (response['Clusters'][0]['NumberOfNodes'])
+            cluster["instance"] = (response['Clusters'][0]['NodeType'])
+        except Exception as e:
+            logger.warning(f"Unable to get cluster information. Please ensure IAM permissions include "
+                           f"Redshift:DescribeClusters. {e}")
+            cluster["num_nodes"] = "N/A"
+            cluster["instance"] = "N/A"
+    else:
         cluster["num_nodes"] = "N/A"
-        cluster["instance"] = "N/A"
+        cluster["instance"] = "Serverless"
+
     return cluster
 
 
@@ -215,3 +223,53 @@ def bucket_dict(bucket_url):
     return {'url': bucket_url,
             'bucket_name': bucket,
             'prefix': path}
+
+
+def get_secret(secret_name, region_name):
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+
+    get_secret_value_response = None
+
+    try:
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+        # secret_string = json.loads(get_secret_value_response['SecretString'])
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'DecryptionFailureException':
+            # Secrets Manager can't decrypt the protected secret text using the provided KMS key.
+            # Deal with the exception here, and/or rethrow at your discretion.
+            raise e
+        elif e.response['Error']['Code'] == 'InternalServiceErrorException':
+            # An error occurred on the server side.
+            # Deal with the exception here, and/or rethrow at your discretion.
+            raise e
+        elif e.response['Error']['Code'] == 'InvalidParameterException':
+            # You provided an invalid value for a parameter.
+            # Deal with the exception here, and/or rethrow at your discretion.
+            raise e
+        elif e.response['Error']['Code'] == 'InvalidRequestException':
+            # You provided a parameter value that is not valid for the current state of the resource.
+            # Deal with the exception here, and/or rethrow at your discretion.
+            raise e
+        elif e.response['Error']['Code'] == 'ResourceNotFoundException':
+            # We can't find the resource that you asked for.
+            # Deal with the exception here, and/or rethrow at your discretion.
+            raise e
+        elif e.response['Error']['Code'] == 'AccessDeniedException':
+            # Use is not authorized to perform secretsmanager:GetSecretValue on requested resource
+            raise e
+
+    # Decrypts secret using the associated KMS key.
+    # Depending on whether the secret is a string or binary, one of these fields will be populated.
+    if 'SecretString' in get_secret_value_response:
+        secret = json.loads(get_secret_value_response['SecretString'])
+    else:
+        secret = json.loads(base64.b64decode(get_secret_value_response['SecretBinary']))
+
+    return secret
