@@ -7,7 +7,6 @@ import json
 import logging
 import multiprocessing
 import os
-import os
 import random
 import re
 import signal
@@ -17,7 +16,6 @@ import sys
 import threading
 import time
 import traceback
-import yaml
 import yaml
 
 from boto3 import client, resource
@@ -29,7 +27,8 @@ from pathlib import Path
 from queue import Empty, Full
 from urllib.parse import urlparse
 
-from util import init_logging, set_log_level, prepend_ids_to_logs, add_logfile, log_version, db_connect, cluster_dict, load_config, load_file, retrieve_compressed_json
+from util import init_logging, set_log_level, prepend_ids_to_logs, add_logfile, log_version, db_connect, cluster_dict, \
+    load_config, load_file, retrieve_compressed_json, get_secret
 from replay_analysis import run_replay_analysis
 
 import redshift_connector
@@ -52,6 +51,9 @@ g_config = {}
 
 g_replay_timestamp = None
 
+g_is_serverless = False
+g_serverless_cluster_endpoint_pattern = r"(.+)\.(.+)\.(.+).redshift-serverless(-dev)?\.amazonaws\.com:[0-9]{4}\/(.)+"
+g_cluster_endpoint_pattern = r"(.+)\.(.+)\.(.+).redshift(-serverless)?\.amazonaws\.com:[0-9]{4}\/(.)+"
 
 class ConnectionLog:
     def __init__(
@@ -367,7 +369,7 @@ class ConnectionThread(threading.Thread):
                 substatement_txt = ""
                 if len(split_statements) > 1:
                     substatement_txt = f", Multistatement: {s_idx+1}/{len(split_statements)}"
-    
+
                 exec_start = datetime.datetime.now(tz=datetime.timezone.utc)
                 exec_end = None
                 try:
@@ -382,7 +384,7 @@ class ConnectionThread(threading.Thread):
                         status = 'Not '
                     exec_end = datetime.datetime.now(tz=datetime.timezone.utc)
                     exec_sec = (exec_end - exec_start).total_seconds()
-    
+
                     logger.debug(
                         f"{status}Replayed DB={transaction.database_name}, USER={transaction.username}, PID={transaction.pid}, XID:{transaction.xid}, Query: {idx+1}/{len(transaction.queries)}{substatement_txt} ({exec_sec} sec)"
                     )
@@ -400,7 +402,7 @@ class ConnectionThread(threading.Thread):
                 self.thread_stats['query_success'] += 1
             else:
                 self.thread_stats['query_error'] += 1
-    
+
             if query.time_interval > 0.0:
                 logger.debug(f"Waiting {query.time_interval} sec between queries")
                 time.sleep(query.time_interval)
@@ -648,7 +650,7 @@ def parse_transaction(transaction_dict):
         if q['end_time'] is not None:
             end_time = dateutil.parser.isoparse(q['end_time'])
         queries.append(Query(start_time, end_time, q['text']))
-    
+
     queries.sort(key=lambda query: query.start_time)
     transaction_key = get_connection_key(transaction_dict['db'], transaction_dict['user'], transaction_dict['pid'])
     return Transaction(transaction_dict['time_interval'], transaction_dict['db'], transaction_dict['user'],
@@ -1322,9 +1324,15 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
 
     cluster_endpoint_split = cluster_endpoint.split(".")
     cluster_id = cluster_endpoint_split[0]
-    cluster_host = cluster_endpoint.split(":")[0]
+
+    # Keeping NLB just for Serverless for now
+    if g_config['nlb_nat_dns'] != None and g_is_serverless:
+        cluster_host = g_config['nlb_nat_dns']
+    else:
+        cluster_host = cluster_endpoint.split(":")[0]
+
     cluster_port = cluster_endpoint_split[5].split("/")[0][4:]
-    cluster_database = database or cluster_endpoint_split[5].split("/")[1]
+    cluster_database = cluster_endpoint_split[5].split("/")[1]
 
     additional_args = {}
     if os.environ.get('ENDPOINT_URL'):
@@ -1335,33 +1343,45 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
                            'verify': False}
 
     response = None
-    rs_client = client("redshift", region_name=g_config.get("target_cluster_region", None), **additional_args)
-    for attempt in range(1, max_attempts + 1):
-        try:
-            response = rs_client.get_cluster_credentials(
-                DbUser=username, ClusterIdentifier=cluster_id, AutoCreate=False, DurationSeconds=credentials_timeout_sec
-            )
-        except NoCredentialsError:
-            raise CredentialsException("No credentials found")
-        except rs_client.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == 'ExpiredToken':
-                logger.error(f"Error retrieving credentials for {cluster_id}: IAM credentials have expired.")
-                exit(-1)
-            else:
-                logger.error(f"Got exception retrieving credentials ({e.response['Error']['Code']})")
-                raise e
-        except rs_client.exceptions.ClusterNotFoundFault:
-            logger.error(f"Cluster {cluster_id} not found. Please confirm cluster endpoint, account, and region.")
-            exit(-1)
+    secret_keys = ['admin_username', 'admin_password']
 
-        if response is None or response.get('DbPassword') is None:
-            logger.warning(f"Failed to retrieve credentials for user {username} (attempt {attempt}/{max_attempts})")
-            logger.debug(response)
-            response = None
-            if attempt < max_attempts:
-                time.sleep(retry_delay_sec)
+    if g_is_serverless:
+        logger.info(f"Fetching secrets from: {g_config['secret_name']}")
+        secret_name = get_secret(g_config["secret_name"], g_config["target_cluster_region"])
+        if len(set(secret_keys) - set(secret_name.keys())) == 0:
+            response = {'DbUser': secret_name["admin_username"], 'DbPassword': secret_name["admin_password"]}
         else:
-            break
+            logger.error(f"Required secrets not found: {secret_keys}")
+            exit(-1)
+    else:
+        rs_client = client("redshift", region_name=g_config.get("target_cluster_region", None), **additional_args)
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = rs_client.get_cluster_credentials(
+                    DbUser=username, ClusterIdentifier=cluster_id, AutoCreate=False,
+                    DurationSeconds=credentials_timeout_sec
+                )
+            except NoCredentialsError:
+                raise CredentialsException("No credentials found")
+            except rs_client.exceptions.ClientError as e:
+                if e.response['Error']['Code'] == 'ExpiredToken':
+                    logger.error(f"Error retrieving credentials for {cluster_id}: IAM credentials have expired.")
+                    exit(-1)
+                else:
+                    logger.error(f"Got exception retrieving credentials ({e.response['Error']['Code']})")
+                    raise e
+            except rs_client.exceptions.ClusterNotFoundFault:
+                logger.error(f"Cluster {cluster_id} not found. Please confirm cluster endpoint, account, and region.")
+                exit(-1)
+
+            if response is None or response.get('DbPassword') is None:
+                logger.warning(f"Failed to retrieve credentials for user {username} (attempt {attempt}/{max_attempts})")
+                logger.debug(response)
+                response = None
+                if attempt < max_attempts:
+                    time.sleep(retry_delay_sec)
+            else:
+                break
 
     if response is None:
         msg = f"Failed to retrieve credentials for {username}"
@@ -1372,7 +1392,7 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
             odbc_driver,
             cluster_host,
             cluster_database,
-            response["DbUser"].split(":")[1],
+            response["DbUser"].split(":")[1] if ":" in response["DbUser"] else response["DbUser"],
             response["DbPassword"],
             cluster_port,
         )
@@ -1454,12 +1474,15 @@ def unload_system_table(
 
 
 def validate_config(config):
-    if (not len(config["target_cluster_endpoint"].split(":")) == 2
-            or not len(config["target_cluster_endpoint"].split("/")) == 2
-    ):
+    if not bool(re.fullmatch(g_cluster_endpoint_pattern, config["target_cluster_endpoint"])):
         logger.error(
             'Config file value for "target_cluster_endpoint" is not a valid endpoint. Endpoints must be in the format '
             'of <cluster-hostname>:<port>/<database-name>.'
+        )
+        exit(-1)
+    if not config["target_cluster_region"]:
+        logger.error(
+            'Config file value for "target_cluster_region" is required.'
         )
         exit(-1)
     if not config["odbc_driver"]:
@@ -1564,6 +1587,16 @@ def validate_config(config):
             'Config file missing value for "workload_location". Please provide a value for "workload_location".'
         )
         exit(-1)
+    if not config["nlb_nat_dns"]:
+        config["nlb_nat_dns"] = None
+        logger.debug(
+            'No NLB / NAT endpoint specified. Replay will use target_cluster_endpoint to connect.'
+        )
+    if bool(re.fullmatch(g_serverless_cluster_endpoint_pattern, g_config['target_cluster_endpoint'])) and not config["secret_name"]:
+        logger.error(
+            'SECRET_NAME property not specified, it is required for Replay on Serverless. Please setup Secret using AWS Secrets Manager as specified in README.'
+        )
+        exit(-1)
 
     config['filters'] = validate_and_normalize_filters(ConnectionLog, config.get('filters', {}))
 
@@ -1582,12 +1615,12 @@ def print_stats(stats):
     logger.debug(f"Max connection offset: {max_connection_diff:+.3f} sec")
 
 
-
 def main():
     global logger
     logger = init_logging(logging.INFO)
 
     global g_config
+    global g_is_serverless
 
     parser = argparse.ArgumentParser()
     parser.add_argument("config_file", type=str, help="Location of replay config file.",)
@@ -1612,7 +1645,15 @@ def main():
 
     # print the version
     log_version()
-    cluster = cluster_dict(g_config["target_cluster_endpoint"])
+
+    # populate the global is_serverless variable
+    if bool(re.fullmatch(g_serverless_cluster_endpoint_pattern, g_config['target_cluster_endpoint'])):
+        logger.info(f"Replaying on Redshift Serverless Cluster {g_config['target_cluster_endpoint']}")
+        g_is_serverless = True
+    else:
+        g_is_serverless = False
+
+    cluster = cluster_dict(g_config["target_cluster_endpoint"], g_is_serverless)
     # generate replay id/hash
     global g_replay_timestamp
     g_replay_timestamp = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -1825,6 +1866,9 @@ def main():
                                 iam_role=g_config["analysis_iam_role"],
                                 user=g_config["master_username"],
                                 tag=g_config["tag"],
+                                is_serverless=g_is_serverless,
+                                secret_name=g_config["secret_name"],
+                                nlb_nat_dns=g_config["nlb_nat_dns"],
                                 complete=complete,
                                 summary=replay_summary)
         except Exception as e:

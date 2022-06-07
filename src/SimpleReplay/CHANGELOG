@@ -1,3 +1,7 @@
+## SimpleReplay 2.2.2
+- AWS Secrets Manager integration for admin credentials 
+- Replay workloads on Redshift Serverless targets
+
 ## SimpleReplay 2.2.1
 - Ability to replay queries with bind variables
 - Remove CFT
