@@ -596,27 +596,27 @@ copy web_returns from 's3://redshift-downloads/TPC-DS/2.13/1TB/web_returns/' iam
 copy web_sales from 's3://redshift-downloads/TPC-DS/2.13/1TB/web_sales/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
 copy web_site from 's3://redshift-downloads/TPC-DS/2.13/1TB/web_site/' iam_role default gzip delimiter '|' EMPTYASNULL region 'us-east-1';
  
-select count(*) from call_center;  -- 48
-select count(*) from catalog_page;  -- 36000
-select count(*) from catalog_returns;  -- 432018033
-select count(*) from catalog_sales;  -- 4320078880
-select count(*) from customer;  -- 30000000
-select count(*) from customer_address;  -- 15000000
+select count(*) from call_center;  -- 42
+select count(*) from catalog_page;  -- 30000
+select count(*) from catalog_returns;  -- 143996756
+select count(*) from catalog_sales;  -- 1439980416
+select count(*) from customer;  -- 12000000
+select count(*) from customer_address;  -- 6000000
 select count(*) from customer_demographics;  -- 1920800
 select count(*) from date_dim;  -- 73049
 select count(*) from household_demographics;  -- 7200
 select count(*) from income_band;  -- 20
-select count(*) from inventory;  -- 1033560000
-select count(*) from item;  -- 360000
-select count(*) from promotion;  -- 1800
-select count(*) from reason;  -- 67
+select count(*) from inventory;  -- 783000000
+select count(*) from item;  -- 300000
+select count(*) from promotion;  -- 1500
+select count(*) from reason;  -- 65
 select count(*) from ship_mode;  -- 20
-select count(*) from store;  -- 1350
-select count(*) from store_returns;  -- 863989652
-select count(*) from store_sales;  -- 8639936081
+select count(*) from store;  -- 1002
+select count(*) from store_returns;  -- 287999764
+select count(*) from store_sales;  -- 2879987999
 select count(*) from time_dim;  -- 86400
-select count(*) from warehouse;  -- 22
-select count(*) from web_page;  -- 3600
-select count(*) from web_returns;  -- 216003761
-select count(*) from web_sales;  -- 2159968881
-select count(*) from web_site;  -- 66
+select count(*) from warehouse;  -- 20
+select count(*) from web_page;  -- 3000
+select count(*) from web_returns;  -- 71997522
+select count(*) from web_sales;  -- 720000376
+select count(*) from web_site;  -- 54
