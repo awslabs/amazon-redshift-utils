@@ -15,7 +15,7 @@ source $VIRTUALENV/bin/activate
 
 set -euf -o pipefail
 
-# add required dependencies
+# Install required python libraries
 pip install -r $SCRIPT_DIR/requirements.txt -t $TMP_DIR/lib
 
 if [ -f $SCRIPT_DIR/dist/$ARCHIVE ]; then
@@ -28,54 +28,64 @@ if [ ! -d $SCRIPT_DIR/dist ]; then
 fi
 
 
-
 # import the column encoding utility
-if [ ! -d lib/ColumnEncodingUtility ]; then
-        mkdir lib/ColumnEncodingUtility
+if [ ! -d $TMP_DIR/lib/ColumnEncodingUtility ]; then
+        mkdir $TMP_DIR/lib/ColumnEncodingUtility
 fi
 
-cp ../ColumnEncodingUtility/analyze-schema-compression.py lib/ColumnEncodingUtility/analyze_schema_compression.py
+cp ../ColumnEncodingUtility/analyze-schema-compression.py $TMP_DIR/lib/ColumnEncodingUtility/analyze_schema_compression.py
 echo "Imported Column Encoding Utility"
 
 # import the Analyze/Vacuum utility
-if [ ! -d lib/AnalyzeVacuumUtility ]; then
-        mkdir lib/AnalyzeVacuumUtility
+if [ ! -d $TMP_DIR/lib/AnalyzeVacuumUtility ]; then
+        mkdir $TMP_DIR/lib/AnalyzeVacuumUtility
 fi
 
-cp ../AnalyzeVacuumUtility/lib/analyze_vacuum.py lib/AnalyzeVacuumUtility/analyze_vacuum.py
+cp ../AnalyzeVacuumUtility/lib/analyze_vacuum.py $TMP_DIR/lib/AnalyzeVacuumUtility/analyze_vacuum.py
 echo "Imported Analyze/Vacuum Utility"
 
 # import the SystemTablePersistence utility
-if [ ! -d lib/SystemTablePersistence ]; then
-        mkdir lib/SystemTablePersistence
+if [ ! -d $TMP_DIR/lib/SystemTablePersistence ]; then
+        mkdir $TMP_DIR/lib/SystemTablePersistence
 fi
 
-cp ../SystemTablePersistence/snapshot_system_stats.py lib/SystemTablePersistence/snapshot_system_stats.py
-cp -R ../SystemTablePersistence/lib lib/SystemTablePersistence
+cp ../SystemTablePersistence/snapshot_system_stats.py $TMP_DIR/lib/SystemTablePersistence/snapshot_system_stats.py
+cp -R ../SystemTablePersistence/lib $TMP_DIR/lib/SystemTablePersistence
 echo "Imported System Table Persistence Utility"
 
-if [ ! -d lib/WorkloadManagementScheduler ]; then
-        mkdir lib/WorkloadManagementScheduler
+if [ ! -d $TMP_DIR/lib/WorkloadManagementScheduler ]; then
+        mkdir $TMP_DIR/lib/WorkloadManagementScheduler
 fi
 
-cp ../WorkloadManagementScheduler/wlm_scheduler.py lib/WorkloadManagementScheduler/wlm_scheduler.py
+cp ../WorkloadManagementScheduler/wlm_scheduler.py $TMP_DIR/lib/WorkloadManagementScheduler/wlm_scheduler.py
 echo "Imported Workload Management"
 
-if [ ! -d lib/amazon-redshift-monitoring ]; then
-    cd lib && git clone https://github.com/awslabs/amazon-redshift-monitoring
+if [ ! -d $TMP_DIR/lib/amazon-redshift-monitoring ]; then
+    cd $TMP_DIR/lib && git clone https://github.com/awslabs/amazon-redshift-monitoring
 else
-    cd lib/amazon-redshift-monitoring && git pull
+    cd $TMP_DIR/lib/amazon-redshift-monitoring && git pull
 fi
 echo "Imported Redshift Advance Monitoring"
 
-cd -
+# Return to the starting directory
+cd $SCRIPT_DIR
 
-# build the combined lambda package
+# Build the combined lambda package in the virtualenv
+# Copy the python files from RedshiftAutomation to the temp directory
 
-echo "Building package $SCRIPT_DIR/$ARCHIVE"
+find $SCRIPT_DIR -maxdepth 1 -name \*.py -exec cp {} $TMP_DIR \;
 
-pushd $TMP_DIR
-zip -r $SCRIPT_DIR/$ARCHIVE lib/
-zip -r $SCRIPT_DIR/$ARCHIVE *.py
-popd
+# Include the common files from the root directory
+find $SCRIPT_DIR/../ -maxdepth 1 -name \*.py -exec cp {} $TMP_DIR \;
+
+# Zip up the python scripts and libraries for the package
+cd $TMP_DIR
+
+# Create the zip file with the lib packages
+zip -r $SCRIPT_DIR/$ARCHIVE ./lib
+
+# Add the python files
+find $TMP_DIR -maxdepth 1 -name \*.py -exec zip -uj $SCRIPT_DIR/$ARCHIVE {} \;
+
+echo "Built Lambda package $SCRIPT_DIR/$ARCHIVE"
 
