@@ -184,7 +184,7 @@ If you do need to rebuild, this module imports the required utilities from other
 
 To build this module after customising your config file or the code, just run:
 
-```build_venv.sh```
+```./build_venv.sh```
 
 This will result in zipfile ```lambda-redshift-util-runner-$version.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python(2.7|3.5)', and the timeout to a value long enough to accomodate running against all your tables.
 
