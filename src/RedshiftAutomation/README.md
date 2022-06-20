@@ -186,7 +186,7 @@ To build this module after customising your config file or the code, just run:
 
 ```./build_venv.sh```
 
-This will result in zipfile ```lambda-redshift-util-runner-$version.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python(3.7)' or later, and the timeout to a value long enough to accomodate running against all your tables.
+This will result in zipfile ```lambda-redshift-util-runner-$version.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python(3.9)' or later, and the timeout to a value long enough to accomodate running against all your tables.
 
 Also, when you include a config.json, this function connects to only one Redshift cluster. If you do this, we encourate you to use a Lambda function name that will be easy to understand which instance you have pointed to. For instance, you might name it ```RedshiftUtilitiesMyClusterMyUser```.
 
