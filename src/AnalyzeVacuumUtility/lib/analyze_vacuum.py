@@ -9,8 +9,8 @@ import traceback
 import socket
 import boto3
 import datetime
-import pg8000
 import pgpasslib
+import redshift_connector
 
 try:
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -49,7 +49,7 @@ def execute_query(conn, query):
 
         if debug:
             comment('Query Execution returned %s Results' % (len(results)))
-    except pg8000.ProgrammingError as e:
+    except Exception as e:
         if "no result set" in str(e):
             return None
         else:
@@ -96,7 +96,7 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
         comment('Connect %s:%s:%s:%s' % (db_host, db_port, db, db_user))
 
     try:
-        conn = pg8000.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd,
+        conn = redshift_connector.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd,
                               ssl=ssl, timeout=None)
         conn._usock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         conn.autocommit = True

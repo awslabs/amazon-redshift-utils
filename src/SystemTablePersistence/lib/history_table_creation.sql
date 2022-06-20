@@ -1,6 +1,12 @@
 CREATE SCHEMA IF NOT EXISTS history;
 
-CREATE TABLE IF NOT EXISTS history.hist_stl_load_errors (LIKE STL_LOAD_ERRORS);
+--# Create a temp table first
+DROP TABLE IF EXISTS history.hist_stl_load_errors_temp;
+CREATE TABLE history.hist_stl_load_errors_temp AS (Select * From STL_LOAD_ERRORS Limit 0);
+
+--# Create main history table only if not already existing
+CREATE TABLE IF NOT EXISTS history.hist_stl_load_errors (LIKE history.hist_stl_load_errors_temp);
+DROP TABLE IF EXISTS history.hist_stl_load_errors_temp;
 
 CREATE TABLE IF NOT EXISTS history.hist_stl_query (
   "userid" INTEGER NOT NULL  ENCODE lzo,
@@ -13,10 +19,16 @@ CREATE TABLE IF NOT EXISTS history.hist_stl_query (
   "starttime" TIMESTAMP WITHOUT TIME ZONE NOT NULL  ENCODE lzo,
   "endtime" TIMESTAMP WITHOUT TIME ZONE NOT NULL  ENCODE lzo,
   "aborted" INTEGER NOT NULL  ENCODE lzo,
-  "insert_pristine" INTEGER NOT NULL  ENCODE lzo
+  "insert_pristine" INTEGER NOT NULL  ENCODE lzo,
+  "concurrency_scaling_status" INTEGER NOT NULL  ENCODE lzo
 );
 
-CREATE TABLE IF NOT EXISTS history.hist_stl_wlm_query (LIKE stl_wlm_query);
+--# Create a temp table first
+DROP TABLE IF EXISTS history.hist_stl_wlm_query_temp;
+CREATE TABLE history.hist_stl_wlm_query_temp AS (Select * From stl_wlm_query Limit 0);
+--# Create main history table only if not already existing
+CREATE TABLE IF NOT EXISTS history.hist_stl_wlm_query (LIKE history.hist_stl_wlm_query_temp);
+DROP TABLE IF EXISTS history.hist_stl_wlm_query_temp;
 
 CREATE TABLE IF NOT EXISTS history.hist_stl_explain
 (
@@ -48,6 +60,8 @@ CREATE TABLE IF NOT EXISTS history.hist_svl_query_summary
     is_delayed_scan   CHARACTER(1) ENCODE zstd,
     rows_pre_filter   BIGINT ENCODE zstd
   );
+  
+  
 CREATE TABLE IF NOT EXISTS history.hist_svl_s3query_summary
   (
     userid                   INTEGER,
@@ -85,6 +99,7 @@ CREATE TABLE IF NOT EXISTS history.hist_svl_s3query_summary
     avg_request_parallelism  DOUBLE PRECISION
   );
 ALTER TABLE history.hist_svl_s3query_summary ADD COLUMN is_nested TEXT DEFAULT NULL;
+
 CREATE TABLE IF NOT EXISTS history.HIST_SVL_S3QUERY
   (
     userid                   INTEGER,
@@ -117,4 +132,9 @@ CREATE TABLE IF NOT EXISTS history.HIST_SVL_S3QUERY
   );
 ALTER TABLE history.hist_svl_s3query ADD COLUMN is_nested TEXT DEFAULT NULL;
 
-CREATE TABLE IF NOT EXISTS history.hist_stl_query_metrics (like stl_query_metrics);
+--# Create a temp table first
+DROP TABLE IF EXISTS history.hist_stl_query_metrics_temp;
+CREATE TABLE history.hist_stl_query_metrics_temp AS (Select * From stl_query_metrics Limit 0);
+--# Create main history table only if not already existing
+CREATE TABLE IF NOT EXISTS history.hist_stl_query_metrics (LIKE history.hist_stl_query_metrics_temp);
+DROP TABLE IF EXISTS history.hist_stl_query_metrics_temp;

@@ -40,7 +40,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: lambda_function.event_handler
-      Runtime: python2.7
+      Runtime: python3.9
       CodeUri:         
         Bucket: !Sub awslabs-code-${AWS::Region}
         Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.5.1.zip
