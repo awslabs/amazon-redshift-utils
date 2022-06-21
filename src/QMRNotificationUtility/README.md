@@ -30,7 +30,7 @@ This utility requires the following items:
 
 ### Installation from CloudFormation Template:
 
-The quickest way to get up and running with the QMRNotificationUtility is by leveraging the packaged CloudFormation template and the AWS CLI.
+The quickest way to get up and running with the QMRNotificationUtility is by leveraging the packaged CloudFormation template and the AWS CLI. Making sure AWS CLI default region is configured correctly to be matched with Redshift cluster region otherwise, use --region switch in front of aws command to set the correct region in each step going forward.
 
 #### 1. Navigate to the QMRNotificationUtility's directory within the amazon-redshift-utils project:
 
@@ -70,7 +70,7 @@ aws cloudformation create-stack \
   ParameterKey=S3Key,ParameterValue=qmr-action-notification-utility-1.5.zip \
   ParameterKey=SNSEmailParameter,ParameterValue=test@email.com \
   ParameterKey=VPC,ParameterValue=vpc-abcd1234 \
-  ParameterKey=SubnetIds,ParameterValue=subnet-abcd1234 \
+  ParameterKey=SubnetIds,ParameterValue=subnet-abcdid1\\,subnet-abcdid2 \
   ParameterKey=SecurityGroupIds,ParameterValue=sg-abcd1234 \
   ParameterKey=RedshiftMonitoringUser,ParameterValue=monitoring_user \
   ParameterKey=RedshiftClusterPort,ParameterValue=cluster_port \
@@ -100,7 +100,7 @@ KMSKEYID=`aws cloudformation describe-stack-resource --stack-name qmr-action-not
 # Insert your plaintext password into file. If using vi ensure binary mode and no automatic EOL
 vi -b -c 'set noeol' passwd.txt
 # Read plaintext password file contents into kms encrypt to generate ciphertext
-CIPHERTEXT=`aws kms encrypt --key-id $KMSKEYID --plaintext file://./passwd.txt --query 'CiphertextBlob' --output text`
+CIPHERTEXT=`aws kms encrypt --key-id $KMSKEYID --plaintext fileb://./passwd.txt --query 'CiphertextBlob' --output text`
 # Cleanup password file
 rm passwd.txt
 ```
