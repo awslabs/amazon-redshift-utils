@@ -9,7 +9,7 @@
     },
     "dependencies": {
         "async": "2.0.0-rc.5 ",
-        "moment": "2.19.3"
+        "moment": "2.29.2"
     },
     "keywords": [
         "amazon",
