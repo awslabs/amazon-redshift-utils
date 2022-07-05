@@ -1,0 +1,10 @@
+Connecting to AWS_REGION : ap-southeast-2
+-- 2022-07-05 03:41:18.968647 [14336] Connected to CloudWatch in ap-southeast-2
+-- 2022-07-05 03:41:20.167731 [14336] [14336] Running 1 out of 1 commands: set statement_timeout = '36000000'
+-- 2022-07-05 03:41:20.404880 [14336] Success.
+-- 2022-07-05 03:41:20.404924 [14336] [14336] Running 1 out of 1 commands: set application_name to 'AnalyzeVacuumUtility-v.10'
+-- 2022-07-05 03:41:20.642507 [14336] Success.
+-- 2022-07-05 03:41:20.642535 [14336] Connected to redshift-cluster-tjell.clm4iz0a3u8x.ap-southeast-2.redshift.amazonaws.com:5439:dev as admintimjell
+-- 2022-07-05 03:41:21.420522 [14336] Found 0 Tables requiring Vacuum and flagged by alert
+-- 2022-07-05 03:41:22.199106 [14336] Found 0 Tables requiring Analysis
+-- 2022-07-05 03:41:22.199144 [14336] Processing Complete
