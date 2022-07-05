@@ -42,7 +42,7 @@ import getopt
 import analyze_vacuum
 import config_constants
 
-__version__ = ".9.2.1"
+__version__ = ".10"
 
 OK = 0
 ERROR = 1

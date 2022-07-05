@@ -19,7 +19,7 @@ except:
 import redshift_utils_helper as aws_utils
 import config_constants
 
-__version__ = ".9.2.1"
+__version__ = ".10"
 
 # set default values to vacuum, analyze variables
 goback_no_of_days = -1
