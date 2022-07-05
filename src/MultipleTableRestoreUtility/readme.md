@@ -20,7 +20,20 @@ This utility enables the end user to automate the restore of multiple tables usi
 }
 ```
 
-The keys 'TableRestoreList' , 'Schemaname' and 'Tablename' must be used in order for the utility to work. The utility is compatible with python 2.7. 
+The keys 'TableRestoreList' , 'Schemaname' and 'Tablename' must be used in order for the utility to work. The utility is compatible with Python 3. 
+## Setup
+The AWS credentials can be provided with one of 3 methods:
+
+1. Shared credential file (~/.aws/credentials)
+1. AWS config file (~/.aws/config)
+1. Setting environment variables
+
+### Setting Environment Variables
+Boto3 will check these environment variables for credentials:
+
+AWS_ACCESS_KEY_ID - The access key for your AWS account.
+AWS_SECRET_ACCESS_KEY - The secret key for your AWS account.
+AWS_SESSION_TOKEN - The session key for your AWS account. This is only needed when you are using temporary credentials. The AWS_SECURITY_TOKEN environment variable can also be used, but is only supported for backwards compatibility purposes. AWS_SESSION_TOKEN is supported by multiple AWS SDKs besides python.
 
 ## Usage
 ```python multitablerestore.py --target-database-name <target database> --source-database-name <source database> --snapshot-identifier <snapshot name> --cluster-identifier <cluster name> --listfile <filename>```
