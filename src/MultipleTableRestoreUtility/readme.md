@@ -1,5 +1,5 @@
 # Multiple Table restore utility
-This utility enables the end user to automate the restore of multiple tables onto a Redshift cluster from a snapshot of that cluster. The list of tables is defined in a JSON formatted file. See the example JSON below:
+This utility enables the end user to automate the restore of multiple tables onto a Redshift cluster from a saved snapshot of that cluster. The list of tables is defined in a JSON formatted file. See the example JSON below:
 
 ```
 {
@@ -29,7 +29,7 @@ The AWS credentials can be provided with one of 3 methods:
 1. Setting environment variables
 
 ### Setting Environment Variables
-Boto3 will check these environment variables for credentials:
+The utility uses the Boto3 library which will check these environment variables for credentials:
 
 * AWS_ACCESS_KEY_ID - The access key for your AWS account.
 * AWS_SECRET_ACCESS_KEY - The secret key for your AWS account.
