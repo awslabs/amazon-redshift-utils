@@ -9,7 +9,7 @@ import traceback
 import socket
 import boto3
 import datetime
-import pgpasslib
+#import pgpasslib
 import redshift_connector
 
 try:
@@ -643,6 +643,8 @@ def run_analyze_vacuum(**kwargs):
     else:
         aws_region = 'us-east-1'
 
+    print("Connecting to AWS_REGION : %s" % aws_region)
+
     cw = None
     if config_constants.SUPPRESS_CLOUDWATCH not in kwargs or not kwargs[config_constants.SUPPRESS_CLOUDWATCH]:
         try:
@@ -672,11 +674,11 @@ def run_analyze_vacuum(**kwargs):
 
     # get the password using .pgpass, environment variables, and then fall back to config
     db_pwd = None
-    try:
-        db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST], kwargs[config_constants.DB_PORT],
-                                   kwargs[config_constants.DB_NAME], kwargs[config_constants.DB_USER])
-    except pgpasslib.FileNotFound as e:
-        pass
+    #try:
+    #    db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST], kwargs[config_constants.DB_PORT],
+    #                               kwargs[config_constants.DB_NAME], kwargs[config_constants.DB_USER])
+    #except pgpasslib.FileNotFound as e:
+    #    pass
 
     if db_pwd is None:
         db_pwd = kwargs[config_constants.DB_PASSWORD]

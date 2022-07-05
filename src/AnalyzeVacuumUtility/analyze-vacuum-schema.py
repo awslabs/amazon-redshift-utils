@@ -88,8 +88,6 @@ parser.add_argument("--max-table-size-mb", dest="max_table_size_mb", type=int,
 parser.add_argument("--output-file", dest="output_file", help="The full path to the output file to be generated")
 parser.add_argument("--predicate-cols", dest="predicate_cols", help="Analyze predicate columns only")
 parser.add_argument("--query-group", dest="query_group", help="Set the query_group for all queries")
-parser.add_argument("--require-ssl", dest="require_ssl", default=False,
-                    help="Does the connection require SSL? (True | False")
 parser.add_argument("--schema-name", dest="schema_name",
                     help="The Schema to be Analyzed or Vacuumed (REGEX: Default = public")
 parser.add_argument("--slot-count", dest="slot_count", help="Modify the wlm_query_slot_count : Default = 1")
@@ -104,13 +102,9 @@ for k, v in vars(full_args).items():
         parse_args[k] = v
 
 
-def main(argv):
-    # get environmental args
-    args = {config_constants.DB_NAME: os.environ.get('PGDATABASE', None),
-            config_constants.DB_USER: os.environ.get('PGUSER', None),
-            config_constants.DB_PASSWORD: os.environ.get('PGPASSWORD', None),
-            config_constants.DB_HOST: os.environ.get('PGHOST', None),
-            config_constants.DB_PORT: os.environ.get('PGPORT', 5439)}
+#def main(argv):
+def main():
+    args = {}
 
     # add argparse args
     args.update(parse_args)
@@ -128,4 +122,5 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    #main(sys.argv)
+    main()
