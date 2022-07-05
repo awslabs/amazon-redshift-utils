@@ -9,7 +9,6 @@ import traceback
 import socket
 import boto3
 import datetime
-#import pgpasslib
 import redshift_connector
 
 try:
