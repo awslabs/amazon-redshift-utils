@@ -38,7 +38,7 @@ NO_WORK = 3
 TERMINATED_BY_USER = 4
 NO_CONNECTION = 5
 
-debug = True
+debug = False
 
 
 def execute_query(conn, query):
