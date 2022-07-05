@@ -102,7 +102,6 @@ for k, v in vars(full_args).items():
         parse_args[k] = v
 
 
-#def main(argv):
 def main():
     args = {}
 
@@ -122,5 +121,4 @@ def main():
 
 
 if __name__ == "__main__":
-    #main(sys.argv)
     main()
