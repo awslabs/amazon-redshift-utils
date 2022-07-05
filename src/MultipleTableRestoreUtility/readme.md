@@ -1,5 +1,5 @@
 # Multiple Table restore utility
-This utility enables the end user to automate the restore of multiple tables using a list of tables in json format. In order to restore several tables you would need to create a list of tables to restore as a json list. See the example json below:
+This utility enables the end user to automate the restore of multiple tables onto a Redshift cluster from a snapshot of that cluster. The list of tables is defined in a JSON formatted file. See the example JSON below:
 
 ```
 {
@@ -36,11 +36,12 @@ Boto3 will check these environment variables for credentials:
 * AWS_SESSION_TOKEN - The session key for your AWS account. This is only needed when you are using temporary credentials.
 
 ## Usage
-```python multitablerestore.py --target-database-name <target database> --source-database-name <source database> --snapshot-identifier <snapshot name> --cluster-identifier <cluster name> --listfile <filename>```
+```python3 multitablerestore.py --target-database-name <target database> --source-database-name <source database> --snapshot-identifier <snapshot name> --cluster-identifier <cluster name> --listfile <filename>```
 
-The source and target databases can be the same however, the table must not exist in the target 
+Note: The source and target databases can be the same.
 
 ## Limitations
-The table cannot be restored to a different schema.
-The table can only be restored to the same cluster the snapshot was taken from.
-Script does not currently check if cluster has enough space, make sure enough space is available when restoring several tables.
+1. The table cannot already exist on the target database
+1. The table cannot be restored to a different schema
+1. The table can only be restored to the same cluster the snapshot was taken from
+1. Script does not currently check if cluster has enough space, make sure enough space is available when restoring several tables
