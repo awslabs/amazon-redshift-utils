@@ -13,7 +13,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "utils"))
 logger.debug("Appeneded 'lib' and 'utils' to the list sys path")
 
-#import pg8000
 import redshift_connector
 import traceback
 import argparse
@@ -25,7 +24,6 @@ ssl = True
 ##################
 
 __version__ = "1.0"
-#pg8000.paramstyle = "qmark"
 
 
 def update_user_last_login(cluster=None, dbPort=5439, dbName=None, dbUser=None):
