@@ -13,7 +13,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "utils"))
 logger.debug("Appeneded 'lib' and 'utils' to the list sys path")
 
-import pg8000
+#import pg8000
+import redshift_connector
 import traceback
 import argparse
 import queries
@@ -24,7 +25,7 @@ ssl = True
 ##################
 
 __version__ = "1.0"
-pg8000.paramstyle = "qmark"
+#pg8000.paramstyle = "qmark"
 
 
 def update_user_last_login(cluster=None, dbPort=5439, dbName=None, dbUser=None):
@@ -37,7 +38,7 @@ def update_user_last_login(cluster=None, dbPort=5439, dbName=None, dbUser=None):
 
     # Connect to the cluster using the above credentials. 
     try:
-        conn = pg8000.connect(database=dbName, user=user, password=pwd, host=cluster, port=int(dbPort), ssl=ssl)
+        conn = redshift_connector.connect(database=dbName, user=user, password=pwd, host=cluster, port=int(dbPort), ssl=ssl)
         logger.debug(("Successfully connected to the cluster %s:%s. DatabaseName: %s and DB User: %s "  %  (cluster, dbPort,dbName, dbUser) ) )
     except:
         logger.error('Redshift Connection Failed: exception %s' % sys.exc_info()[1])
