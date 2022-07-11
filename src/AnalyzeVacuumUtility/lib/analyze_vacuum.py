@@ -9,7 +9,6 @@ import traceback
 import socket
 import boto3
 import datetime
-import pgpasslib
 import redshift_connector
 
 try:
@@ -20,7 +19,7 @@ except:
 import redshift_utils_helper as aws_utils
 import config_constants
 
-__version__ = ".9.2.1"
+__version__ = ".10"
 
 # set default values to vacuum, analyze variables
 goback_no_of_days = -1
@@ -88,7 +87,7 @@ def print_statements(statements):
                 print(s)
 
 
-def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_group=None, query_slot_count=1,
+def get_rs_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_group=None, query_slot_count=1,
                 ssl=True, **kwargs):
     conn = None
 
@@ -214,7 +213,10 @@ def run_vacuum(conn,
                                          "table" as table_name,
                                          "schema" as schema_name
                                   FROM svv_table_info
-                                  WHERE (unsorted > %s or stats_off > %s)
+                                  WHERE 
+                                    ( NVL(unsorted,0) > %s 
+                                      OR stats_off > %s
+                                    )
                                     AND   size < %s
                                     AND  "schema" ~ '%s'
                                     AND  "table" = '%s';
@@ -233,7 +235,9 @@ def run_vacuum(conn,
                                          "table" as table_name,
                                          "schema" as schema_name
                                   FROM svv_table_info
-                                  WHERE (unsorted > %s or stats_off > %s)
+                                  WHERE 
+                                    (NVL(unsorted) > %s
+                                     OR stats_off > %s)
                                     AND   size < %s
                                     AND  "schema" ~ '%s'
                                     AND  "table" NOT IN (%s);
@@ -279,7 +283,7 @@ def run_vacuum(conn,
                   JOIN svv_table_info info_tbl
                     ON info_tbl.schema = feedback_tbl.schema_name
                    AND info_tbl.table = feedback_tbl.table_name
-                WHERE (info_tbl.unsorted > %s OR info_tbl.stats_off > %s)
+                WHERE (NVL(info_tbl.unsorted) > %s OR info_tbl.stats_off > %s)
                 AND   info_tbl.size < %s
                 AND   TRIM(info_tbl.schema) ~ '%s'
                 ORDER BY info_tbl.size,
@@ -324,12 +328,12 @@ def run_vacuum(conn,
                                                 AND
                                                  (
                                                 --If the size of the table is less than the max_table_size_mb then , run vacuum based on condition: >min_unsorted_pct
-                                                    ((size < %s) AND (unsorted > %s or stats_off > %s))
+                                                    ((size < %s) AND (NVL(unsorted,0) > %s or stats_off > %s))
                                                     OR
                                                 --If the size of the table is greater than the max_table_size_mb then , run vacuum based on condition:
                                                 -- >min_unsorted_pct AND < max_unsorted_pct
                                                 --This is to avoid big table with large unsorted_pct
-                                                     ((size > %s) AND (unsorted > %s AND unsorted < %s ))
+                                                     ((size > %s) AND (NVL(unsorted) > %s AND unsorted < %s ))
                                                  )
                                         ORDER BY "size" ASC ,skew_rows ASC;
                                         ''' % (vacuum_parameter,
@@ -638,6 +642,8 @@ def run_analyze_vacuum(**kwargs):
     else:
         aws_region = 'us-east-1'
 
+    print("Connecting to AWS_REGION : %s" % aws_region)
+
     cw = None
     if config_constants.SUPPRESS_CLOUDWATCH not in kwargs or not kwargs[config_constants.SUPPRESS_CLOUDWATCH]:
         try:
@@ -665,13 +671,7 @@ def run_analyze_vacuum(**kwargs):
         comment("Supplied Args:")
         print(kwargs)
 
-    # get the password using .pgpass, environment variables, and then fall back to config
     db_pwd = None
-    try:
-        db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST], kwargs[config_constants.DB_PORT],
-                                   kwargs[config_constants.DB_NAME], kwargs[config_constants.DB_USER])
-    except pgpasslib.FileNotFound as e:
-        pass
 
     if db_pwd is None:
         db_pwd = kwargs[config_constants.DB_PASSWORD]
@@ -680,7 +680,7 @@ def run_analyze_vacuum(**kwargs):
         kwargs[config_constants.SCHEMA_NAME] = 'public'
 
     # get a connection for the controlling processes
-    master_conn = get_pg_conn(kwargs[config_constants.DB_HOST],
+    master_conn = get_rs_conn(kwargs[config_constants.DB_HOST],
                               kwargs[config_constants.DB_NAME],
                               kwargs[config_constants.DB_USER],
                               db_pwd,

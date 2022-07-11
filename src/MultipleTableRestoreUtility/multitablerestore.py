@@ -70,7 +70,7 @@ class RsRestore:
             print("[%s] STATUS: %s " % (datetime_str, self.restorestatus('Status')))
         else:
             print("[%s] DETAIL: Table %s.%s restored to database %s. Total size restored is %sMB." \
-             % (datetime_str, self.restorestatus('TargetSchemaName'), self.restorestatus('NewTableName'),
+                  % (datetime_str, self.restorestatus('TargetSchemaName'), self.restorestatus('NewTableName'),
                      self.restorestatus('TargetDatabaseName'), self.restorestatus('TotalDataInMegaBytes')))
 
 
@@ -91,7 +91,7 @@ def tablerestore(tgtdbname, srcdbname, snapshotid, clusterid, filename):
             #  Check json for valid key
             if 'TableRestoreList' not in datac:
                 print('ERROR: \'%s\' key in %s list is an invalid key. Valid key is \'TableRestoreList\'.' \
-                 % (datac.keys()[0], filename))
+                      % (datac.keys()[0], filename))
                 exit()
     #  Check restore list file exists
     except IOError:
