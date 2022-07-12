@@ -7,7 +7,10 @@ import logging
 from global_config import config_parameters
 from util.resources import Resource
 from util.s3_utils import S3Helper
+from util.redshift_cluster import RedshiftCluster
 
+logger = logging.getLogger('UnloadCopy')
+logger.debug('Starting util')
 
 class TaskManager(object):
     def __init__(self):
@@ -54,30 +57,30 @@ class TaskManager(object):
                         task.execute()
                         self.mark_task_as_succeeded(task)
                     except Exception as e:
-                        logging.warning(e)
+                        logger.warning(e)
                         self.mark_task_as_failed(task)
                         if config_parameters['failOnError']:
-                            logging.fatal('Task {t} fails and failOnError is True.'.format(t=task))
+                            logger.fatal('Task {t} fails and failOnError is True.'.format(t=task))
                             sys.exit(2)
                 else:
-                    logging.debug('Task {t} has {n} unmet dependencies.'.format(
+                    logger.debug('Task {t} has {n} unmet dependencies.'.format(
                         t=self.tasks[task_id],
                         n=len(self.tasks[task_id].dependencies)
                     ))
                     for dependency in self.tasks[task_id].dependencies:
-                        logging.debug('\t{d}'.format(d=dependency))
+                        logger.debug('\t{d}'.format(d=dependency))
             time.sleep(1)
 
     def remove_fulfilled_dependencies(self, task_id):
         for dependency in self.tasks[task_id].dependencies.copy():
             if dependency in self.completed_successfully_tasks.keys():
-                logging.debug('Dependency {d} for task {t} succeeded earlier, clearing dependency'.format(
+                logger.debug('Dependency {d} for task {t} succeeded earlier, clearing dependency'.format(
                     d=dependency,
                     t=task_id
                 ))
                 self.tasks[task_id].dependencies.remove(dependency)
             elif dependency in self.completed_failed_tasks.keys():
-                logging.debug('Dependency {d} for task {t} failed earlier, failing {t} task as well.'.format(
+                logger.debug('Dependency {d} for task {t} failed earlier, failing {t} task as well.'.format(
                     d=dependency,
                     t=task_id
                 ))
@@ -85,14 +88,14 @@ class TaskManager(object):
                 self.tasks[task_id].dependencies.remove(dependency)
 
     def mark_task_as_succeeded(self, task):
-        logging.info('Task succeeded {t}'.format(t=task))
+        #logger.info('Task succeeded {t}'.format(t=task))
         self.completed_successfully_tasks[task.task_id] = task
-        logging.debug('All succeeded tasks: {tl}'.format(tl=self.completed_successfully_tasks))
+        logger.debug('All succeeded tasks: {tl}'.format(tl=self.completed_successfully_tasks))
 
     def mark_task_as_failed(self, task):
-        logging.info('Task failed {t}'.format(t=task))
+        logger.info('Task failed {t}'.format(t=task))
         self.completed_failed_tasks[task.task_id] = task
-        logging.debug('All failed tasks: {tl}'.format(tl=self.completed_failed_tasks))
+        logger.debug('All failed tasks: {tl}'.format(tl=self.completed_failed_tasks))
 
 
 class DependencyList(list):
@@ -141,7 +144,8 @@ class Task(object):
         pass
 
     def __str__(self):
-        return self.__class__.__name__ + '(' + str(self.task_id) + ')'
+        #return self.__class__.__name__ + '(' + str(self.task_id) + ')'
+        return self.__class__.__name__ 
 
 
 class FailIfResourceDoesNotExistsTask(Task):
@@ -183,12 +187,12 @@ class CreateIfTargetDoesNotExistTask(Task):
 
     def execute(self):
         if config_parameters['destinationTableForceDropCreate']:
-            logging.info('Dropping target table {tbl}'.format(tbl=str(self.target_resource)))
+            logger.info('Dropping target table {tbl}'.format(tbl=str(self.target_resource)))
             self.target_resource.drop()
 
         if not self.target_resource.is_present():
             self.target_resource.clone_structure_from(self.source_resource)
-            logging.info('Creating target {tbl}'.format(tbl=str(self.target_resource)))
+            logger.info('Creating target {tbl}'.format(tbl=str(self.target_resource)))
             self.target_resource.create()
 
 
@@ -199,7 +203,7 @@ class UnloadDataToS3Task(Task):
                                                  s3_details=s3_details)
 
     def execute(self):
-        logging.info("Exporting from Source ({t})".format(t=self))
+        logger.info("Exporting from Source ({t})".format(t=self))
         self.source_resource.unload_data(self.s3_details)
 
 
@@ -210,7 +214,7 @@ class CopyDataFromS3Task(Task):
                                                  s3_details=s3_details)
 
     def execute(self):
-        logging.info("Importing to Target ({t})".format(t=self))
+        logger.info("Importing to Target ({t})".format(t=self))
         self.target_resource.copy_data(self.s3_details)
 
 
