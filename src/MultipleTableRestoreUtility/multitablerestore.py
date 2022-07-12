@@ -11,6 +11,7 @@ Managed by adedotua
 2017-12-23: Added cosmetic changes. Logs will now record timestamp for each step. 
             Number of successful, canceled or Failed restores will now be recorded once script completes
 2017-12-23: Fixed issue where script would get stuck if table restore status is in state CANCELED.
+2020-05-08: Python3 3.5+
 """
 
 import json
@@ -78,7 +79,7 @@ def errormsg(script_name):
     print("Usage: %s --target-database-name <target database> "
           "--source-database-name <source database> "
           "--snapshot-identifier <snapshot name> "
-          "--cluster-identifier <cluster> --listfile <filename>") % script_name
+          "--cluster-identifier <cluster> --listfile <filename>" % script_name)
 
 
 #  Table restore function that can be called from within another module
@@ -105,6 +106,9 @@ def tablerestore(tgtdbname, srcdbname, snapshotid, clusterid, filename):
     count_canceled = 0
     count_unknown = 0
     total_restore_size = 0
+
+    srcschema = None
+    srctable = None
 
     for i in datac['TableRestoreList']:
         try:
@@ -153,6 +157,7 @@ def main(input_args):
     snapshotid = None
     clusterid = None
     filename = None
+    optlist = None
 
     try:
         optlist,  remaining = getopt.getopt(input_args[1:], "", ['target-database-name=', 'source-database-name=',
