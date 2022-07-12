@@ -7,6 +7,7 @@ from util.sql.sql_text_helpers import GET_SAFE_LOG_STRING
 import pytz
 import boto3
 
+__version__ = "1.0"
 
 logger = logging.getLogger('UnloadCopy')
 logger.info('Starting redshift cluster...')
@@ -256,11 +257,18 @@ class RedshiftCluster:
         try:
             rs_conn = redshift_connector.connect(database=db, user=rs_user, password=rs_pwd, host=host, port=port, ssl=True)
             logger.info("Successfully connected to Redshift cluster: %s" % host)
-            cursor: redshift_connector.Cursor = rs_conn.cursor()
+            rs_cursor: redshift_connector.Cursor = rs_conn.cursor()
+            
+            #Set the Application Name
+            set_name = "set application_name to 'UnloadCopyUtility-v%s'" % __version__
+
+            rs_cursor.execute(set_name)
+
+
         
         except Exception as ie:
             logger.fatal('Error encountered when trying to connect: {ie}'.format(ie=ie))
-        return cursor
+        return rs_cursor
 
     def execute_update(self, command, opt=options, timeout=set_timeout_stmt, database=None):
         cursor_rs = self.get_conn_to_rs(opt=opt, timeout=timeout, database=database)

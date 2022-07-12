@@ -21,7 +21,6 @@ from util.tasks import TaskManager, FailIfResourceDoesNotExistsTask, CreateIfTar
     FailIfResourceClusterDoesNotExistsTask, UnloadDataToS3Task, CopyDataFromS3Task, CleanupS3StagingAreaTask, \
     NoOperationTask
 
-
 logger = util.log.setup_custom_logger('UnloadCopy')
 logger.info('Starting the UnloadCopy Utility')
 
