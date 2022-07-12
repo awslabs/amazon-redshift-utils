@@ -169,12 +169,8 @@ class UnloadCopyTool:
 def main(args):
     global region
 
-    #logger = util.log.setup_custom_logger('UnloadCopy')
-    #logger.info('Starting the UnloadCopy Utility')
-
     global_config_reader = GlobalConfigParametersReader()
     global_config_values = global_config_reader.get_config_key_values_updated_with_cli_args(args)
-    #util.log.set_log_level(global_config_values['logLevel'])
 
     UnloadCopyTool(global_config_values['s3ConfigFile'], global_config_values['region'], global_config_values)
 
