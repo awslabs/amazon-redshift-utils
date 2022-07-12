@@ -224,6 +224,20 @@ class RedshiftCluster:
         return self.get_element_from_cluster_endpoint('cluster_identifier')
 
     def get_conn_to_rs(self, opt=options, timeout=set_timeout_stmt, database=None):
+        database = database or self.get_db()
+        if database in self.database_connections:
+            if opt in self.database_connections[database]:
+                if not (opt in self.database_timeouts[database] and self.database_timeouts[database][opt] == timeout):
+                    logger.debug('Timeout is different from last configured timeout.')
+                    self.database_connections[database][opt].execute(timeout)
+                return self.database_connections[database][opt]
+        else:
+            self.database_connections[database] = {}
+            self.database_timeouts[database] = {}
+        self.database_connections[database][opt] = self._conn_to_rs(opt=opt, timeout=timeout, database=database)
+        return self.database_connections[database][opt]
+
+    def _conn_to_rs(self, opt=options, timeout=set_timeout_stmt, database=None):
         host=self.get_host()
         port=self.get_port()
         db=self.get_db()
