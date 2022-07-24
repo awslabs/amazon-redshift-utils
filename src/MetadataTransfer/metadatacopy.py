@@ -26,7 +26,6 @@ def createobjs(objtype, query, objcon, srccursor, tgtcursor, tgtcluster):
     # Convert from a tuple of lists ([a,b],[c,d])
     # into a tuple of tuples: ((a,b),(c,d))
     for tps in srcobjlist_2:
-        #logger.info("Adding a converted source tuple..")
         src_tup = src_tup + (tuple(tps),)
 
     # Target
@@ -51,7 +50,7 @@ def createobjs(objtype, query, objcon, srccursor, tgtcursor, tgtcluster):
         if objtype == 'database':
             logger.info("Starting database...")
             objcon.commit()
-            #objcon.set_session(autocommit=True)
+            objcon.autocommit = True
         try:
             for i in objlist:
                 logger.info("Starting objlist...")
@@ -71,7 +70,7 @@ def createobjs(objtype, query, objcon, srccursor, tgtcursor, tgtcluster):
             if objerr:
                 objcnt = 0
                 if objtype == 'database':
-                    #objcon.set_session(autocommit=False)
+                    objcon.autocommit = False
                     logger.info( "%s '%s' failed to create successfully" \
                           % (objtype.title(), objname))
                 else:
@@ -84,8 +83,7 @@ def createobjs(objtype, query, objcon, srccursor, tgtcursor, tgtcluster):
                       % (objcnt, objtype + 's', tgtcluster))
                 objcon.commit()
                 if objtype == 'database':
-                    pass
-                    #objcon.set_session(autocommit=False)
+                    objcon.autocommit = False
     else:
         logger.info( "All %s already exist!" % (objtype + 's'))
     return objerr
@@ -152,11 +150,6 @@ def transferprivs(srccursor, tgtcursor, gettablequery, usrgrntquery, tgtdb):
     logger.info( "Starting transfer of user object privileges to database '%s' on target" % (tgtdb))
     
     # Get tables from target cluster to be used in extracting user privileges from source cluster
-    #tgttables = executequery(tgtcursor, gettablequery)
-    #tgttbl = tgttables.fetchall()
-    
-    #logger.info(tgttbl)
-
 
     logger.info(query)
     srctables = srccursor.execute(query)
@@ -169,8 +162,6 @@ def transferprivs(srccursor, tgtcursor, gettablequery, usrgrntquery, tgtdb):
 
 
     tablelist = tuple([i for sub in tgttables for i in sub])
-    
-
 
     if tablelist:
         tgtddl = executequery(tgtcursor, usrgrntquery, (tablelist,))
@@ -219,11 +210,7 @@ def main():
         parser.print.help()
         exit()
 
-    #tgtconstring = connstring(dbname=tgtdbname, dbhost=tgthost, clusterid=tgtclusterid, dbuser=tgtuser)
-    #srcconstring = connstring(dbname=srcdbname, dbhost=srchost, clusterid=srclusterid, dbuser=srcuser)
-
     src_credentials = getiamcredentials(srchost,srcdbname,srcuser)
-    
     logger.debug( ( "Source IAM User:%s , Expiration: %s " % (src_credentials['DbUser'], src_credentials['Expiration']  )   ) )
 
     tgt_credentials = getiamcredentials(tgthost,tgtdbname,tgtuser)
@@ -255,13 +242,6 @@ def main():
         srccur.execute(set_name)
         tgtcur.execute(set_name)
 
-
-    #try:
-    #    srccon = psycopg2.connect(srcconstring)
-    #    srccur = srccon.cursor()
-    #    tgtcon = psycopg2.connect(tgtconstring)
-    #    tgtcur = tgtcon.cursor()
-#
         logger.info( "Starting transfer of metadata from source cluster %s to target cluster %s" % \
               (srcclusterid.title(), tgtclusterid.title()))
         
@@ -291,10 +271,7 @@ def main():
         logger.info("Executing ACL privileges...")
         executeddls(srccur, tgtcur, queries.defaclprivs, tgtuser, 'defacl') 
 
-
         logger.info("Completed Metadata Transfer")
-        #cleanup(tgtcur, tgtcon, 'target')
-        #cleanup(srccur, srccon, 'source')
 
     except Exception as err:
         logger.error(err)

@@ -241,8 +241,6 @@ def main():
     except Exception as err:
         logger.error(err)
         exit()
-    #cleanup(tgtcur, tgtcon, 'target')
-    #cleanup(srccur, srccon, 'source')
 
 
 if __name__ == "__main__":
