@@ -1,12 +1,12 @@
 # Metadata transfer utility
-This utility enables the end user to automate the transfer of metadata from one cluster to another. Metadata includes users, user profiles, groups, databases, schemas and related privileges. The utility is compatible with python 2.7.
+This utility enables the end user to automate the transfer of metadata from one cluster to another. Metadata includes users, user profiles, groups, databases, schemas and related privileges. The utility is compatible with Python 3.
 
-The utility requries [`psycopg2`](https://pypi.org/project/psycopg2/) and the `boto3` SDK. Additionally, the utility requires that you configure the [default region](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html#cli-configure-quickstart-region) for `boto3` to successfully send requests.
+The utility requries [`redshift_connector`](https://pypi.org/project/psycopg2/) and the [`boto3`](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/quickstart.html)  Python3 libraries. Additionally, the utility requires that you configure the [default region](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html#cli-configure-quickstart-region) for `boto3` to successfully send requests.
 
 ## Usage
 
 ```sh
-python metadatacopy.py \
+python3 metadatacopy.py \
 --tgtcluster <target cluster endpoint> \
 --srccluster <source cluster endpoint> \
 --tgtuser <target superuser> \
