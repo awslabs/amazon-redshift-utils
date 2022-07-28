@@ -4,7 +4,7 @@ tablelist = """select trim(pgn.nspname),trim(pgc.relname),decode(stvb.size_mb,nu
  join (select id from stv_tbl_perm where backup=1 and slice=0) stvp on pgc.oid=stvp.id
  where pgc.relowner>1"""
 # DATABASE privileges
-databaseprivs = """SELECT  
+databaseprivs = """SELECT 
 QUOTE_IDENT(pg_get_userbyid(b.datdba))::text AS objowner,
 null::text AS schemaname,
 QUOTE_IDENT(b.datname)::text AS objname,

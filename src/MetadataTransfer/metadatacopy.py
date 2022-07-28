@@ -150,8 +150,8 @@ def transferprivs(srccursor, tgtcursor, gettablequery, usrgrntquery, tgtdb):
     logger.info( "Starting transfer of user object privileges to database '%s' on target" % (tgtdb))
     
     # Get tables from target cluster to be used in extracting user privileges from source cluster
-
     logger.info(query)
+
     srctables = srccursor.execute(query)
 
     srctbls = srctables.fetchall()
@@ -237,7 +237,7 @@ def main():
         tgtcur: redshift_connector.Cursor = tgt_rs_conn.cursor()
         
         #Set the Application Name
-        set_name = "set application_name to 'UnloadCopyUtility-v%s'" % __version__
+        set_name = "set application_name to 'MetadataTransferUtility-v%s'" % __version__
 
         srccur.execute(set_name)
         tgtcur.execute(set_name)
