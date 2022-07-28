@@ -150,9 +150,7 @@ def transferprivs(srccursor, tgtcursor, gettablequery, usrgrntquery, tgtdb):
     logger.info( "Starting transfer of user object privileges to database '%s' on target" % (tgtdb))
     
     # Get tables from target cluster to be used in extracting user privileges from source cluster
-
     logger.info(query)
-    logger.info("Getting the source tables...")
 
     srctables = srccursor.execute(query)
 
