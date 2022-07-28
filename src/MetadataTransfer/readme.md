@@ -33,7 +33,14 @@ python3 metadatacopy.py \
 The 'user_privs.py' script can be used to just transfer the user privileges:
 
 ```
-
+python3 userprivs.py \
+--tgtcluster <target cluster endpoint> \
+--srccluster <source cluster endpoint> \
+--tgtuser <target superuser> \
+--srcuser <Source superuser> \
+--tgtdbname <target cluster dbname> \
+--srcdbname <source cluster dbname> \
+[--dbport <database port>]
 ```
 
 ## Limitations
