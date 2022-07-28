@@ -53,19 +53,22 @@ BEGIN
            ' JOIN pg_namespace  AS sch ON sch.oid =tbl.relnamespace'||
            ' WHERE tbl.relkind = ''r'' AND con.contype = ''p''';
     IF CHARINDEX('.',check_table) > 0 THEN
-        sql := sql||' AND sch.nspname = '||quote_ident(SPLIT_PART(check_table,'.',1))||
-                    ' AND tbl.relname = '||quote_ident(SPLIT_PART(check_table,'.',1))||';';
+        sql := sql||' AND sch.nspname = \''||quote_ident(SPLIT_PART(check_table,'.',1))||'\''
+                  ||' AND tbl.relname = \''||quote_ident(SPLIT_PART(check_table,'.',2))||'\';';
     ELSE
         sql := sql||' AND tbl.relname = '''||check_table||''';';
-    END IF;    
+    END IF;
     EXECUTE sql||' ;' INTO pk_columns;
     IF pk_columns = '' THEN
          RAISE INFO 'No PRIMARY KEY found for table "%".',check_table;
     ELSE
-        --Count the number of duplicates in the PRIMARY KEY 
+        --Count the number of duplicates in the PRIMARY KEY
         sql := 'SELECT SUM(dupes) FROM (SELECT '||pk_columns||', COUNT(*) dupes'||
                 ' FROM '||check_table||' GROUP BY '||pk_columns||' HAVING COUNT(*) > 1)';
         EXECUTE sql||' ;' INTO dupe_count;
+        IF dupe_count IS NULL THEN
+            dupe_count := 0;
+        END IF;
         IF dupe_count = 0 THEN
              EXECUTE 'INSERT INTO '||log_table||' SELECT '''||batch_time||''','''||check_table||''', '''||SYSDATE||''',''OK - No duplicates found'',0;';
              RAISE INFO 'OK - No duplicates found';
@@ -77,11 +80,11 @@ BEGIN
                  EXECUTE 'INSERT INTO '||log_table||' SELECT '''||batch_time||''','''||check_table||''', '''||SYSDATE||''',''ERROR (FIX) - Duplicate count exceeds `max_fix_rows` value.'','||dupe_count||';';
                  RAISE INFO 'ERROR (FIX) - Duplicate count % exceeds `max_fix_rows` %',dupe_count,max_fix_rows;
             ELSE --Attempt to correct the PK
-                EXECUTE 'DROP TABLE IF EXISTS tmp_sp_fix_pk;'; 
+                EXECUTE 'DROP TABLE IF EXISTS tmp_sp_fix_pk;';
                 EXECUTE 'CREATE TEMPORARY TABLE tmp_sp_fix_pk (LIKE '||check_table||' );';
                 --Insert distinct rows for PK duplicates into temp table
                 EXECUTE 'INSERT INTO tmp_sp_fix_pk'||
-                       ' SELECT DISTINCT * FROM '||check_table||' WHERE '||pk_columns||' IN (SELECT '||pk_columns||
+                       ' SELECT DISTINCT * FROM '||check_table||' WHERE ('||pk_columns||') IN (SELECT '||pk_columns||
                          ' FROM '||check_table||' GROUP BY '||pk_columns||' HAVING COUNT(*) > 1)';
                 --Check that PK duplciates are removed in the temp table
                 EXECUTE 'SELECT COUNT(*) FROM (SELECT '||pk_columns||
@@ -91,7 +94,7 @@ BEGIN
                     RAISE INFO 'ERROR (FIX) - Failed. Duplicate PK rows are not identical';
                 ELSE
                     --Delete all rows for the PK duplicates from the source table
-                    EXECUTE 'DELETE FROM '||check_table||' WHERE '||pk_columns||' IN (SELECT '||pk_columns||' FROM tmp_sp_fix_pk);';
+                    EXECUTE 'DELETE FROM '||check_table||' WHERE ('||pk_columns||') IN (SELECT '||pk_columns||' FROM tmp_sp_fix_pk);';
                     --Insert the deduped rows from the temp table into the source
                     EXECUTE 'INSERT INTO '||check_table||' SELECT * FROM tmp_sp_fix_pk;';
                     --Update the log for the fix

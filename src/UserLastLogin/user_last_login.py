@@ -23,7 +23,7 @@ from utils import getiamcredentials
 ssl = True
 ##################
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 
 def update_user_last_login(cluster=None, dbPort=5439, dbName=None, dbUser=None):
