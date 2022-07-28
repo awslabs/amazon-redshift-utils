@@ -59,6 +59,8 @@ python3 userprivs.py \
 
 ## Limitations
 
-* While copying object privileges, all or none of the privileges will be transferred to the target. If any privilege fail to apply at target, all privileges will be rolled back for that transaction.
+* While copying object privileges, all or none of the privileges will be transferred to the target. If any privilege fail to apply at target, all privileges will be rolled back for that transaction
 
-* When copying users, the utility uses a command similar to `create user <username> password disable;`. The password field is set to `disable` because it is not possible (due to security concerns) to extract plain text passwords for users in a cluster.
+* When copying users, the utility uses a command similar to `create user <username> password disable;`. The password field is set to `disable` because it is not possible (due to security concerns) to extract plain text passwords for users in a cluster
+
+* The source and the target clusters must both be in the same region
