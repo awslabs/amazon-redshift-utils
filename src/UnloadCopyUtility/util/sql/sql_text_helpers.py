@@ -1,6 +1,9 @@
 import re
 import logging
 
+logger = logging.getLogger('UnloadCopy')
+logger.info("Starting SQL redactor")
+
 
 class SQLRedactor:
     REDACTION_STRING = 'REDACTED'
@@ -13,10 +16,10 @@ class SQLRedactor:
     def apply_all_redactions(self, input_string):
         output_string = input_string
         for k in self.key_equal_value_redactor_keys:
-            logging.debug('Applying key=value redactor {r}'.format(r=k))
+            logger.debug('Applying key=value redactor {r}'.format(r=k))
             output_string = SQLRedactor.remove_string_value_from_key_equal_sign_value_pair(k, output_string)
         for k in self.keywords_to_redact_value_from:
-            logging.debug('Applying keyword redactor {r}'.format(r=k))
+            logger.debug('Applying keyword redactor {r}'.format(r=k))
             output_string = SQLRedactor.remove_keyword_value(k, output_string)
         return output_string
 
@@ -149,7 +152,7 @@ class SQLTextHelper:
     @staticmethod
     def quote_indent(identifier_string):
         if identifier_string.startswith('"') and identifier_string.endswith('"'):
-            logging.warning('QUOTE_INDENT() called on identifier already surrounded by double quotes {id}'.format(
+            logger.warning('QUOTE_INDENT() called on identifier already surrounded by double quotes {id}'.format(
                 id=identifier_string
             ))
         if '"' in identifier_string:

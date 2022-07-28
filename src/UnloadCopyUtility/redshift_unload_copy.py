@@ -12,13 +12,17 @@ python redshift-unload-copy.py <config file> <region>
 import json
 import sys
 import logging
+import util.log
 from global_config import GlobalConfigParametersReader, config_parameters
 from util.s3_utils import S3Helper, S3Details
+from util.redshift_cluster import RedshiftCluster
 from util.resources import ResourceFactory, TableResource, DBResource
 from util.tasks import TaskManager, FailIfResourceDoesNotExistsTask, CreateIfTargetDoesNotExistTask, \
     FailIfResourceClusterDoesNotExistsTask, UnloadDataToS3Task, CopyDataFromS3Task, CleanupS3StagingAreaTask, \
     NoOperationTask
 
+logger = util.log.setup_custom_logger('UnloadCopy')
+logger.info('Starting the UnloadCopy Utility')
 
 region = None
 
@@ -76,11 +80,12 @@ class UnloadCopyTool:
         if(src_config['tableNames']):
             src_tables = src_config['tableNames']
             dest_tables = dest_config['tableNames']
-            logging.info("Migrating multiple tables")
+            logger.info("Migrating multiple tables")
             if( not dest_tables or len(src_tables) != len(dest_tables) ):
-                logging.fatal("When migrating multiple tables 'tableNames' property must be configured in unloadSource and copyTarget, and be the same length")
+                logger.fatal("When migrating multiple tables 'tableNames' property must be configured in unloadSource and copyTarget, and be the same length")
                 raise NotImplementedError
             for idx in range(0,len(src_tables)):
+                logger.info("Migrating table: " + src_tables[idx])
                 src_config['tableName'] = src_tables[idx]
                 dest_config['tableName'] = dest_tables[idx]
                 source = ResourceFactory.get_source_resource_from_config_helper(self.config_helper, self.region)
@@ -104,13 +109,13 @@ class UnloadCopyTool:
                     destination.set_table(global_config_values['tableName'])
                 self.add_table_migration(source, destination, global_config_values)
             else:
-                logging.fatal('Destination should be a database resource')
+                logger.fatal('Destination should be a database resource')
                 raise NotImplementedError
             pass
         else:
             # TODO: add additional scenario's
             # For example if both resources are of type schema then create target schema and migrate all tables
-            logging.fatal('Source is not a Table, this type of unload-copy is currently not supported.')
+            logger.fatal('Source is not a Table, this type of unload-copy is currently not supported.')
             raise NotImplementedError
 
 
@@ -160,33 +165,11 @@ class UnloadCopyTool:
         s3_cleanup = CleanupS3StagingAreaTask(s3_details)
         self.task_manager.add_task(s3_cleanup, dependencies=copy_data)
 
-
-def set_log_level(log_level_string):
-    log_level_string = log_level_string.upper()
-    if not hasattr(logging, log_level_string):
-        logging.error('Could not find log_level {lvl}'.format(lvl=log_level_string))
-        logging.basicConfig(level=logging.INFO)
-    else:
-        stdout_handler = logging.StreamHandler(stream=sys.stdout)
-        stdout_handler.setLevel(logging.INFO)
-        formatter = logging.Formatter(
-            '[%(asctime)s] p%(process)s {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s',
-            '%m-%d %H:%M:%S'
-        )
-        stderr_handler = logging.StreamHandler()
-        stderr_handler.setFormatter(formatter)
-        log_level = getattr(logging, log_level_string)
-        stderr_handler.setLevel(log_level)
-        logging.basicConfig(level=log_level, handlers=[stdout_handler, stderr_handler])
-        logging.debug('Log level set to {lvl}'.format(lvl=log_level_string))
-
-
 def main(args):
     global region
 
     global_config_reader = GlobalConfigParametersReader()
     global_config_values = global_config_reader.get_config_key_values_updated_with_cli_args(args)
-    set_log_level(global_config_values['logLevel'])
 
     UnloadCopyTool(global_config_values['s3ConfigFile'], global_config_values['region'], global_config_values)
 

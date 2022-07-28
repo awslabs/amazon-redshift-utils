@@ -70,7 +70,7 @@ The utility takes at minimum 2 parameters:
 When passing in parameters via command line words get separated with a `-` and are all lower-case. For example, to run the utility with a configuration file stored in a bucket in `eu-west-1`:
 
 ```
-python redshift-unload-copy.py --s3-config-file s3://my-bucket/my-unload-copy-config.json --region eu-west-1
+python3 redshift-unload-copy.py --s3-config-file s3://my-bucket/my-unload-copy-config.json --region eu-west-1
 ```
 
 All available parameters are defined in [`global_config_parameters.json`](global_config_parameters.json) and have an elaborate description over there.
@@ -80,27 +80,8 @@ Please note that the bucket where the configuration is stored, and where the enc
 
 ## Install Notes
 
-This utility uses PyGreSQL to connect to your Redshift Clusters. To install PyGreSQL (Python PostgreSQL Driver) on Amazon Linux, please ensure that you follow the below steps as the ec2-user:
+The utility works best with Python3. It uses the AWS provided `redshift_connector` Python package to connect to your Redshift clusters. To install all the required Python3 packages on Amazon Linux execute the command below:
 
 ```
-wget https://bootstrap.pypa.io/pip/2.7/get-pip.py
-python get-pip.py
-sudo yum install git postgresql postgresql-devel gcc python-devel libffi-devel PyGreSQL
-sudo pip install boto3 pytz
-git clone https://github.com/awslabs/amazon-redshift-utils.git
-cd amazon-redshift-utils/src/UnloadCopyUtility
+$ pip3 install --user -r requirements.txt
 ```
-
-Confirm the versions of the following packages on your EC2 instance:
-
-```
-[ec2-user@ip-10-0-0-1 UnloadCopyUtility]$ python -V
-Python 2.7.18
-[ec2-user@ip-10-0-0-1 UnloadCopyUtility]$ pip -V
-pip 20.3.4 from /usr/lib/python2.7/site-packages/pip (python 2.7)
-[ec2-user@ip-10-0-0-1 UnloadCopyUtility]$ gcc -v
-... 
-gcc version 7.3.1 20180712 (Red Hat 7.3.1-13) (GCC)
-```
-
-On other Linux distributions, make sure that you install the PostgreSQL client version 9.0 or higher.

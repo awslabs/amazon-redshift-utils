@@ -2,11 +2,11 @@ import base64
 import datetime
 import json
 import logging
-
 import boto3
-
 from util.kms_helper import KMSHelper
 
+logger = logging.getLogger('UnloadCopy')
+logger.info('Starting S3 Utilities')
 
 class S3Helper:
     def __init__(self, region_name):
@@ -48,7 +48,7 @@ class S3Helper:
         self.s3_client.delete_objects(Bucket=bucket_name, Delete={'Objects': object_list})
 
     def delete_s3_prefix(self, s3_details):
-        print("Cleaning up S3 Data Staging Location %s" % s3_details.dataStagingPath)
+        logger.info("Cleaning up S3 Data Staging Location %s" % s3_details.dataStagingPath)
         (stagingBucket, stagingPrefix) = S3Helper.tokenize_s3_path(s3_details.dataStagingRoot)
 
         objects = self.s3_client.list_objects_v2(Bucket=stagingBucket, Prefix=stagingPrefix)
@@ -112,7 +112,7 @@ class S3Details:
             if 'region' in s3_staging_conf:
                 self.dataStagingRegion = s3_staging_conf['region']
             else:
-                logging.warning('No region in s3_staging_conf')
+                logger.warning('No region in s3_staging_conf')
                 self.dataStagingRegion = None
 
             if 'deleteOnSuccess' in s3_staging_conf \
@@ -163,4 +163,4 @@ class S3Details:
             try:
                 self.symmetric_key = self.symmetric_key.decode('utf-8')
             except:
-                logging.debug('Exception converting string can be ignored, likely Python2 so already a string.')
+                logger.debug('Exception converting string can be ignored, likely Python2 so already a string.')

@@ -1,9 +1,9 @@
 import base64
 import logging
 import sys
-
 import boto3
 
+logger = logging.getLogger('UnloadCopy')
 
 class KMSHelper:
     def __init__(self, region_name):
@@ -40,6 +40,6 @@ class KMSHelper:
                 Alternatively you could use KMS by setting s3Staging -> kmsGeneratedKey to True in the config file
                 In that case make sure to generate a key using ./createKmsKey.sh <region-short-name>
                 """
-                logging.fatal(pycrypto_explanation)
+                logger.fatal(pycrypto_explanation)
                 sys.exit(-5)
             return Random.new().read(256 / 8)
