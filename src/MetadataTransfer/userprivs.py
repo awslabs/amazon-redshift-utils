@@ -218,7 +218,7 @@ def main():
         tgtcur: redshift_connector.Cursor = tgt_rs_conn.cursor()
 
         #Set the Application Name
-        set_name = "set application_name to 'UnloadCopyUtility-v%s'" % __version__
+        set_name = "set application_name to 'MetadataTransferUtility-v%s'" % __version__
 
         srccur.execute(set_name)
         tgtcur.execute(set_name)
