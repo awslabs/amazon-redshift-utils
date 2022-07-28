@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import redshift_connector
 from redshiftfunc import getiamcredentials
 import log
