@@ -6,9 +6,13 @@ The utility requries [`redshift_connector`](https://pypi.org/project/psycopg2/) 
 The objects which are transfered are:
 
 | Privilege Type | Metadata Copy | User Privileges |
-|---|:---:|---|
+|---|:---:|:---:|
 |Language|Y|Y|
 |Database|Y|Y|
+|Schema|Y|Y|
+|Table|Y|Y|
+|Function|Y|Y|
+|ACL|Y|Y|
 
 
 
