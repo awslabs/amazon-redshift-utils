@@ -17,7 +17,7 @@ python3 user_last_login.py --cluster <cluster dns end point> --dbPort <port> --d
 The results are stored in a table on the cluster. The schema and table are created if they do not already exist, or otherwise are truncated and repopulated on each execution of the script. View the results of the run by executing the following SQL query on the cluster:
 
 ```
-Select * from history.stg_user_last_login;
+Select * from history.user_last_login;
 ```
 
 ## Working Details and Limitations 
