@@ -1,4 +1,4 @@
-FROM python:2-slim
+FROM python:3.8-slim
 
 RUN apt-get update && mkdir -p /usr/share/man/man1 /usr/share/man/man7
 RUN apt-get install -y libpq-dev postgresql-client gcc
@@ -9,7 +9,7 @@ RUN find /usr/src/app -name "*.py"|xargs chmod +x && find /usr/src/app -name "*.
 
 ENV PATH="/usr/src/app/AnalyzeVacuumUtility:/usr/src/app/ColumnEncodingUtility:/usr/src/app/UnloadCopyUtility:${PATH}"
 
-RUN pip install -r /usr/src/app/requirements.txt && \
-    pip install -r /usr/src/app/UnloadCopyUtility/requirements.txt 
+RUN pip3 install -r /usr/src/app/requirements.txt && \
+    pip3 install -r /usr/src/app/UnloadCopyUtility/requirements.txt
 
 ENTRYPOINT ["/usr/src/app/bin/entrypoint.sh"]

@@ -50,13 +50,12 @@ else
     if [ "${OUTPUT_FILE}" != "" ]; then OUTPUT_FILE_CMD="--output-file ${OUTPUT_FILE}"; fi
     if [ "${QUERY_GROUP}" != "" ]; then QUERY_GROUP_CMD="--query_group ${QUERY_GROUP}"; fi
 
-    python AnalyzeVacuumUtility/analyze-vacuum-schema.py \
+    python3 AnalyzeVacuumUtility/analyze-vacuum-schema.py \
         --db ${DB} \
         --db-user ${DB_USER} \
         --db-pwd ${DB_PWD} \
         --db-host ${DB_HOST} \
         --db-port ${DB_PORT} \
-        --require-ssl ${REQUIRE_SSL} \
         --schema-name ${SCHEMA_NAME} \
         --debug ${DEBUG} \
         --slot-count ${SLOT_COUNT} \

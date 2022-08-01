@@ -101,10 +101,12 @@ docker run --net host --rm -it -e CONFIG_FILE=s3://.... amazon-redshift-utils un
 
 The docker [entrypoint scripts](src/bin/) work off of environment variables, so you'd want to provide those in your run scripts above.
 
-For convenience, you can create a `.env` file locally and upload them to the docker container via the `--env-file` argument. E.g.:
+For convenience, you can create a `.env` file locally and upload them to the docker container via the `--env-file` argument. For example if your environment variables file is named redshift_utils.env then you could execute with:
 
 ```bash
-docker run --net host --rm -it --env-file .env .... amazon-redshift-utils analyze-vacuum
+docker run --net host --rm -it --env-file redshift_utils.env .... amazon-redshift-utils analyze-vacuum
+
+docker run --net host --rm -it --env-file redshift_utils.env -e CONFIG_FILE=s3://<bucket_name>/<config_file>.json amazon-redshift-utils unload-copy
 ```
 
 Please see the [entrypoint scripts](src/bin/) for the environment variable configuration references that are needed.
