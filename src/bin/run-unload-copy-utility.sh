@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#/usr/bin/env bash
 
 set -e
 
@@ -13,7 +13,7 @@ AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
 if [ "${CONFIG_FILE}" == "" ]; then echo "Environment Var 'CONFIG_FILE' must be defined"
 else
     cd UnloadCopyUtility
-    python redshift-unload-copy.py ${CONFIG_FILE} ${AWS_REGION}
+    python3 redshift_unload_copy.py ${CONFIG_FILE} ${AWS_REGION}
     echo "Done"
 fi
 
