@@ -5,22 +5,28 @@ This utility enables the end user to automate the restore of multiple tables ont
 {
     "TableRestoreList": [
         {
-            "Schemaname": "schema1",
-            "Tablename": "table1"
+            "SrcSchemaname": "src_schema1",
+            "SrcTablename": "src_table1",
+            "TgtSchemaname": "tgt_schema1",
+            "TgtTablename": "tgt_table1"
         },
         {
-            "Schemaname": "schema2",
-            "Tablename": "table2"
+            "SrcSchemaname": "src_schema2",
+            "SrcTablename": "src_table2",
+            "TgtSchemaname": "tgt_schema2",
+            "TgtTablename": "tgt_table2"
         },
         {
-            "Schemaname": "schema3",
-            "Tablename": "table3"
+            "SrcSchemaname": "src_schema3",
+            "SrcTablename": "src_table3",
+            "TgtSchemaname": "tgt_schema3",
+            "TgtTablename": "tgt_table3"
         }
     ]
 }
 ```
 
-The keys 'TableRestoreList' , 'Schemaname' and 'Tablename' must be used in order for the utility to work. The utility is compatible with Python 3. 
+The keys 'TableRestoreList' , 'SrcSchemaname', 'SrcTablename', 'TgtSchemaname', and 'TgtTablename' must be used in order for the utility to work. The utility is compatible with Python 3. 
 ## Setup
 The AWS credentials can be provided with one of 3 methods:
 
@@ -36,12 +42,11 @@ The utility uses the Boto3 library which will check these environment variables 
 * AWS_SESSION_TOKEN - The session key for your AWS account. This is only needed when you are using temporary credentials.
 
 ## Usage
-```python3 multitablerestore.py --target-database-name <target database> --source-database-name <source database> --snapshot-identifier <snapshot name> --cluster-identifier <cluster name> --listfile <filename>```
+```python3 multitablerestore.py --cluster-identifier <cluster name> --snapshot-identifier <snapshot name> --source-database-name <source database> --target-database-name <target database> --listfile <filename>```
 
 Note: The source and target databases can be the same.
 
 ## Limitations
 1. The table cannot already exist on the target database
-1. The table cannot be restored to a different schema
 1. The table can only be restored to the same cluster the snapshot was taken from
 1. Script does not currently check if cluster has enough space, make sure enough space is available when restoring several tables

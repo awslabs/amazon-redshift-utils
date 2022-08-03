@@ -12,6 +12,7 @@ Managed by adedotua
             Number of successful, canceled or Failed restores will now be recorded once script completes
 2017-12-23: Fixed issue where script would get stuck if table restore status is in state CANCELED.
 2020-05-08: Python3 3.5+
+2022-08-03: Added support for the different schemaname and tablename on the restore target database
 """
 
 import json
@@ -112,20 +113,20 @@ def tablerestore(tgtdbname, srcdbname, snapshotid, clusterid, filename):
 
     for i in datac['TableRestoreList']:
         try:
-            srcschema = i['Schemaname']
-            srctable = i['Tablename']
+            srcschema = i['SrcSchemaname']
+            srctable = i['SrcTablename']
+            tgtschema = i['TgtSchemaname']
+            tgttable = i['TgtTablename']
         except KeyError as e:
             print('ERROR: Expected key %s is missing in %s.' % (e, filename))
             print('DETAIL: %s' % i)
             exit()
-        tgtschema = srcschema
-        trgttable = srctable
         tlr = RsRestore(clusterid, snapshotid, srcdbname, srcschema, tgtdbname, tgtschema)
-        tlr.restoretable(srctable, trgttable)
+        tlr.restoretable(srctable, tgttable)
         print("%s Starting Table Restores %s" % ('-' * 50, '-' * 50))
         print("[%s] Requestid: %s " % (str(datetime.datetime.now()), tlr.restorestatus('TableRestoreRequestId')))
         print("[%s] INFO: Starting restore of %s to schema %s in database %s" % (str(datetime.datetime.now()),
-                                                                                 trgttable, tgtschema, tgtdbname))
+                                                                                 tgttable, tgtschema, tgtdbname))
         current_status = tlr.restorestatus('Status')
         while current_status != 'SUCCEEDED' and current_status != 'FAILED' and current_status != 'CANCELED':
             if current_status != previous_status:
