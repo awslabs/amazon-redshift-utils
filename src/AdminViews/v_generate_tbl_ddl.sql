@@ -263,7 +263,7 @@ from (SELECT
        n.nspname     AS schemaname,
        c.relname     AS tablename,
        600250000     AS seq,
-       ('COMMENT ON '::text + nvl2(cl.column_name, 'column '::text, 'table '::text) + quote_ident(n.nspname::text) + '.'::text + quote_ident(c.relname::text) + nvl2(cl.column_name, '.'::text + cl.column_name::text, ''::text) + ' IS \''::text + quote_ident(des.description) + '\'; '::text)::character VARYING AS ddl
+       ('COMMENT ON '::text + nvl2(cl.column_name, 'column '::text, 'table '::text) + quote_ident(n.nspname::text) + '.'::text + quote_ident(c.relname::text) + nvl2(cl.column_name, '.'::text + cl.column_name::text, ''::text) + ' IS \''::text + trim(des.description) + '\'; '::text)::character VARYING AS ddl
   FROM pg_description des
   JOIN pg_class c ON c.oid = des.objoid
   JOIN pg_namespace n ON n.oid = c.relnamespace
