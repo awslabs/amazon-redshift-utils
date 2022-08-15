@@ -1,6 +1,6 @@
 SELECT CASE
          WHEN "userid" = 1 THEN 'SYSTEM'
-         WHEN REGEXP_INSTR ("querytxt",'(padb_|pg_internal)') THEN 'SYSTEM'
+         WHEN REGEXP_INSTR ("querytxt",'(padb_|pg_|catalog_history)') THEN 'SYSTEM'
          WHEN REGEXP_INSTR ("querytxt",'[uU][nN][dD][oO][iI][nN][gG] ') THEN 'ROLLBACK'
          WHEN REGEXP_INSTR ("querytxt",'[cC][uU][rR][sS][oO][rR] ') THEN 'CURSOR'
          WHEN REGEXP_INSTR ("querytxt",'[fF][eE][tT][cC][hH] ') THEN 'FETCH'

@@ -7,6 +7,7 @@ Purpose: View to get that will generate unload and copy commands for an object. 
 	be left so if the UNLOAD needs to get all data of the table.
 History:
 2014-02-12 jjschmit Created
+2022-08-15 saeedma8 excluded system tables
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_unload_copy_cmd
 AS
@@ -24,7 +25,7 @@ FROM
 		,'UNLOAD (''SELECT * FROM ' + schemaname + '.' + tablename + ' --WHERE audit_id > ___auditid___'') TO ''s3://__bucketname__/' + TO_CHAR(GETDATE(), 'YYYYMMDD_HH24MISSMS')  + '/'  + schemaname + '.' + tablename + '-'' CREDENTIALS ''__creds_here__'' GZIP DELIMITER ''\\t'';' AS dml
 	FROM 
 		pg_tables
-WHERE schemaname NOT IN ('pg_internal') 
+WHERE schemaname !~ '^information_schema|catalog_history|pg_' 
 	UNION ALL
 	SELECT 
 		schemaname
@@ -34,6 +35,6 @@ WHERE schemaname NOT IN ('pg_internal')
 	FROM 
 		pg_tables 
 	)
-WHERE schemaname NOT IN ('pg_internal')
+WHERE schemaname !~ '^information_schema|catalog_history|pg_'
 ORDER BY 3 DESC,1,2
 ;
