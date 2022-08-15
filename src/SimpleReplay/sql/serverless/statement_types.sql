@@ -1,6 +1,6 @@
 SELECT
     CASE
-      WHEN REGEXP_INSTR ("query_text",'(padb_|pg_internal)')
+      WHEN REGEXP_INSTR ("query_text",'(padb_|pg_|catalog_history)')
       THEN 'SYSTEM'
       WHEN query_type = 'DELETE'
       THEN 'DELETE'

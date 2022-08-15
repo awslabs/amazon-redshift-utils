@@ -3,6 +3,7 @@
 Purpose: View to summarize queries by type (Insert, Select, etc.) per hour for the past 7 Days
 History:
 2016-07-13 joeharris76 Created
+2022-08-15 saeedma8 excluded system tables
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_query_type_duration_summary
 AS
@@ -22,7 +23,7 @@ FROM /* Calculate the icosile (1/20th) for each query by type and hour */
       FROM /* Classify each query and calculate the duration 
               NOTE: The order of the search is important. */
            (SELECT  CASE  WHEN "userid" = 1                                             THEN 'SYSTEM'
-                          WHEN REGEXP_INSTR("querytxt",'(padb_|pg_internal)'          ) THEN 'SYSTEM'
+                          WHEN REGEXP_INSTR("querytxt",'(padb_|pg_|catalog_history)'  ) THEN 'SYSTEM'
                           WHEN REGEXP_INSTR("querytxt",'[uU][nN][dD][oO][iI][nN][gG] ') THEN 'ROLLBACK'
                           WHEN REGEXP_INSTR("querytxt",'[cC][uU][rR][sS][oO][rR] '    ) THEN 'CURSOR'
                           WHEN REGEXP_INSTR("querytxt",'[fF][eE][tT][cC][hH] '        ) THEN 'CURSOR'
