@@ -667,6 +667,8 @@ def run_analyze_vacuum(**kwargs):
 
     if debug:
         comment("Using Cluster Name %s" % cluster_name)
+        comment("Supplied Args:")
+        print(kwargs)
 
     db_pwd = None
 
