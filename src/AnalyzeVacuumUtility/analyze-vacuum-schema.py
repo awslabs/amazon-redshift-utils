@@ -53,8 +53,8 @@ NO_CONNECTION = 5
 
 # setup cli args
 parser = argparse.ArgumentParser()
-parser.add_argument("--analyze-flag", dest="analyze_flag", default=True, type=bool,
-                    help="Flag to turn ON/OFF ANALYZE functionality (True or False : Default = True ")
+parser.add_argument("--analyze-flag", dest="analyze_flag", required=True, default='False',
+                    help="Flag to turn ON/OFF ANALYZE functionality (True or False): Default = False ")
 parser.add_argument("--max-unsorted-pct", dest="max_unsorted_pct",
                     help="Maximum unsorted percentage(% to consider a table for vacuum : Default = 50%")
 parser.add_argument("--min-interleaved-cnt", dest="min_interleaved_cnt", type=int,
@@ -67,8 +67,8 @@ parser.add_argument("--stats-off-pct ", dest="stats_off_pct",
                     help="Minimum stats off percentage(% to consider a table for analyze : Default = 10%")
 parser.add_argument("--table-name", dest="table_name",
                     help="A specific table to be Analyzed or Vacuumed if analyze-schema is not desired")
-parser.add_argument("--vacuum-flag", dest="vacuum_flag", default=True, type=bool,
-                    help="Flag to turn ON/OFF VACUUM functionality (True or False :  Default = True")
+parser.add_argument("--vacuum-flag", dest="vacuum_flag", required=True, default='False',
+                    help="Flag to turn ON/OFF VACUUM functionality (True or False): Default = False")
 parser.add_argument("--vacuum-parameter", dest="vacuum_parameter",
                     help="Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL")
 parser.add_argument("--blacklisted-tables", dest="blacklisted_tables", help="The tables we do not want to Vacuum")
@@ -95,6 +95,7 @@ parser.add_argument("--suppress-cloudwatch", dest="suppress_cw",
                     help="Don't emit CloudWatch metrics for analyze or vacuum when set to True")
 parser.add_argument("--db", dest="db", help="The Database to Use")
 full_args = parser.parse_args()
+
 parse_args = {}
 # remove args that end up as None
 for k, v in vars(full_args).items():
