@@ -668,9 +668,6 @@ def run_analyze_vacuum(**kwargs):
     if debug:
         comment("Using Cluster Name %s" % cluster_name)
 
-        comment("Supplied Args:")
-        print(kwargs)
-
     db_pwd = None
 
     if db_pwd is None:
@@ -695,22 +692,36 @@ def run_analyze_vacuum(**kwargs):
     if master_conn is None:
         raise Exception("No Connection was established")
 
-    vacuum_flag = kwargs.get(config_constants.DO_VACUUM, True)
-    if vacuum_flag is True:
+    # Retrieve the flags from the arguments:
+    vacuum_flag = kwargs.get("vacuum_flag",'False')
+    analyze_flag = kwargs.get("analyze_flag",'False')
+
+    # Convert to Boolean
+    if(vacuum_flag == 'True'):
+        vacuum_flag_b = True
+    else:
+        vacuum_flag_b = False
+
+    if( analyze_flag == 'True'):
+        analyze_flag_b = True
+    else:
+        analyze_flag_b = False
+
+    # Evaluate wether to run vacuum or analyze or both
+    if vacuum_flag_b is True:
         # Run vacuum based on the Unsorted , Stats off and Size of the table
         run_vacuum(master_conn, cluster_name, cw, **kwargs)
     else:
-        comment("Vacuum flag arg is not set. Vacuum not performed.")
+        comment("Vacuum flag arg is set as '%s'. Vacuum not performed." % vacuum_flag )
 
-    analyze_flag = kwargs.get(config_constants.DO_ANALYZE, True)
-    if analyze_flag is True:
-        if not vacuum_flag:
+    if analyze_flag_b is True:
+        if not vacuum_flag_b:
             comment("Warning - Analyze without Vacuum may result in sub-optimal performance")
 
         # Run Analyze based on the  Stats off Metrics table
         run_analyze(master_conn, cluster_name, cw, **kwargs)
     else:
-        comment("Analyze flag arg is set as %s. Analyze is not performed." % analyze_flag)
+        comment("Analyze flag arg is set as '%s'. Analyze is not performed." % analyze_flag )
 
     comment('Processing Complete')
 
