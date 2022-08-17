@@ -22,6 +22,7 @@ History:
 2017-03-23 thiyagu Added percentage encoded column metric (pct_enc) and fixes  
 2017-10-01 mscaer Fixed columns "rows", pct_stats_off, and pct_unsorted to be correct for DISTSTYLE ALL.
 2021-03-05 edsonune Fixed column "Enc" to correctly show values for non-compressed tables.
+2022-08-17 timjell Update pg_attribute select to exclude system columns
 **********************************************************************************************/
 
 SELECT TRIM(pgn.nspname) AS SCHEMA,
@@ -78,6 +79,7 @@ FROM (SELECT db_id,
                      MAX(case when attencodingtype not in (0,128) THEN attencodingtype ELSE 0 END) AS max_enc,
                      SUM(case when attencodingtype <> 0 then 1 else 0 end)::DECIMAL(20,3)/COUNT(attencodingtype)::DECIMAL(20,3)  *100.00 as pct_enc
               FROM pg_attribute
+	      WHERE attnum > 0
               GROUP BY 1) AS det ON det.attrelid = a.id
   INNER JOIN (SELECT tbl,
                      MAX(Mbytes)::DECIMAL(32) /MIN(Mbytes) AS ratio
