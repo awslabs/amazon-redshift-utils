@@ -28,7 +28,7 @@ History:
 2016-09-12 chriz-bigdata created
 2020-11-18 maryna-popova added case for auto distkeys
 2022-08-15 saeedma8 excluded system tables
-2022-08016 timjell Update attencodingtype in (0,128)
+2022-08-16 timjell Update attencodingtype in (0,128)
 **********************************************************************************************/
 
 CREATE OR REPLACE VIEW admin.v_extended_table_info AS
@@ -111,7 +111,7 @@ pcon AS
 colenc AS
 (
   SELECT attrelid,
-         SUM(CASE WHEN a.attencodingtype IN(0,128) THEN 0 ELSE 1 END) AS encoded_cols,
+         SUM(CASE WHEN a.attencodingtype IN (0,128) THEN 0 ELSE 1 END) AS encoded_cols,
          COUNT(*) AS cols
   FROM pg_attribute a
   WHERE a.attrelid IN (SELECT oid FROM tbl_ids)
