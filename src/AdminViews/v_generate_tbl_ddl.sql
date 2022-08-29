@@ -287,7 +287,7 @@ from (SELECT
     SELECT c.oid::bigint as table_id,'zzzzzzzz' || n.nspname AS schemaname,
        'zzzzzzzz' || c.relname AS tablename,
        700000000 + MOD(CAST(con.oid AS INT),100000000) AS seq,
-       'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
+       'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(10000) + ';' AS ddl
     FROM pg_constraint AS con
       INNER JOIN pg_class AS c
              ON c.relnamespace = con.connamespace
