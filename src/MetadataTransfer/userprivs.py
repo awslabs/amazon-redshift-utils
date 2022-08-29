@@ -176,8 +176,6 @@ def main():
     parser.add_argument("--dbport", help="set database port", default=5439)
     args = parser.parse_args()
 
-    print(args)
-
     srchost = args.srccluster
     srclusterid = srchost.split('.')[0]
     srcuser = args.srcuser
@@ -187,7 +185,6 @@ def main():
     tgthost = args.tgtcluster
     tgtclusterid = tgthost.split('.')[0]
     rsport = args.dbport
-    print(rsport)
 
     logger.info("Starting UserPrivileges migration")
 
