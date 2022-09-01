@@ -35,7 +35,7 @@ import argparse
 try:
     sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-except:
+except Exception:
     pass
 
 import getopt
@@ -56,15 +56,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--analyze-flag", dest="analyze_flag", required=True, default='False',
                     help="Flag to turn ON/OFF ANALYZE functionality (True or False): Default = False ")
 parser.add_argument("--max-unsorted-pct", dest="max_unsorted_pct",
-                    help="Maximum unsorted percentage(% to consider a table for vacuum : Default = 50%")
+                    help="Maximum unsorted percentage( to consider a table for vacuum : Default = 50")
 parser.add_argument("--min-interleaved-cnt", dest="min_interleaved_cnt", type=int,
                     help="Minimum stv_interleaved_counts records to consider a table for vacuum reindex: Default = 0")
 parser.add_argument("--min-interleaved-skew", dest="min_interleaved_skew",
                     help="Minimum index skew to consider a table for vacuum reindex: Default = 1.4")
 parser.add_argument("--min-unsorted-pct", dest="min_unsorted_pct",
-                    help="Minimum unsorted percentage(% to consider a table for vacuum : Default = 5%")
+                    help="Minimum unsorted percentage( to consider a table for vacuum : Default = 5")
 parser.add_argument("--stats-off-pct ", dest="stats_off_pct",
-                    help="Minimum stats off percentage(% to consider a table for analyze : Default = 10%")
+                    help="Minimum stats off percentage( to consider a table for analyze : Default = 10")
 parser.add_argument("--table-name", dest="table_name",
                     help="A specific table to be Analyzed or Vacuumed if analyze-schema is not desired")
 parser.add_argument("--vacuum-flag", dest="vacuum_flag", required=True, default='False',
