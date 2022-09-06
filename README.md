@@ -59,7 +59,7 @@ This [project](src/RedshiftAutomation) includes code that is able to run the Ama
 
 # Snapshot Manager
 
-This [project](src/SnapshotManager) includes a Lambda function that will ensure that your Redshift cluster is backed up as frequently as you require, and that the snapshots that it creates are cleaned up automatically when they are no longer needed.
+This [project](src/SnapshotManager) is now deprecated. The automatic capture and management of cluster snapshots is handled by AWS. Documentation is [available](https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-snapshots.html)
 
 # WLM Query Monitoring Rule (QMR) Action Notification Utility
 
