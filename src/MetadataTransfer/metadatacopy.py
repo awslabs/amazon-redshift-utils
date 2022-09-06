@@ -193,7 +193,7 @@ def main():
     parser.add_argument("--srcuser", help="<superuser on source cluster>")
     parser.add_argument("--srcdbname", help="<source cluster database>")
     parser.add_argument("--tgtdbname", help="<target cluster database>")
-    parser.add_argument("--dbport", help="set database port", default=5439,type=int)
+    parser.add_argument("--dbport", help="set database port", default=5439, type=int)
     args = parser.parse_args()
 
     srchost = args.srccluster
