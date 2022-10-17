@@ -11,3 +11,4 @@ reportlab
 sqlparse
 tabulate
 tqdm==4.59.0
+maya
