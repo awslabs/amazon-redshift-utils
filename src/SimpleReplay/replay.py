@@ -1352,7 +1352,7 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
             logger.info(f"Fetching secrets from: {g_config['secret_name']}")
             secret_name = get_secret(g_config["secret_name"], g_config["target_cluster_region"])
             if len(set(secret_keys) - set(secret_name.keys())) == 0:
-                response = {'dbUser': secret_name["admin_username"], 'dbPassword': secret_name["admin_password"]}
+                response = {'DbUser': secret_name["admin_username"], 'DbPassword': secret_name["admin_password"]}
             else:
                 logger.error(f"Required secrets not found: {secret_keys}")
                 exit(-1)
@@ -1381,7 +1381,7 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
                         logger.error(f"Got exception retrieving credentials ({e.response['Error']['Code']})")
                         raise e
 
-                if response is None or response.get('dbPassword') is None:
+                if response is None or response.get('DbPassword') is None:
                     logger.warning(f"Failed to retrieve credentials for db {database} (attempt {attempt}/{max_attempts})")
                     logger.debug(response)
                     response = None
@@ -1389,8 +1389,8 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
                         time.sleep(retry_delay_sec)
                 else:
                     break
-        db_user = response["dbUser"]
-        db_password = response["dbPassword"]
+            db_user = response['DbUser']
+            db_password = response['DbPassword']
     else:
         rs_client = client("redshift", region_name=g_config.get("target_cluster_region", None), **additional_args)
         for attempt in range(1, max_attempts + 1):
