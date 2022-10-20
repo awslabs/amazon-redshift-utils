@@ -1,3 +1,9 @@
+"""
+extract.py
+====================================
+The core module of Simple Replay Project
+"""
+
 import argparse
 import datetime
 import gzip
@@ -6,724 +12,88 @@ import logging
 import os
 import pathlib
 import re
-import redshift_connector
-import threading
-import time
-import yaml
-from tqdm import tqdm
 from collections import OrderedDict
-from contextlib import contextmanager
 
 import boto3
-from boto3 import client
 import dateutil.parser
+import redshift_connector
+import yaml
+from boto3 import client
+from tqdm import tqdm
 
-from util import init_logging, set_log_level, prepend_ids_to_logs, add_logfile, log_version
+from audit_logs_parsing import (
+    parse_cloudwatch_logs,
+    ConnectionLog,
+    parse_log,
+    Logger,
+)
+
+from log_validation import (
+    remove_line_comments,
+    connection_time_replacement,
+    get_logs_in_range,
+)
+from util import (
+    init_logging,
+    set_log_level,
+    add_logfile,
+    log_version,
+)
 
 logger = None
 g_disable_progress_bar = None
 
-g_bar_format = '{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]'
-
-class Log:
-    def __init__(self):
-        self.record_time = ""
-        self.start_time = ""
-        self.end_time = ""
-        self.username = ""
-        self.database_name = ""
-        self.pid = ""
-        self.xid = ""
-        self.text = ""
-
-    def get_filename(self):
-        base_name = (
-            self.database_name + "-" + self.username + "-" + self.pid + "-" + self.xid + " (" + self.record_time.isoformat() + ")"
-        )
-        return base_name
-
-    def __str__(self):
-        return (
-            "Record time: %s, Start time: %s, End time: %s, Username: %s, Database: %s, PID: %s, XID: %s, Query: %s"
-            % (
-                self.record_time,
-                self.start_time,
-                self.end_time,
-                self.username,
-                self.database_name,
-                self.pid,
-                self.xid,
-                self.text,
-            )
-        )
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.record_time == other.record_time
-            and self.start_time == other.start_time
-            and self.end_time == other.end_time
-            and self.username == other.username
-            and self.database_name == other.database_name
-            and self.pid == other.pid
-            and self.xid == other.xid
-            and self.text == other.text
-        )
-
-    def __hash__(self):
-        return hash((str(self.pid), str(self.xid), self.text.strip("\n")))
-
-class ConnectionLog:
-    def __init__(self, session_initiation_time, end_time, database_name, username, pid):
-        self.session_initiation_time = session_initiation_time
-        self.disconnection_time = end_time
-        self.application_name = ""
-        self.database_name = database_name
-        self.username = username
-        self.pid = pid
-        self.time_interval_between_transactions = True
-        self.time_interval_between_queries = "transaction"
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.session_initiation_time == other.session_initiation_time
-            and self.disconnection_time == other.disconnection_time
-            and self.application_name == other.application_name
-            and self.database_name == other.database_name
-            and self.username == other.username
-            and self.pid == other.pid
-            and self.time_interval_between_transactions
-            == other.time_interval_between_transactions
-            and self.time_interval_between_queries
-            == other.time_interval_between_queries
-        )
-
-    def __hash__(self):
-            return hash((self.database_name, self.username, self.pid))
-
-    def get_pk(self):
-        return hash((self.session_initiation_time, self.database_name, self.username, self.pid))
-
-
-class SystemLog:
-    def __init__(self, start_time, end_time, database_name, user_id, pid, xid, text):
-        self.start_time = start_time
-        self.end_time = end_time
-        self.database_name = database_name
-        self.user_id = user_id
-        self.pid = pid
-        self.xid = xid
-        self.text = text
-
-    def __str__(self):
-        return (
-            "Start time: %s, End time: %s, User id: %s, PID: %s, XID: %s, Query: %s"
-            % (
-                self.start_time,
-                self.end_time,
-                self.user_id,
-                self.pid,
-                self.xid,
-                self.text,
-            )
-        )
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, self.__class__)
-            and self.start_time == other.start_time
-            and self.end_time == other.end_time
-            and self.user_id == other.user_id
-            and self.pid == other.xid
-            and self.xid == other.xid
-            and self.text == other.text
-        )
-
-    def __hash__(self):
-        return hash((str(self.pid), str(self.xid), self.text.strip("\n")))
-
-
-def retrieve_source_cluster_statement_text(
-    source_cluster_urls, databases, start_time, end_time, interface
-):
-    statement_text_logs = {}
-
-    for database_name in databases:
-        with initiate_connection(
-            source_cluster_urls, interface, database_name
-        ) as connection:
-            cursor = connection.cursor()
-
-            start_time_where = ""
-            end_time_where = ""
-            if start_time:
-                start_time_where = (
-                    f"AND starttime > '{start_time.strftime('%Y-%m-%d %H:%M:%S')}' "
-                )
-            if end_time:
-                end_time_where = (
-                    f"AND endtime < '{end_time.strftime('%Y-%m-%d %H:%M:%S')}' "
-                )
-
-            cursor.execute(
-                "SELECT starttime, endtime, userid, pid, xid, text, sequence "
-                "FROM SVL_STATEMENTTEXT "
-                f"WHERE userid>1 {start_time_where} {end_time_where}"
-                "ORDER BY xid, starttime, sequence;"
-            )
-
-            fetch_size = 10000
-
-            rows = cursor.fetchmany(fetch_size)
-            complete_log = None
-            for row in rows:
-                start_time = row[0].replace(tzinfo=datetime.timezone.utc)
-                end_time = row[1].replace(tzinfo=datetime.timezone.utc)
-                system_log = SystemLog(
-                    start_time, end_time, database_name, row[2], row[3], row[4], row[5],
-                )
-
-                if row[6] == 0:
-                    if complete_log is None:
-                        complete_log = system_log
-                    else:
-                        if hash(complete_log) in statement_text_logs:
-                            statement_text_logs[hash(complete_log)].append(complete_log)
-                        else:
-                            statement_text_logs[hash(complete_log)] = [complete_log]
-                        complete_log = system_log
-                else:
-                    if not complete_log is None:
-                        complete_log.text = complete_log.text + system_log.text
-
-                rows = cursor.fetchmany(fetch_size)
-
-            if hash(complete_log) in statement_text_logs:
-                statement_text_logs[hash(complete_log)].append(complete_log)
-            else:
-                statement_text_logs[hash(complete_log)] = [complete_log]
-
-    return statement_text_logs
-
-
-def combine_logs(audit_logs, statement_text_logs):
-    for audit_transaction in audit_logs:
-        for audit_query in audit_logs[audit_transaction]:
-            matching_statement_text_logs = statement_text_logs.get(hash(audit_query))
-            if matching_statement_text_logs:
-                statement_text_log = matching_statement_text_logs.pop()
-                if statement_text_log:
-                    if statement_text_log.start_time:
-                        audit_query.start_time = statement_text_log.start_time
-                    if statement_text_log.end_time:
-                        audit_query.end_time = statement_text_log.end_time
-
-
-@contextmanager
-def initiate_connection(cluster_urls, interface, database_name):
-    conn = None
-    if interface == "odbc":
-        cluster_split = cluster_urls["odbc"].split(";")
-        cluster_split[2] = "Database=" + database_name
-        cluster = ";".join(cluster_split)
-        try:
-            conn = pyodbc.connect(cluster, autocommit=True)
-            yield conn
-        finally:
-            if conn is not None:
-                conn.close()
-    elif interface == "psql":
-        try:
-            conn = redshift_connector.connect(
-                user=cluster_urls["psql"]["username"],
-                password=cluster_urls["psql"]["password"],
-                host=cluster_urls["psql"]["host"],
-                port=int(cluster_urls["psql"]["port"]),
-                database=database_name,
-
-            )
-            conn.autocommit = True
-            yield conn
-        finally:
-            if conn is not None:
-                conn.close()
-
-
-def parse_log(
-    log_file, filename, connections, last_connections, logs, databases, start_time, end_time,
-):
-    if "useractivitylog" in filename:
-        logger.debug(f"Parsing user activity log: {filename}")
-        parse_user_activity_log(log_file, logs, databases, start_time, end_time)
-    elif "connectionlog" in filename:
-        logger.debug(f"Parsing connection log: {filename}")
-        parse_connection_log(log_file, connections, last_connections, start_time, end_time)
-    elif "start_node" in filename:
-        logger.debug(f"Parsing start node log: {filename}")
-        parse_start_node_log(log_file, logs, databases, start_time, end_time)
-
-
-def parse_connection_log(file, connections, last_connections, start_time, end_time):
-    for line in file.readlines():
-        line = line.decode("utf-8")
-        connection_information = line.split("|")
-        connection_event = connection_information[0]
-        event_time = datetime.datetime.strptime(
-            connection_information[1], "%a, %d %b %Y %H:%M:%S:%f"
-        ).replace(tzinfo=datetime.timezone.utc)
-        pid = connection_information[4]
-        database_name = connection_information[5].strip()
-        if connection_information[7].strip() == 'IAM AssumeUser':
-            username = connection_information[6].strip()[4:]
-        else:
-            username = connection_information[6].strip()
-        application_name = connection_information[15]
-
-        if username != "rdsdb" and (not start_time or event_time >= start_time) and (not end_time or event_time <= end_time):
-
-            connection_log = ConnectionLog(event_time, end_time, database_name, username, pid)
-            if connection_event == "initiating session ":
-                connection_key = connection_log.get_pk()
-                # create a new connection
-                connections[connection_key] = connection_log
-                last_connections[hash(connection_log)]=connection_key
-            elif connection_event == "set application_name ":
-                if hash(connection_log) in last_connections:
-                    connection_key = last_connections[hash(connection_log)]
-                    if connection_key in connections:
-                        # set the latest connection with application name
-                        connections[connection_key].application_name = " ".join(application_name.split())
-                    else:
-                        # create new connection if there's no one yet with start
-                        # time equals to start of extraction
-                        connection_log.session_initiation_time = start_time
-                        connection_key = connection_log.get_pk()
-                        connections[connection_key] = connection_log
-                        last_connections[hash(connection_log)] = connection_key
-            elif connection_event == "disconnecting session ":
-                if hash(connection_log) in last_connections:
-                    connection_key = last_connections[hash(connection_log)]
-                    if connection_key in connections:
-                        # set the latest connection with disconnection time
-                        connections[connection_key].disconnection_time = event_time
-                else:
-                    # create new connection if there's no one yet with start
-                    # time equals to start of extraction
-                    connection_log.session_initiation_time = start_time
-                    connection_log.disconnection_time = event_time
-                    connection_key = connection_log.get_pk()
-                    connections[connection_key] = connection_log
-                    last_connections[hash(connection_log)] = connection_key
-
-
-def parse_user_activity_log(file, logs, databases, start_time, end_time):
-    user_activity_log = Log()
-
-    datetime_pattern = re.compile(r"'\d+-\d+-\d+T\d+:\d+:\d+Z UTC")
-    fetch_pattern = re.compile(r"fetch\s+(next|all|forward all|\d+|forward\s+\d+)\s+(from|in)\s+\S+", flags=re.IGNORECASE)
-    for line in file.readlines():
-        line = line.decode("utf-8")
-        if datetime_pattern.match(line):
-            if user_activity_log.xid and is_valid_log(
-                user_activity_log, start_time, end_time
-            ):
-                filename = user_activity_log.get_filename()
-                if filename in logs:
-                    # Check if duplicate. This happens with JDBC connections.
-                    prev_query = logs[filename][-1]
-                    if not is_duplicate(prev_query.text, user_activity_log.text):
-                        if fetch_pattern.search(prev_query.text) and fetch_pattern.search(user_activity_log.text):
-                            user_activity_log.text = f"--{user_activity_log.text}"
-                            logs[filename].append(user_activity_log)
-                        else:
-                            logs[filename].append(user_activity_log)
-                else:
-                    logs[filename] = [user_activity_log]
-
-                databases.add(user_activity_log.database_name)
-                user_activity_log = Log()
-            line_split = line.split(" LOG: ")
-            query_information = line_split[0].split(" ")
-
-            user_activity_log.record_time = dateutil.parser.parse(
-                query_information[0][1:]
-            )
-            user_activity_log.username = query_information[4][5:]
-            user_activity_log.database_name = query_information[3][3:]
-            user_activity_log.pid = query_information[5][4:]
-            user_activity_log.xid = query_information[7][4:]
-            user_activity_log.text = line_split[1]
-        else:
-            user_activity_log.text += line
-
-
-def is_valid_log(log, start_time, end_time):
-    """If query doesn't contain problem statements, saves it."""
-    problem_keywords = [
-        "SPECTRUM INTERNAL QUERY",
-        "context: SQL",
-        "ERROR:",
-        "CONTEXT:  SQL",
-        "show ",
-        "Undoing transaction",
-        "Undo on",
-        "pg_terminate_backend",
-        "pg_cancel_backend",
-        "volt_",
-        "pg_temp_",
-    ]
-
-    potential_problem_keywords = [
-        "BIND"
-    ]
-
-    not_problem_keywords = [
-        "BINDING"
-    ]
-
-    if log.username == "rdsdb":
-        return False
-
-    if start_time and log.record_time < start_time:
-        return False
-
-    if end_time and log.record_time > end_time:
-        return False
-
-    if any(word in log.text for word in problem_keywords):
-        return False
-
-    if any(word in log.text for word in potential_problem_keywords) and not any(word in log.text for word in not_problem_keywords):
-        return False
-
-    return True
-
-
-def is_duplicate(first_query_text, second_query_text):
-    dedupe_these = [
-        "set",
-        "select",
-        "create",
-        "delete",
-        "update",
-        "insert",
-        "copy",
-        "unload",
-        "with"
-    ]
-
-    first_query_text = first_query_text.strip()
-    second_query_text = second_query_text.strip()
-    first_query_text_no_semi = first_query_text.replace(";", "")
-    second_query_tex_no_semi = second_query_text.replace(";", "")
-    second_query_comment_removed = second_query_text
-    first_query_comment_removed = first_query_text
-    if second_query_text.startswith("/*"):
-        second_query_comment_removed = second_query_text[second_query_text.find('*/')+2:len(second_query_text)].strip()
-    if first_query_text.startswith("/*"):
-        first_query_comment_removed = first_query_text[second_query_text.find('*/')+2:len(first_query_text)].strip()
-    return (
-        (
-                first_query_text_no_semi == second_query_tex_no_semi
-                and any(second_query_comment_removed.startswith(word) for word in dedupe_these)
-        ) or ((second_query_comment_removed.lower().startswith('create')) and (first_query_comment_removed.lower().startswith('create')) and second_query_comment_removed.endswith(';'))
-        or ((second_query_comment_removed.lower().startswith('drop')) and (first_query_comment_removed.lower().startswith('drop')) and second_query_comment_removed.endswith(';'))
-        or ((second_query_comment_removed.lower().startswith('alter')) and (first_query_comment_removed.lower().startswith('alter')) and second_query_comment_removed.endswith(';'))
-    )
-
-
-def parse_start_node_log(file, logs, databases, start_time, end_time):
-    start_node_log = Log()
-
-    datetime_pattern = re.compile(r"'\d+-\d+-\d+ \d+:\d+:\d+ UTC")
-
-    for line in file.readlines():
-
-        if datetime_pattern.match(line):
-            if start_node_log.xid and is_valid_log(
-                start_node_log, start_time, end_time
-            ):
-                filename = start_node_log.get_filename()
-                if filename in logs:
-                    # Check if duplicate. This happens with JDBC connections.
-                    prev_query = logs[filename][-1]
-                    if not is_duplicate(prev_query.text, start_node_log.text):
-                        logs[filename].append(start_node_log)
-                else:
-                    logs[filename] = [start_node_log]
-
-                databases.add(start_node_log.database_name)
-                start_node_log = Log()
-
-            line_split = line.split("LOG:  statement: ")
-
-            # We only want to export statements, not errors or contexts
-            if len(line_split) == 2:
-                query_information = line_split[0].split(" ")
-
-                start_node_log.record_time = dateutil.parser.parse(
-                    query_information[0][1:]
-                    + " "
-                    + query_information[1]
-                    + " "
-                    + query_information[2]
-                )
-                start_node_log.database_name = query_information[4].split("@")[1]
-                start_node_log.username = query_information[4][3:].split(":")[0]
-                start_node_log.pid = query_information[5][4:]
-                start_node_log.xid = query_information[7][4:]
-                start_node_log.text = line_split[1].strip()
-        else:
-            start_node_log.text += line
-
-def connection_time_replacement(sorted_connections):
-    i = 0
-    min_init_time = sorted_connections[0]['session_initiation_time']
-    max_disconnect_time = sorted_connections[0]['disconnection_time']
-    empty_init_times = []
-    empty_disconnect_times = []
-    for connection in sorted_connections:
-        if connection['session_initiation_time'] == '':
-            empty_init_times.append(i)
-        elif min_init_time > connection['session_initiation_time']:
-            min_init_time = connection['session_initiation_time']
-
-        if connection['disconnection_time'] == '':
-            empty_disconnect_times.append(i)
-
-        elif max_disconnect_time == '' or ( max_disconnect_time and max_disconnect_time < connection['disconnection_time']):
-            max_disconnect_time = connection['disconnection_time']
-
-        i += 1
-    for init_time in empty_init_times:
-        sorted_connections[init_time]['session_initiation_time'] = min_init_time
-
-    for init_time in empty_disconnect_times:
-        sorted_connections[init_time]['disconnection_time'] = max_disconnect_time
-
-    return sorted_connections
-
-
-"""
-Remove single line comments
-If a line comment is inside a block comment, then the line comment ends at the end of the comment
-
-param query: the multiline query to remove single line comments from
-return: a string of the update query lines
-"""
-
-
-def remove_line_comments(query):
-    removed_string = query
-    prev_location = 0
-
-    while True:
-        line_comment_begin = removed_string.find('--', prev_location)
-        prev_location = line_comment_begin
-
-        # no more comments to find
-        if line_comment_begin == -1:
-            break
-
-        #found_comment = True
-        linebreak = removed_string.find('\n', line_comment_begin)
-        start_comment = removed_string.find('/*', line_comment_begin, linebreak if linebreak != -1 else len(removed_string))
-        end_comment = removed_string.find('*/', line_comment_begin, linebreak if linebreak != -1 else len(removed_string))
-
-        if linebreak != -1:
-            if start_comment == -1 and end_comment != -1:
-                # if line comment is between start and end, then remove until end of comment
-                removed_string = removed_string[:line_comment_begin] + removed_string[end_comment:]
-            else:
-                # else remove up the end of line
-                removed_string = removed_string[:line_comment_begin] + removed_string[linebreak:]
-        else:
-            # reached end of query
-            if start_comment == -1 and end_comment != -1:
-                # if line comment is between start and end, then remove until end of comment
-
-                removed_string = removed_string[:line_comment_begin] + removed_string[end_comment:]
-            else:
-                # else remove up the end of line
-                removed_string = removed_string[:line_comment_begin]
-
-    return removed_string
-
-
-def save_logs(logs, last_connections, output_directory, connections, start_time, end_time):
-    num_queries = 0
-    for filename, transaction in logs.items():
-        num_queries += len(transaction)
-    logger.info(
-        f"Exporting {len(logs)} transactions ({num_queries} queries) to {output_directory}"
-    )
-
-    is_s3 = True
-    if output_directory.startswith("s3://"):
-        output_s3_location = output_directory[5:].partition("/")
-        bucket_name = output_s3_location[0]
-        output_prefix = output_s3_location[2]
-        s3_client = boto3.client("s3")
-        archive_filename = "/tmp/SQLs.json.gz"
-    else:
-        is_s3 = False
-        archive_filename = output_directory + "/SQLs.json.gz"
-        logger.info(f"Creating directory {output_directory} if it doesn't already exist")
-        pathlib.Path(output_directory).mkdir(parents=True, exist_ok=True)
-
-    # transactions has form { "xid": xxx, "pid": xxx, etc..., queries: [] }
-    sql_json = {"transactions": OrderedDict()}
-
-    missing_audit_log_connections = set()
-
-    # Save the main logs and find replacements
-    replacements = set()
-
-    for filename, queries in tqdm(logs.items(), disable=g_disable_progress_bar, unit='files', desc='Files processed', bar_format=g_bar_format):
-        for idx, query in enumerate(queries):
-            try:
-                if query.xid not in sql_json['transactions']:
-                    sql_json['transactions'][query.xid] = {"xid": query.xid,
-                                                           "pid": query.pid,
-                                                           "db": query.database_name,
-                                                           "user": query.username,
-                                                           "time_interval": True,
-                                                           "queries": []}
-                query_info = {
-                  "record_time": query.record_time.isoformat(),
-                  "start_time": query.start_time.isoformat() if query.start_time else None,
-                  "end_time": query.end_time.isoformat() if query.end_time else None
-                }
-            except AttributeError:
-                logger.error(f'Query is missing header info, skipping {filename}: {query}')
-                continue
-
-            query.text = remove_line_comments(query.text).strip()
-
-            if "copy " in query.text.lower() and "from 's3:" in query.text.lower(): #Raj
-                bucket = re.search(r"from 's3:\/\/[^']*", query.text, re.IGNORECASE).group()[6:]
-                replacements.add(bucket)
-                query.text = re.sub(
-                    r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'",
-                    f" IAM_ROLE ''",
-                    query.text,
-                    flags=re.IGNORECASE,
-                )
-            if "unload" in query.text.lower() and "to 's3:" in query.text.lower():
-                query.text = re.sub(
-                    r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'",
-                    f" IAM_ROLE ''",
-                    query.text,
-                    flags=re.IGNORECASE,
-                )
-
-            query.text = f"{query.text.strip()}"
-            if not len(query.text) == 0:
-                if not query.text.endswith(";"):
-                    query.text += ";"
-
-            if "%" in query.text:
-                # Escape modulo operator in extract for replay - RR-411
-                query_info['text'] = query.text.replace("%", "%%")
-            else:
-                query_info['text'] = query.text
-
-            sql_json['transactions'][query.xid]['queries'].append(query_info)
-            if not hash((query.database_name, query.username, query.pid)) in last_connections:
-                missing_audit_log_connections.add((query.database_name, query.username, query.pid))
-
-    with gzip.open(archive_filename, 'wb') as f:
-        f.write(json.dumps(sql_json, indent=2).encode('utf-8'))
-
-    if is_s3:
-        dest = output_prefix + "/SQLs.json.gz"
-        logger.info("Transferring SQL archive to {dest}")
-        s3_client.upload_file(archive_filename, bucket_name, dest)
-
-    logger.info(f"Generating {len(missing_audit_log_connections)} missing connections.")
-    for missing_audit_log_connection_info in missing_audit_log_connections:
-        connection = ConnectionLog(
-            start_time,
-            end_time, # for missing connections set start_time and end_time to our extraction range
-            missing_audit_log_connection_info[0],
-            missing_audit_log_connection_info[1],
-            missing_audit_log_connection_info[2],
-        )
-        pk = connection.get_pk()
-        connections[pk] = connection
-    logger.info(
-        f"Exporting a total of {len(connections.values())} connections to {output_directory}"
-    )
-    # Save the connections logs
-    sorted_connections = connections.values()
-    connections_dict = connection_time_replacement([connection.__dict__ for connection in sorted_connections])
-    connections_string = json.dumps(
-        [connection.__dict__ for connection in sorted_connections],
-        indent=4,
-        default=str,
-    )
-    if is_s3:
-        s3_client.put_object(
-            Body=connections_string,
-            Bucket=bucket_name,
-            Key=output_prefix + "/connections.json",
+g_bar_format = (
+    "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]"
+)
+
+
+
+def get_logs(log_location, start_time, end_time, config):
+    """
+    getting the log location whether cloudwatch or s3 for cluster and checking
+    whether the cluster is serverless or provisioned
+    :param log_location:
+    :param start_time:
+    :param end_time:
+    :param config:
+    :return:
+    """
+
+    if  (config["source_cluster_endpoint"] and "redshift-serverless" in config["source_cluster_endpoint"]) or (config["log_location"] and "/aws/" in config["log_location"]):
+        logger.info(f"Extracting and parsing logs for serverless")
+        logger.info(f"Time range: {start_time or '*'} to {end_time or '*'}")
+        logger.info(f"This may take several minutes...")
+        return parse_cloudwatch_logs(
+            start_time=start_time, end_time=end_time, config=config
         )
     else:
-        connections_file = open(output_directory + "/connections.json", "x")
-        connections_file.write(connections_string)
-        connections_file.close()
-
-    # Save the replacements
-    logger.info(f"Exporting copy replacements to {output_directory}")
-    replacements_string = (
-        "Original location,Replacement location,Replacement IAM role\n"
-    )
-    for bucket in replacements:
-        replacements_string += bucket + ",,\n"
-    if is_s3:
-        s3_client.put_object(
-            Body=replacements_string,
-            Bucket=bucket_name,
-            Key=output_prefix + "/copy_replacements.csv",
-        )
-    else:
-        replacements_file = open(output_directory + "/copy_replacements.csv", "w")
-        replacements_file.write(replacements_string)
-        replacements_file.close()
-
-
-def get_cluster_log_location(source_cluster_endpoint):
-    """ Get the audit log location for the cluster via the API """
-    logger.debug(f"Retrieving log location for {source_cluster_endpoint}")
-    result = client("redshift").describe_logging_status(
-        ClusterIdentifier=source_cluster_endpoint.split(".")[0]
-    )
-
-    if not result["LoggingEnabled"]:
-       logger.warning(f"Cluster {source_cluster_endpoint} does not appear to have audit logging enabled.  Please confirm logging is enabled.")
-       return None
-
-    location = "s3://{}/{}".format(result["BucketName"], result.get('S3KeyPrefix', ''))
-    logger.debug(f"Log location: {location}")
-    return location
-
-
-def get_logs(log_location, start_time, end_time):
-    logger.info(f"Extracting and parsing logs from {log_location}")
-    logger.info(f"Time range: {start_time or '*'} to {end_time or '*'}")
-    logger.info(f"This may take several minutes...")
-    if log_location.startswith("s3://"):
-        match = re.search(r's3://([^/]+)/(.*)', log_location)
-        if not(match):
-            logger.error(f"Failed to parse log location {log_location}")
-            return None
-        return get_s3_logs(match.group(1), match.group(2), start_time, end_time)
-    else:
-        return get_local_logs(log_location, start_time, end_time)
+        logger.info(f"Extracting and parsing logs for provisioned")
+        logger.info(f"Time range: {start_time or '*'} to {end_time or '*'}")
+        logger.info(f"This may take several minutes...")
+        if log_location.startswith("s3://"):
+            match = re.search(r"s3://([^/]+)/(.*)", log_location)
+            if not (match):
+                logger.error(f"Failed to parse log location {log_location}")
+                return None
+            return get_s3_logs(match.group(1), match.group(2), start_time, end_time)
+        elif log_location in "cloudwatch":
+            # Function for cloudwatch logs
+            return parse_cloudwatch_logs(
+                start_time=start_time, end_time=end_time, config=config
+            )
+        else:
+            return get_local_logs(log_location, start_time, end_time)
 
 
 def get_local_logs(log_directory_path, start_time, end_time):
+    """
+
+    :param log_directory_path:
+    :param start_time:
+    :param end_time:
+    :return:
+    """
     connections = {}
     last_connections = {}
     logs = {}
@@ -732,7 +102,13 @@ def get_local_logs(log_directory_path, start_time, end_time):
     unsorted_list = os.listdir(log_directory_path)
     log_directory = sorted(unsorted_list)
 
-    for filename in tqdm(log_directory, disable=g_disable_progress_bar, unit='files', desc='Files processed', bar_format=g_bar_format):
+    for filename in tqdm(
+        log_directory,
+        disable=g_disable_progress_bar,
+        unit="files",
+        desc="Files processed",
+        bar_format=g_bar_format,
+    ):
         if g_disable_progress_bar:
             logger.info(f"Processing {filename}")
         if "start_node" in filename:
@@ -742,7 +118,14 @@ def get_local_logs(log_directory_path, start_time, end_time):
         else:
             log_file = gzip.open(log_directory_path + "/" + filename, "r")
         parse_log(
-            log_file, filename, connections, last_connections, logs, databases, start_time, end_time,
+            log_file,
+            filename,
+            connections,
+            last_connections,
+            logs,
+            databases,
+            start_time,
+            end_time,
         )
         log_file.close()
 
@@ -750,6 +133,14 @@ def get_local_logs(log_directory_path, start_time, end_time):
 
 
 def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
+    """
+    getting logs from s3 and passing it to get_s3_audit_logs()
+    :param log_bucket:
+    :param log_prefix:
+    :param start_time:
+    :param end_time:
+    :return:
+    """
     connections = {}
     logs = {}
     last_connections = {}
@@ -758,17 +149,14 @@ def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
     conn = client("s3")
 
     # get first set of
-    response = conn.list_objects_v2(Bucket=log_bucket,
-                                    Prefix=log_prefix
-    )
+    response = conn.list_objects_v2(Bucket=log_bucket, Prefix=log_prefix)
     bucket_objects = response["Contents"]
 
     if "NextContinuationToken" in response:
         prev_key = response["NextContinuationToken"]
         while True:
-            response = conn.list_objects_v2(Bucket=log_bucket,
-                                            Prefix=log_prefix,
-                                            ContinuationToken=prev_key
+            response = conn.list_objects_v2(
+                Bucket=log_bucket, Prefix=log_prefix, ContinuationToken=prev_key
             )
             bucket_objects.extend(response["Contents"])
             if "NextContinuationToken" not in response:
@@ -812,33 +200,6 @@ def get_s3_logs(log_bucket, log_prefix, start_time, end_time):
     return (connections, logs, databases, last_connections)
 
 
-def get_logs_in_range(audit_objects, start_time, end_time):
-    start_idx = None
-    end_idx = None
-    filenames = []
-    for index, log in list(enumerate(audit_objects)):
-        filename = log["Key"].split("/")[-1]
-        file_datetime = dateutil.parser.parse(filename.split("_")[-1][:-3]).replace(
-            tzinfo=datetime.timezone.utc
-        )
-        if start_time and file_datetime < start_time:
-            continue
-
-        if end_time and file_datetime > end_time:
-            # make sure we've started
-            if len(filenames) > 0:
-                filenames.append(log["Key"])
-            break
-
-        # start with one before the first file to make sure we capture everything
-        if len(filenames) == 0 and index > 0:
-            filenames.append(audit_objects[index - 1]["Key"])
-
-        filenames.append(log["Key"])
-
-    return filenames
-
-
 def get_s3_audit_logs(
     log_bucket,
     log_prefix,
@@ -850,6 +211,20 @@ def get_s3_audit_logs(
     databases,
     last_connections,
 ):
+    """
+    Getting  audit logs from S3 for the cluster from get_s3_logs  and calling the pasrse_log()
+
+    :param log_bucket:
+    :param log_prefix:
+    :param start_time:
+    :param end_time:
+    :param audit_objects:
+    :param connections:
+    :param logs:
+    :param databases:
+    :param last_connections:
+    :return:
+    """
     s3 = boto3.resource("s3")
 
     index_of_last_valid_log = len(audit_objects) - 1
@@ -862,20 +237,33 @@ def get_s3_audit_logs(
     curr_index = index_of_last_valid_log
 
     last = curr_index
-    for filename in tqdm(log_filenames, disable=g_disable_progress_bar, unit='files', desc='Files processed', bar_format=g_bar_format):
-          file_datetime = dateutil.parser.parse(filename.split("_")[-1][:-3]).replace(
-              tzinfo=datetime.timezone.utc
-          )
+    for filename in tqdm(
+        log_filenames,
+        disable=g_disable_progress_bar,
+        unit="files",
+        desc="Files processed",
+        bar_format=g_bar_format,
+    ):
+        file_datetime = dateutil.parser.parse(filename.split("_")[-1][:-3]).replace(
+            tzinfo=datetime.timezone.utc
+        )
 
-          curr_connection_length = len(connections)
-          curr_logs_length = len(logs)
+        curr_connection_length = len(connections)
+        curr_logs_length = len(logs)
 
-          log_object = s3.Object(log_bucket, filename)
-          log_file = gzip.GzipFile(fileobj=log_object.get()["Body"])
+        log_object = s3.Object(log_bucket, filename)
+        log_file = gzip.GzipFile(fileobj=log_object.get()["Body"])
 
-          parse_log(
-              log_file, filename, connections, last_connections, logs, databases, start_time, end_time,
-          )
+        parse_log(
+            log_file,
+            filename,
+            connections,
+            last_connections,
+            logs,
+            databases,
+            start_time,
+            end_time,
+        )
 
     logger.debug(
         f'First audit log in start_time range: {audit_objects[curr_index]["Key"].split("/")[-1]}'
@@ -883,39 +271,178 @@ def get_s3_audit_logs(
     return (connections, logs, databases, last_connections)
 
 
-def get_connection_string(cluster_endpoint, username, odbc_driver):
-    cluster_endpoint_split = cluster_endpoint.split(".")
-    cluster_id = cluster_endpoint_split[0]
-    cluster_host = cluster_endpoint.split(":")[0]
-    cluster_port = cluster_endpoint_split[5].split("/")[0][4:]
-    cluster_database = cluster_endpoint_split[5].split("/")[1]
+def save_logs(
+    logs, last_connections, output_directory, connections, start_time, end_time
+):
+    """
+    saving the extracted logs in S3 location in the following format:
+    connections.json, copy_replacements.csv, SQLs.json.gz
+    :param logs:
+    :param last_connections:
+    :param output_directory:
+    :param connections:
+    :param start_time:
+    :param end_time:
+    :return:
+    """
+    num_queries = 0
+    for filename, transaction in logs.items():
+        num_queries += len(transaction)
+    logger.info(
+        f"Exporting {len(logs)} transactions ({num_queries} queries) to {output_directory}"
+    )
 
-    try:
-        response = client("redshift").get_cluster_credentials(
-            DbUser=username, ClusterIdentifier=cluster_id, AutoCreate=False,
+    is_s3 = True
+    if output_directory.startswith("s3://"):
+        output_s3_location = output_directory[5:].partition("/")
+        bucket_name = output_s3_location[0]
+        output_prefix = output_s3_location[2]
+        s3_client = boto3.client("s3")
+        archive_filename = "/tmp/SQLs.json.gz"
+    else:
+        is_s3 = False
+        archive_filename = output_directory + "/SQLs.json.gz"
+        logger.info(
+            f"Creating directory {output_directory} if it doesn't already exist"
         )
-        cluster_odbc_url = (
-            "Driver={%s}; Server=%s; Database=%s; IAM=1; DbUser=%s; DbPassword=%s; Port=%s"
-            % (
-                odbc_driver,
-                cluster_host,
-                cluster_database,
-                response["DbUser"].split(":")[1],
-                response["DbPassword"],
-                cluster_port,
-            )
+        pathlib.Path(output_directory).mkdir(parents=True, exist_ok=True)
+
+    # transactions has form { "xid": xxx, "pid": xxx, etc..., queries: [] }
+    sql_json = {"transactions": OrderedDict()}
+
+    missing_audit_log_connections = set()
+
+    # Save the main logs and find replacements
+    replacements = set()
+
+    for filename, queries in tqdm(
+        logs.items(),
+        disable=g_disable_progress_bar,
+        unit="files",
+        desc="Files processed",
+        bar_format=g_bar_format,
+    ):
+        for idx, query in enumerate(queries):
+            try:
+                if query.xid not in sql_json["transactions"]:
+                    sql_json["transactions"][query.xid] = {
+                        "xid": query.xid,
+                        "pid": query.pid,
+                        "db": query.database_name,
+                        "user": query.username,
+                        "time_interval": True,
+                        "queries": [],
+                    }
+                query_info = {
+                    "record_time": query.record_time.isoformat(),
+                    "start_time": query.start_time.isoformat()
+                    if query.start_time
+                    else None,
+                    "end_time": query.end_time.isoformat() if query.end_time else None,
+                }
+            except AttributeError:
+                logger.error(
+                    f"Query is missing header info, skipping {filename}: {query}"
+                )
+                continue
+
+            query.text = remove_line_comments(query.text).strip()
+
+            if "copy " in query.text.lower() and "from 's3:" in query.text.lower():
+                bucket = re.search(
+                    r"from 's3:\/\/[^']*", query.text, re.IGNORECASE
+                ).group()[6:]
+                replacements.add(bucket)
+                query.text = re.sub(
+                    r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'",
+                    f" IAM_ROLE ''",
+                    query.text,
+                    flags=re.IGNORECASE,
+                )
+            if "unload" in query.text.lower() and "to 's3:" in query.text.lower():
+                query.text = re.sub(
+                    r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'",
+                    f" IAM_ROLE ''",
+                    query.text,
+                    flags=re.IGNORECASE,
+                )
+
+            query.text = f"{query.text.strip()}"
+            if not len(query.text) == 0:
+                if not query.text.endswith(";"):
+                    query.text += ";"
+
+            query_info["text"] = query.text
+            sql_json["transactions"][query.xid]["queries"].append(query_info)
+
+            if (
+                not hash((query.database_name, query.username, query.pid))
+                in last_connections
+            ):
+                missing_audit_log_connections.add(
+                    (query.database_name, query.username, query.pid)
+                )
+
+    with gzip.open(archive_filename, "wb") as f:
+        f.write(json.dumps(sql_json, indent=2).encode("utf-8"))
+
+    if is_s3:
+        dest = output_prefix + "/SQLs.json.gz"
+        logger.info("Transferring SQL archive to {dest}")
+        s3_client.upload_file(archive_filename, bucket_name, dest)
+
+    logger.info(f"Generating {len(missing_audit_log_connections)} missing connections.")
+    for missing_audit_log_connection_info in missing_audit_log_connections:
+        connection = ConnectionLog(
+            start_time,
+            end_time,  # for missing connections set start_time and end_time to our extraction range
+            missing_audit_log_connection_info[0],
+            missing_audit_log_connection_info[1],
+            missing_audit_log_connection_info[2],
         )
-        cluster_psql = {
-            "username": response["DbUser"],
-            "password": response["DbPassword"],
-            "host": cluster_host,
-            "port": cluster_port,
-            "database": cluster_database,
-        }
-        return {"odbc": cluster_odbc_url, "psql": cluster_psql}
-    except Exception as err:
-        logger.error("Failed to generate connection string: " + str(err))
-        return ""
+        pk = connection.get_pk()
+        connections[pk] = connection
+    logger.info(
+        f"Exporting a total of {len(connections.values())} connections to {output_directory}"
+    )
+    # Save the connections logs
+    sorted_connections = connections.values()
+    connections_dict = connection_time_replacement(
+        [connection.__dict__ for connection in sorted_connections]
+    )
+    connections_string = json.dumps(
+        [connection.__dict__ for connection in sorted_connections],
+        indent=4,
+        default=str,
+    )
+    if is_s3:
+        s3_client.put_object(
+            Body=connections_string,
+            Bucket=bucket_name,
+            Key=output_prefix + "/connections.json",
+        )
+    else:
+        connections_file = open(output_directory + "/connections.json", "x")
+        connections_file.write(connections_string)
+        connections_file.close()
+
+    # Save the replacements
+    logger.info(f"Exporting copy replacements to {output_directory}")
+    replacements_string = (
+        "Original location,Replacement location,Replacement IAM role\n"
+    )
+    for bucket in replacements:
+        replacements_string += bucket + ",,\n"
+    if is_s3:
+        s3_client.put_object(
+            Body=replacements_string,
+            Bucket=bucket_name,
+            Key=output_prefix + "/copy_replacements.csv",
+        )
+    else:
+        replacements_file = open(output_directory + "/copy_replacements.csv", "w")
+        replacements_file.write(replacements_string)
+        replacements_file.close()
 
 
 def unload_system_table(
@@ -925,6 +452,16 @@ def unload_system_table(
     unload_location,
     unload_iam_role,
 ):
+    """
+    Unloading the system table if the unload location and unload iam user
+    is mentioned in the extract.yaml file.
+    :param source_cluster_urls: cluster dict
+    :param odbc_driver:
+    :param unload_system_table_queries_file:
+    :param unload_location:
+    :param unload_iam_role:
+    :return:
+    """
     conn = None
     if odbc_driver:
         conn = pyodbc.connect(source_cluster_urls["odbc"])
@@ -935,7 +472,6 @@ def unload_system_table(
             host=source_cluster_urls["psql"]["host"],
             port=int(source_cluster_urls["psql"]["port"]),
             database=source_cluster_urls["psql"]["database"],
-
         )
 
     conn.autocommit = True
@@ -975,12 +511,27 @@ def unload_system_table(
 
 
 def validate_config_file(config_file):
+    """
+    Validating the parameters from extract.yaml file
+    :param config_file: extract.yaml file
+    :return:
+    """
     if config_file["source_cluster_endpoint"]:
-        if (
+        if "redshift-serverless" in config_file["source_cluster_endpoint"]:
+            if (
+                not len(config_file["source_cluster_endpoint"].split(".")) == 6
+                or not len(config_file["source_cluster_endpoint"].split(":")) == 2
+                or not len(config_file["source_cluster_endpoint"].split("/")) == 2
+            ):
+                logger.error(
+                    'Config file value for "source_cluster_endpoint" is not a valid endpoint. Endpoints must be in the format of <identifier>.<region>.redshift-serverless.amazonaws.com:<port>/<database-name>.'
+                )
+                exit(-1)
+        elif (
             not len(config_file["source_cluster_endpoint"].split(".")) == 6
             or not len(config_file["source_cluster_endpoint"].split(":")) == 2
             or not len(config_file["source_cluster_endpoint"].split("/")) == 2
-            or not ".redshift.amazonaws.com:" in config_file["source_cluster_endpoint"]
+            or ".redshift.amazonaws.com:" not in config_file["source_cluster_endpoint"]
         ):
             logger.error(
                 'Config file value for "source_cluster_endpoint" is not a valid endpoint. Endpoints must be in the format of <cluster-name>.<identifier>.<region>.redshift.amazonaws.com:<port>/<database-name>.'
@@ -1050,11 +601,44 @@ def validate_config_file(config_file):
         exit(-1)
 
 
+def get_cluster_log_location(source_cluster_endpoint):
+    """Get the audit log location for the cluster via the API
+    """
+    if "redshift-serverless" not in source_cluster_endpoint:
+        logger.debug(f"Retrieving log location for {source_cluster_endpoint}")
+        region = source_cluster_endpoint.split(".")[2]
+        result = client("redshift", region).describe_logging_status(
+            ClusterIdentifier=source_cluster_endpoint.split(".")[0]
+        )
+
+        if not result["LoggingEnabled"]:
+            logger.warning(
+                f"Cluster {source_cluster_endpoint} does not appear to have audit logging enabled.  Please confirm logging is enabled."
+            )
+            return None
+        if "LogDestinationType" in result and result["LogDestinationType"] == "cloudwatch":
+            return "cloudwatch"
+        location = "s3://{}/{}".format(result["BucketName"], result.get("S3KeyPrefix", ""))
+        logger.debug(f"Log location: {location}")
+        return location
+    else:
+        logger.debug(f"Retrieving log location for {source_cluster_endpoint}")
+        region = source_cluster_endpoint.split(".")[2]
+        serverless_client = boto3.client('redshift-serverless',region)
+        workgroup_response = serverless_client.get_workgroup(workgroupName=source_cluster_endpoint.split(".")[0])
+        namespace_response = serverless_client.get_namespace(namespaceName=workgroup_response["workgroup"]["namespaceName"])
+        if len(namespace_response["namespace"]["logExports"])==0 :
+            logger.warning(
+                f"Cluster {source_cluster_endpoint} does not appear to have audit logging enabled.  Please confirm logging is enabled."
+            )
+            return None
+
 def load_driver():
     interface = None
     if g_config["odbc_driver"]:
         try:
             import pyodbc
+
             interface = "odbc"
         except Exception as err:
             logger.error(
@@ -1063,6 +647,7 @@ def load_driver():
     else:
         try:
             import redshift_connector
+
             interface = "psql"
         except Exception as err:
             logger.error(
@@ -1072,20 +657,78 @@ def load_driver():
     return interface
 
 
-def main():
+def get_connection_string(cluster_endpoint, username, odbc_driver):
+    cluster_endpoint_split = cluster_endpoint.split(".")
+    cluster_region = cluster_endpoint.split(".")[2]
+    cluster_id = cluster_endpoint_split[0]
+    cluster_host = cluster_endpoint.split(":")[0]
+    if "redshift-serverless" in cluster_endpoint:
+        cluster_port = cluster_endpoint_split[5].split("/")[0][4:]
+        cluster_database = cluster_endpoint_split[5].split("/")[1]
+    else:
+        cluster_port = cluster_endpoint_split[5].split("/")[0][4:]
+        cluster_database = cluster_endpoint_split[5].split("/")[1]
+    try:
+        if "redshift-serverless" in cluster_endpoint:
+            response = client.get_credentials(
+                dbName=cluster_database,
+                durationSeconds=123,
+                workgroupName=cluster_id
+            )
+            cluster_psql = {
+                "username": response["dbUser"],
+                "password": response["dbPassword"],
+                "host": cluster_host,
+                "port":  cluster_port,
+                "database": cluster_database,
+            }
+        else:
+            response = client("redshift", cluster_region).get_cluster_credentials(
+                DbUser=username,
+                ClusterIdentifier=cluster_id,
+                AutoCreate=False,
+            )
+            cluster_psql = {
+                "username": response["DbUser"],
+                "password": response["DbPassword"],
+                "host": cluster_host,
+                "port": cluster_port,
+                "database": cluster_database,
+            }
+
+        return {"odbc": None, "psql": cluster_psql}
+    except Exception as err:
+        logger.error("Failed to generate connection string: " + str(err))
+        return ""
+
+
+def init_logger():
+    """Initialize logger"""
     global logger
     logger = init_logging(logging.INFO)
+    Logger(logger)
 
-    global g_config
 
+def get_arguments():
+    """
+    getting the CLI arguments
+    :return: CLI argumets
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "config_file",
         type=argparse.FileType("r"),
         help="Location of extraction config file.",
     )
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+def init_global_config(args):
+    """
+    Loading the extract.yaml filr
+    :param args: CLI as extract.yaml file
+    """
+    global g_config
     g_config = {}
     with args.config_file as stream:
         try:
@@ -1094,30 +737,46 @@ def main():
             logger.error(f"Failed to parse extraction config yaml file: {exception}")
             exit(-1)
 
-    validate_config_file(g_config)
 
-    level = logging.getLevelName(g_config.get('log_level', 'INFO').upper())
+def configure_logging():
+    """
+    logging configuration, settting log_level to (INFO or DEBUG)
+    and producing the progress_bar in the output
+    """
+    level = logging.getLevelName(g_config.get("log_level", "INFO").upper())
     set_log_level(level)
 
     if g_config.get("logfile_level") != "none":
-        level = logging.getLevelName(g_config.get('logfile_level', 'DEBUG').upper())
-        log_file = 'extract.log'
-        add_logfile(log_file, level=level, preamble=yaml.dump(g_config), backup_count=g_config.get("backup_count", 2))
-
-    # print the version
+        level = logging.getLevelName(g_config.get("logfile_level", "DEBUG").upper())
+        log_file = "extract.log"
+        add_logfile(
+            log_file,
+            level=level,
+            preamble=yaml.dump(g_config),
+            backup_count=g_config.get("backup_count", 2),
+        )
     log_version()
-
     # disable_progress_bar should be None if user sets to False, to disable writing to
     # non-tty (i.e. log file)
-    if g_config.get('disable_progress_bar') ==  True:
+    if g_config.get("disable_progress_bar") == True:
         global g_disable_progress_bar
         g_disable_progress_bar = True
 
+
+def attempt_driver_loading():
+    """
+    calling load_driver for loading either psql or odbc driver
+    """
     interface = load_driver()
     if not interface:
         logger.error("Failed to load driver.")
         exit(-1)
 
+
+def get_parameters_for_log_extraction():
+    """
+    return parameters extraction_name, start_time, end_time, log_location
+    """
     if g_config["source_cluster_endpoint"]:
         extraction_name = f'Extraction_{g_config["source_cluster_endpoint"].split(".")[0]}_{datetime.datetime.now().replace(tzinfo=datetime.timezone.utc).isoformat()}'
     else:
@@ -1135,36 +794,46 @@ def main():
             dateutil.tz.tzutc()
         )
 
-    # read the logs
-    if g_config.get("log_location"):
-        log_location = g_config["log_location"]
-    elif g_config.get("source_cluster_endpoint"):
-        log_location = get_cluster_log_location(g_config["source_cluster_endpoint"])
-    else:
-        logger.error("Either log_location or source_cluster_endpoint must be specified.")
-        exit(-1)
+        # read the logs
+        log_location = ""
+        if (g_config["source_cluster_endpoint"] and "redshift-serverless" not in g_config[
+            "source_cluster_endpoint"]) or (g_config["log_location"] and "s3://" in g_config["log_location"]):
+            if g_config.get("log_location"):
+                log_location = g_config["log_location"]
+            elif g_config.get("source_cluster_endpoint"):
+                log_location = get_cluster_log_location(g_config["source_cluster_endpoint"])
+            else:
+                logger.error(
+                    "Either log_location or source_cluster_endpoint must be specified."
+                )
+                exit(-1)
+        else:
+            if g_config.get("log_location"):
+                log_location = g_config["log_location"]
+            elif g_config.get("source_cluster_endpoint"):
+                log_location = get_cluster_log_location(g_config["source_cluster_endpoint"])
+            else:
+                logger.error(
+                    "Either log_location or source_cluster_endpoint must be specified."
+                )
+                exit(-1)
+        return extraction_name, start_time, end_time, log_location
 
-    (connections, audit_logs, databases, last_connections) = get_logs(log_location, start_time, end_time)
 
-    logger.debug(f"Found {len(connections)} connection logs, {len(audit_logs)} audit logs")
-
-    if(len(audit_logs) == 0 or len(connections) == 0):
-        logger.warning("No audit logs or connections logs found. Please verify that the audit log location or cluster endpoint is correct. Note, audit logs can take several hours to start appearing in S3 after logging is first enabled.")
-        exit(-1)
-
-    if g_config["source_cluster_endpoint"]:
+def retrieve_cluster_endpoint_info(extraction_name):
+    """
+    retrieving information for cluster endpoint and calling the
+    get_connection_string(), unload_system_table
+    :param extraction_name: name for the extraction log file
+    :return:
+    """
+    if g_config["source_cluster_endpoint"] and "redshift-serverless" not in g_config["source_cluster_endpoint"]:
         logger.info(f'Retrieving info from {g_config["source_cluster_endpoint"]}')
         source_cluster_urls = get_connection_string(
             g_config["source_cluster_endpoint"],
             g_config["master_username"],
             g_config["odbc_driver"],
         )
-
-        source_cluster_statement_text_logs = retrieve_source_cluster_statement_text(
-            source_cluster_urls, databases, start_time, end_time, interface,
-        )
-
-        combine_logs(audit_logs, source_cluster_statement_text_logs)
 
         if (
             g_config["source_cluster_system_table_unload_location"]
@@ -1179,7 +848,9 @@ def main():
                 source_cluster_urls,
                 g_config["odbc_driver"],
                 g_config["unload_system_table_queries"],
-                g_config["source_cluster_system_table_unload_location"] + "/" + extraction_name,
+                g_config["source_cluster_system_table_unload_location"]
+                + "/"
+                + extraction_name,
                 g_config["source_cluster_system_table_unload_iam_role"],
             )
 
@@ -1187,13 +858,55 @@ def main():
                 f'Exported system tables to {g_config["source_cluster_system_table_unload_location"]}'
             )
 
+
+def validate_log_result(connections, audit_logs) -> None:
+    """Validate log results from get_logs()
+
+    :param connections: number of connection logs
+    :param audit_logs: number of audit logs
+    :return: None
+    """
+    logger.debug(
+        f"Found {len(connections)} connection logs, {len(audit_logs)} audit logs"
+    )
+
+    if len(audit_logs) == 0 or len(connections) == 0:
+        logger.warning(
+            "No audit logs or connections logs found. "
+            "Please verify that the audit log location or cluster endpoint is correct. "
+            "Note, audit logs can take several hours to start appearing in S3 after logging is first enabled."
+        )
+        exit(-1)
+
+
+def main():
+    init_logger()
+    args = get_arguments()
+    init_global_config(args)
+    validate_config_file(g_config)
+    configure_logging()
+    attempt_driver_loading()
+
+    (
+        extraction_name,
+        start_time,
+        end_time,
+        log_location,
+    ) = get_parameters_for_log_extraction()
+    (connections, audit_logs, databases, last_connections) = get_logs(
+        log_location, start_time, end_time, g_config
+    )
+
+    validate_log_result(connections=connections, audit_logs=audit_logs)
+    retrieve_cluster_endpoint_info(extraction_name)
+
     save_logs(
         audit_logs,
         last_connections,
         g_config["workload_location"] + "/" + extraction_name,
         connections,
         start_time,
-        end_time
+        end_time,
     )
 
 

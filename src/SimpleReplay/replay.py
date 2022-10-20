@@ -1326,7 +1326,7 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
     cluster_id = cluster_endpoint_split[0]
 
     # Keeping NLB just for Serverless for now
-    if g_config['nlb_nat_dns'] != None and g_is_serverless:
+    if g_config['nlb_nat_dns'] is not None and g_is_serverless:
         cluster_host = g_config['nlb_nat_dns']
     else:
         cluster_host = cluster_endpoint.split(":")[0]
@@ -1343,16 +1343,54 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
                            'verify': False}
 
     response = None
+    db_user = None
+    db_password = None
     secret_keys = ['admin_username', 'admin_password']
 
     if g_is_serverless:
-        logger.info(f"Fetching secrets from: {g_config['secret_name']}")
-        secret_name = get_secret(g_config["secret_name"], g_config["target_cluster_region"])
-        if len(set(secret_keys) - set(secret_name.keys())) == 0:
-            response = {'DbUser': secret_name["admin_username"], 'DbPassword': secret_name["admin_password"]}
+        if g_config['secret_name'] is not None:
+            logger.info(f"Fetching secrets from: {g_config['secret_name']}")
+            secret_name = get_secret(g_config["secret_name"], g_config["target_cluster_region"])
+            if len(set(secret_keys) - set(secret_name.keys())) == 0:
+                response = {'DbUser': secret_name["admin_username"], 'DbPassword': secret_name["admin_password"]}
+            else:
+                logger.error(f"Required secrets not found: {secret_keys}")
+                exit(-1)
         else:
-            logger.error(f"Required secrets not found: {secret_keys}")
-            exit(-1)
+            # Using backward compatibility method to fetch user credentials for serverless workgroup
+            # rs_client = client('redshift-serverless', region_name=g_config.get("target_cluster_region", None))
+            rs_client = client('redshift', region_name=g_config.get("target_cluster_region", None))
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    # response = rs_client.get_credentials(dbName=database, durationSeconds = 3600, workgroupName=cluster_id)
+                    serverless_cluster_id = f"redshift-serverless-{cluster_id}"
+                    logger.debug(f"Serverless cluster id {serverless_cluster_id} passed to get_cluster_credentials")
+                    response = rs_client.get_cluster_credentials(
+                        DbUser=username, ClusterIdentifier=serverless_cluster_id, AutoCreate=False,
+                        DurationSeconds=credentials_timeout_sec
+                    )
+                except rs_client.exceptions.ClientError as e:
+                    if e.response['Error']['Code'] == 'ExpiredToken':
+                        logger.error(f"Error retrieving credentials for {cluster_id}: IAM credentials have expired.")
+                        exit(-1)
+                    elif e.response['Error']['Code'] == 'ResourceNotFoundException':
+                        logger.error(f"Serverless endpoint could not be found "
+                                    f"RedshiftServerless:GetCredentials. {e}")
+                        exit(-1)
+                    else:
+                        logger.error(f"Got exception retrieving credentials ({e.response['Error']['Code']})")
+                        raise e
+
+                if response is None or response.get('DbPassword') is None:
+                    logger.warning(f"Failed to retrieve credentials for db {database} (attempt {attempt}/{max_attempts})")
+                    logger.debug(response)
+                    response = None
+                    if attempt < max_attempts:
+                        time.sleep(retry_delay_sec)
+                else:
+                    break
+            db_user = response['DbUser']
+            db_password = response['DbPassword']
     else:
         rs_client = client("redshift", region_name=g_config.get("target_cluster_region", None), **additional_args)
         for attempt in range(1, max_attempts + 1):
@@ -1382,6 +1420,8 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
                     time.sleep(retry_delay_sec)
             else:
                 break
+        db_user = response["DbUser"]
+        db_password = response["DbPassword"]
 
     if response is None:
         msg = f"Failed to retrieve credentials for {username}"
@@ -1392,15 +1432,15 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
             odbc_driver,
             cluster_host,
             cluster_database,
-            response["DbUser"].split(":")[1] if ":" in response["DbUser"] else response["DbUser"],
-            response["DbPassword"],
+            db_user.split(":")[1] if ":" in db_user else db_user,
+            db_password,
             cluster_port,
         )
     )
 
     cluster_psql = {
-        "username": response["DbUser"],
-        "password": response["DbPassword"],
+        "username": db_user,
+        "password": db_password,
         "host": cluster_host,
         "port": cluster_port,
         "database": cluster_database,
@@ -1410,8 +1450,8 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
         'odbc': cluster_odbc_url,
         'psql': cluster_psql,
         # new params
-        'username': response['DbUser'],
-        'password': response['DbPassword'],
+        'username': db_user,
+        'password': db_password,
         'host': cluster_host,
         'port': cluster_port,
         'database': cluster_database,
@@ -1592,11 +1632,11 @@ def validate_config(config):
         logger.debug(
             'No NLB / NAT endpoint specified. Replay will use target_cluster_endpoint to connect.'
         )
-    if bool(re.fullmatch(g_serverless_cluster_endpoint_pattern, g_config['target_cluster_endpoint'])) and not config["secret_name"]:
-        logger.error(
-            'SECRET_NAME property not specified, it is required for Replay on Serverless. Please setup Secret using AWS Secrets Manager as specified in README.'
+    if not config["secret_name"]:
+        config["secret_name"] = None
+        logger.debug(
+            'SECRET_NAME property not specified.'
         )
-        exit(-1)
 
     config['filters'] = validate_and_normalize_filters(ConnectionLog, config.get('filters', {}))
 
@@ -1654,6 +1694,7 @@ def main():
         g_is_serverless = False
 
     cluster = cluster_dict(g_config["target_cluster_endpoint"], g_is_serverless)
+
     # generate replay id/hash
     global g_replay_timestamp
     g_replay_timestamp = datetime.datetime.now(tz=datetime.timezone.utc)
