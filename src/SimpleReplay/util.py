@@ -121,7 +121,7 @@ def db_connect(interface="psql",
         conn = pyodbc.connect(odbc_connection_str)
     else:
         raise ValueError(f"Unknown Interface {interface}")
-    conn.autocommit = True
+    conn.autocommit = False
     return conn
 
 
