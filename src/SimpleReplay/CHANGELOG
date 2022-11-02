@@ -1,3 +1,6 @@
+## SimpleReplay 2.2.4
+- Reverting AutoCommit mode to FALSE
+
 ## SimpleReplay 2.2.3
 - Ability to run Simple Replay Extract and Replay for Serverless
 - Boto3 Auth support for Replay on Serverless
