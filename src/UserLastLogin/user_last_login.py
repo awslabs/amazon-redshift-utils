@@ -13,7 +13,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "utils"))
 logger.debug("Appeneded 'lib' and 'utils' to the list sys path")
 
-#import redshift_connector
 import boto3
 from botocore.config import Config
 import traceback

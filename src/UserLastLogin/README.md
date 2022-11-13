@@ -1,5 +1,5 @@
 # UserLastLogin utility
-This utility tracks the last login time of all the database users on a Redshift clusteri or endpoint. The timestamp of each users last login is recorded in a table on the cluster. The script is compatible with Python 3.
+This utility tracks the last login time of all the database users on a Redshift cluster or endpoint. The timestamp of each users last login is recorded in a table on the cluster. The script is compatible with Python 3.
 
 For customers with PCI-DSS compliance requirements to track inactive users, this utility can help to identify inactive Redshift users and provide the information necessary for the customer to take action. 
 
