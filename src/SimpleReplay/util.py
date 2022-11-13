@@ -99,13 +99,14 @@ def db_connect(interface="psql",
       :param drop_return: if True, don't store returned value.
     """
     if interface == "psql":
-        conn = redshift_connector.connect(user=username,password=password,host=host,
-                        port=port, database=database)
+        conn = redshift_connector.connect(user=username, password=password, host=host,
+                                          port=port, database=database)
 
         # if drop_return is set, monkey patch driver to not store result set in memory
         if drop_return:
             def drop_data(self, data) -> None:
                 pass
+
             # conn.handle_DATA_ROW = drop_data
             conn.message_types[redshift_connector.core.DATA_ROW] = drop_data
 
@@ -144,8 +145,9 @@ def load_file(location, decode=False):
         if decode:
             content = content.decode('utf-8')
     except Exception as e:
-        logger.error(f"Unable to load file from {location}. Does the file exist and do you have correct permissions? {str(e)}")
-        raise(e)
+        logger.error(
+            f"Unable to load file from {location}. Does the file exist and do you have correct permissions? {str(e)}")
+        raise (e)
 
     return content
 
@@ -170,13 +172,17 @@ def cluster_dict(endpoint, is_serverless=False, start_time=None, end_time=None):
     url_split = parsed.scheme.split(".")
     port_database = parsed.path.split("/")
 
+    if is_serverless:
+        workgroup_name = url_split[0]
+
     cluster = {
         "endpoint": endpoint,
         "id": url_split[0],
         "host": parsed.scheme,
         "region": url_split[2],
         "port": port_database[0],
-        "database": port_database[1]
+        "database": port_database[1],
+        "is_serverless": is_serverless
     }
 
     if start_time is not None:
@@ -190,6 +196,7 @@ def cluster_dict(endpoint, is_serverless=False, start_time=None, end_time=None):
         rs_client = boto3.client('redshift', region_name=cluster.get("region"))
         try:
             response = rs_client.describe_clusters(ClusterIdentifier=cluster.get('id'))
+
             cluster["num_nodes"] = (response['Clusters'][0]['NumberOfNodes'])
             cluster["instance"] = (response['Clusters'][0]['NodeType'])
         except Exception as e:
@@ -198,8 +205,23 @@ def cluster_dict(endpoint, is_serverless=False, start_time=None, end_time=None):
             cluster["num_nodes"] = "N/A"
             cluster["instance"] = "N/A"
     else:
-        cluster["num_nodes"] = "N/A"
-        cluster["instance"] = "Serverless"
+        rs_client = boto3.client('redshift-serverless', region_name=cluster.get("region"))
+        try:
+            response = rs_client.get_workgroup(workgroupName=workgroup_name)
+
+            cluster["num_nodes"] = "N/A"
+            cluster["instance"] = "Serverless"
+            cluster["base_rpu"] = response['workgroup']['baseCapacity']
+        except Exception as e:
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                logger.warning(f"Serverless endpoint could not be found "
+                               f"RedshiftServerless:GetWorkGroup. {e}")
+            else:
+                logger.warning(f"Exception during fetching work group details for Serverless endpoint "
+                               f"RedshiftServerless:GetWorkGroup. {e}")
+                cluster["num_nodes"] = "N/A"
+                cluster["instance"] = "Serverless"
+                cluster["base_rpu"] = "N/A"
 
     return cluster
 
