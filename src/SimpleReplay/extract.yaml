@@ -21,6 +21,9 @@ odbc_driver: ""
 # another location.
 log_location: ""
 
+#Required only if log location for cloudwatch logs is specified
+region: ""
+
 # Location of the SQL file containing queries to unload system tables
 unload_system_table_queries: "unload_system_tables.sql"
 
