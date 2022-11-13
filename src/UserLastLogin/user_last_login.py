@@ -26,7 +26,7 @@ from utils import getiamcredentials
 ssl = True
 ##################
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 client = None
 
