@@ -3,7 +3,7 @@
 ## Release Notes
 Version 2.0 has had significant changes to the code.
 * Redshift queries submitted via Data API, not via ODBC connection
-* No password details required. Data API calls obtain temporary database credentials. Permission to call the redshift:GetClusterCredentials operation is required. See the [Data API Documentation](https://docs.aws.amazon.com/redshift/latest/mgmt/data-api.html)
+* No password details required. Data API calls obtain temporary database credentials. Permission to call the `redshift:GetClusterCredentials` operation is required. See the [Data API Documentation](https://docs.aws.amazon.com/redshift/latest/mgmt/data-api.html)
 * The cluster identifier used is NOT the same as the cluster endpoint. Instead of creating the stack with the `RedshiftClusterEndpoint` havivng the value of `cluster-name.random-letters.region.redshift.amazonaws.com` only the cluster identifier such as `cluster-name` is required.
 * Future updates will allow the utility to be utilised with serverless clusters. This release is limited to provisioned clusters only.
 
