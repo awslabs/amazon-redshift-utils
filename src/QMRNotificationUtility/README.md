@@ -27,11 +27,11 @@ This utility requires the following items:
 
 * An Amazon Redshift cluster in the above VPC. The cluster identifier is shown on the 'General Information' page on the AWS Redshift console ***NOTE: Amazon Redshift cluster identifier, Port, Database***
 
-* Database user credentials for an Amazon Redshift user with access to [`STL_WLM_RULE_ACTION`](http://docs.aws.amazon.com/redshift/latest/dg/r_STL_WLM_RULE_ACTION.html). A superuser will be able to see all rows in this table, and a non-privileged user will be able to see only their own rows. More on visibility here: [Visibility of Data in System Tables and Views](http://docs.aws.amazon.com/redshift/latest/dg/c_visibility-of-data.html). Note that only the username is required here. Database access uses the Redshift Data API which handles authentication through the IAM roles created as part of the stack.
+* Amazon Redshift username with access to [`STL_WLM_RULE_ACTION`](http://docs.aws.amazon.com/redshift/latest/dg/r_STL_WLM_RULE_ACTION.html). A superuser will be able to see all rows in this table, and a non-privileged user will be able to see only their own rows. More on visibility here: [Visibility of Data in System Tables and Views](http://docs.aws.amazon.com/redshift/latest/dg/c_visibility-of-data.html). Note that only the username is required here. Database access uses the Redshift Data API which handles authentication through the IAM roles created as part of the stack.
 
 * An active WLM configuration with QMR enabled ([Documentation](http://docs.aws.amazon.com/redshift/latest/mgmt/workload-mgmt-config.html)).
 
-* Access to an IAM user with privileges to create and modify the necessary CloudFormation, KMS, IAM, SNS, and CloudWatch Events resources.
+* Access to an IAM user with privileges to create and modify the necessary CloudFormation, IAM, SNS, and CloudWatch Events resources.
 
 * A locally cloned amazon-redshift-utils project containing this utility and AWS CLI and/or AWS Console access. 
 
@@ -49,7 +49,7 @@ cd amazon-redshift-utils/src/QMRNotificationUtility
 #### 2. Copy the zipped python Deployment Package for the Lambda function to a location of your choosing in S3:
 
 ```bash
-aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.6.zip s3://yourbucket/qmr-action-notification-utility-1.6.zip
+aws s3 cp ./lambda/dist/qmr-action-notification-utility-2.0.zip s3://yourbucket/qmr-action-notification-utility-2.0.zip
 ```
 
 #### 3. Gather the necessary identifiers noted in the prerequistes section above:
