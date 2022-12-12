@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION=1.5
+VERSION=2.0
 
 ARCHIVE=qmr-action-notification-utility-$VERSION.zip
 
