@@ -142,6 +142,8 @@ def query_redshift():
             objects_list = []
             
             for row in result_rows:
+                
+                print(row)
                 userid,query,service_class,rule,action,recordtime  = row
                 d = collections.OrderedDict()
                 d['clusterid'] = clusterid
@@ -151,7 +153,8 @@ def query_redshift():
                 d['service_class'] = service_class
                 d['rule'] = rule
                 d['action'] = action
-                d['recordtime'] = recordtime.isoformat()
+                d['recordtime'] = recordtime #--.isoformat()
+                
                 objects_list.append(d)
     
             #Publish to SNS if any rows fetched
@@ -159,7 +162,8 @@ def query_redshift():
                 print('No rows to publish to SNS')
             else:
                 print("Publishing rows to SNS")
-                response= publish_to_sns(objects_list)
+                query_result_json = json.dumps(objects_list)
+                response = publish_to_sns(query_result_json)
         
         print('Completed Succesfully ')
         return 'Success'
@@ -169,6 +173,8 @@ def query_redshift():
         return 'Failed'
     
 def publish_to_sns(message):
+    global platform_endpoint
+    
     try:
         # Publish a message.
         response = platform_endpoint.publish(
@@ -181,9 +187,9 @@ def publish_to_sns(message):
                               'DataType': 'String'
                        }
                   }
-
             )
-
+            
+        print("Published message...")
         return response
 
     except:
@@ -222,10 +228,10 @@ def lambda_handler(event, context):
     try:
         sns = boto3.resource('sns')
         platform_endpoint = sns.PlatformEndpoint('{sns_arn}'.format(sns_arn = sns_arn))
+        
     except: 
         print('SNS access failed: Exception %s' % sys.exc_info()[1])
         
-        
     # Execute the QMR query
     query_redshift()
-    
+

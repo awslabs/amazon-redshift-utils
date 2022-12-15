@@ -104,6 +104,7 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
         - arn:aws:iam::aws:policy/AmazonRedshiftDataFullAccess
         - arn:aws:iam::aws:policy/AmazonRedshiftQueryEditor
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
       Path: "/"
 
   RedshiftQMRLambdaFunction:
