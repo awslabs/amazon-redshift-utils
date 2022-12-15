@@ -24,7 +24,7 @@ Metadata:
       Parameters:
       - RedshiftMonitoringUser
       - RedshiftClusterPort
-      - RedshiftClusterEndpoint
+      - RedshiftClusterIdentifier
       - RedshiftClusterDatabase
       - RedshiftClusterRegion
 Parameters:
@@ -50,7 +50,7 @@ Parameters:
   RedshiftClusterPort:
     Description: Port of Amazon Redshift cluster to attempt connection from Lambda on.
     Type: Number
-  RedshiftClusterEndpoint:
+  RedshiftClusterIdentifier:
     Description: Amazon Redshift cluster endpoint to attempt connection from Lambda on.
     Type: String
   RedshiftClusterDatabase: 
@@ -133,7 +133,7 @@ Resources:
       Environment:
         Variables:
           sns_arn: !Ref 'LambdaSNSTopic'
-          host: !Ref 'RedshiftClusterEndpoint'
+          host: !Ref 'RedshiftClusterIdentifier'
           port: !Ref 'RedshiftClusterPort'
           database: !Ref 'RedshiftClusterDatabase'
           user: !Ref 'RedshiftMonitoringUser'
