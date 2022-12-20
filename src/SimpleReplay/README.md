@@ -36,7 +36,8 @@ It may take around three hours for the audit logs to be delivered to S3.
 
 In the newly created EC2 machine:
 
-2.1 Install Python3
+2.1 Install Python3.
+Check if Python is already installed by doing ``which python3``. If the python3 binary is not found, then use:
 
 ```
 sudo yum install python3
@@ -50,11 +51,11 @@ sudo yum install python3-pip
 sudo yum install gcc gcc-c++ python3 python3-devel unixODBC unixODBC-devel
 ```
 
-2.3 Clone Simple Replay scripts
+2.3 Clone Simple Replay scripts. Check if `git` is installed by doing ``which git``. If git binary cannot be found, then do ``yum install git`` before proceeding.
 
-   ```
-   git clone https://github.com/awslabs/amazon-redshift-utils.git
-   ```
+```
+git clone https://github.com/awslabs/amazon-redshift-utils.git
+```
 
 2.4 Install Python libraries
 
