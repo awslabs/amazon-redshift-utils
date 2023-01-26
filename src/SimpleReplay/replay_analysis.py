@@ -15,13 +15,36 @@ from io import StringIO
 from report_gen import pdf_gen
 from report_util import Report, styles
 from tabulate import tabulate
-from util import db_connect, init_logging, cluster_dict, bucket_dict, get_secret
+from util import db_connect, init_logging, cluster_dict, bucket_dict, get_secret, create_json
 
 g_stylesheet = styles()
 g_columns = g_stylesheet.get('columns')
 
+
+def launch_analysis_v2():
+    """Package install and server init"""
+
+    # add explicit instructions for user
+
+    os.system("pip install -r requirements.txt")
+    os.chdir(f'{os.getcwd()}/gui')
+
+    # explicit version checking
+    if os.system("node -v") != 0:
+        print("Please install node before proceeding.")
+        exit(-1)
+
+    if os.system("npm install") != 0:
+        print("Could not install npm packages. ")
+
+    os.system("npm run start-backend &")
+    os.system("npm start")
+
+
 def run_replay_analysis(replay, cluster_endpoint, start_time, end_time, bucket_url, iam_role, user, tag='',
-                        is_serverless=False, secret_name=None, nlb_nat_dns = None, complete=True, summary=None):
+                        workload="",
+                        is_serverless=False, secret_name=None, nlb_nat_dns=None, complete=True, stats=None,
+                        summary=None):
     """End to end data collection, parsing, analysis and pdf generation
 
     @param replay: str, replay id from replay.py
@@ -36,6 +59,7 @@ def run_replay_analysis(replay, cluster_endpoint, start_time, end_time, bucket_u
     @param secret_name: str, name of the secret that stores admin username and password
     @param nlb_nat_dns: str, dns endpoint if specified will be used to connect instead of target cluster endpoint
     @param complete: bool, complete/incomplete replay run
+    @param stats: dict, run details
     @param summary: str list, replay output summary from replay.py
     """
 
@@ -52,10 +76,15 @@ def run_replay_analysis(replay, cluster_endpoint, start_time, end_time, bucket_u
     logger.debug(bucket)
 
     logger.info(f"Running analysis for replay: {replay}")
-    replay_path = f"{bucket.get('prefix')}analysis/{replay}"
+    replay_path = f"{bucket['prefix']}analysis/{replay}"
 
     # unload from cluster
     queries = unload(bucket, iam_role, cluster, user, replay)
+    info = create_json(replay, cluster, workload, complete, stats, tag)
+    try:
+        boto3.resource('s3').Bucket(bucket.get('bucket_name')).upload_file(info, f"{replay_path}/{info}")
+    except ClientError as e:
+        logger.error(f"{e} Could not upload info. Confirm IAM permissions include S3::PutObject.")
 
     if is_serverless:
         exit(0)
@@ -77,7 +106,6 @@ def run_replay_analysis(replay, cluster_endpoint, start_time, end_time, bucket_u
         # generate replay_id_report.pdf and info.json
         logger.info(f"Generating report.")
         pdf = pdf_gen(report, summary)
-        info = create_json(report)
 
         s3_resource = boto3.resource('s3')
         # upload to s3 and output presigned urls
@@ -133,11 +161,13 @@ def initiate_connection(username, cluster):
                 AutoCreate=False,
             )
         except rs_client.exceptions.ClusterNotFoundFault:
-            logger.error(f"Cluster {cluster.get('id')} not found. Please confirm cluster endpoint, account, and region.")
+            logger.error(
+                f"Cluster {cluster.get('id')} not found. Please confirm cluster endpoint, account, and region.")
             exit(-1)
         except Exception as e:
-            logger.error(f"Unable to connect to Redshift. Confirm IAM permissions include Redshift::GetClusterCredentials."
-                         f" {e}")
+            logger.error(
+                f"Unable to connect to Redshift. Confirm IAM permissions include Redshift::GetClusterCredentials."
+                f" {e}")
             exit(-1)
 
     if response is None or response.get('DbPassword') is None:
@@ -185,7 +215,7 @@ def unload(unload_location, iam_role, cluster, user, replay):
 
     logger = logging.getLogger("SimpleReplayLogger")
 
-    directory = r'sql' if not cluster.get("is_serverless") else r'sql/serverless'
+    directory = r'sql/serverless'
 
     queries = []  # used to return query names
     with initiate_connection(username=user, cluster=cluster) as conn:  # initiate connection
@@ -294,21 +324,6 @@ def read_data(table_name, df, report_columns, report):
     return report_table
 
 
-def create_json(report):
-    """Generates a JSON containing cluster details for the replay
-
-    @param report: Report object with cluster details
-    @return: String, file name
-    """
-
-    dictionary = report.cluster_details
-    dictionary['Replay ID'] = report.replay_id
-    json_object = json.dumps(dictionary, indent=4)
-    with open(f"info.json", "w") as outfile:
-        outfile.write(json_object)
-        return outfile.name
-
-
 def create_presigned_url(bucket_name, object_name):
     """Creates a presigned url for a given object
 
@@ -388,11 +403,11 @@ def list_replays(bucket_url):
         file_content = content_object.get()['Body'].read().decode('utf-8')
         json_content = json.loads(file_content)
 
-        table.append([json_content['Replay ID'],
-                      json_content['Cluster ID'],
-                      json_content['Start Time'],
-                      json_content['End Time'],
-                      json_content['Replay Tag']])
+        table.append([json_content['replay_id'],
+                      json_content['id'],
+                      json_content['start_time'],
+                      json_content['end_time'],
+                      json_content['replay_tag']])
     # use tabulate lib to format output
     print(tabulate(table, headers=["Replay", "Cluster ID", "Start Time", "End Time", "Replay Tag"]))
 
@@ -444,7 +459,7 @@ def main():
     args = parser.parse_args()
 
     if not (args.bucket or args.replay_id1 or args.replay_id2):
-        print("Find work location")
+        launch_analysis_v2()
     elif args.bucket and not (args.replay_id1 or args.replay_id2):
         list_replays(args.bucket[0])
     elif args.bucket and args.replay_id1 and not args.replay_id2:

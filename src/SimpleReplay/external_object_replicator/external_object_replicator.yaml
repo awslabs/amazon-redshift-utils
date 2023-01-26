@@ -1,0 +1,16 @@
+#Provide a provisioned source cluster endpoint. eg: "<region>.redshift.amazonaws.com:<port>\<databasename>"
+source_cluster_endpoint:
+#Provide region. eg: "us-east-2"
+region:
+#Provide redshift username. eg: "awsuser"
+redshift_user :
+
+#Provide the start time and end time of workload to be replicated. eg: “2020-07-24T09:31:00+00:00”
+start_time :
+end_time  :
+
+#Provide the S3 bucket location where you want the replicator to store cloned objects. eg: "s3://mybucket/myworkload"
+target_s3_location:
+
+# Set the amount of logging - either INFO or DEBUG
+log_level:

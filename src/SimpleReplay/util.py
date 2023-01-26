@@ -1,3 +1,5 @@
+import re
+
 import boto3
 import gzip
 import io
@@ -11,11 +13,11 @@ from urllib.parse import urlparse
 import yaml
 import base64
 from botocore.exceptions import ClientError
+import datetime
 
 logger = logging.getLogger("SimpleReplayLogger")
 
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-
 
 def init_logging(level=logging.INFO):
     """ Initialize logging to stdio """
@@ -295,3 +297,132 @@ def get_secret(secret_name, region_name):
         secret = json.loads(base64.b64decode(get_secret_value_response['SecretBinary']))
 
     return secret
+
+
+def categorize_error(err_code):
+    # https://www.postgresql.org/docs/current/errcodes-appendix.html
+    err_class = {'00': 'Successful Completion',
+                 '01': 'Warning',
+                 '02': 'No Data',
+                 '03': 'SQL Statement Not Yet Complete',
+                 '08': 'Connection Exception',
+                 '09': 'Triggered Action Exception',
+                 '0A': 'Feature Not Supported',
+                 '0B': 'Invalid Transaction Initiation',
+                 '0F': 'Locator Exception',
+                 '0L': 'Invalid Grantor',
+                 '0P': 'Invalid Role Specification',
+                 '0Z': 'Diagnostics Exception',
+                 '20': 'Case Not Found',
+                 '21': 'Cardinality Violation',
+                 '22': 'Data Exception',
+                 '23': 'Integrity Constraint Violation',
+                 '24': 'Invalid Cursor State',
+                 '25': 'Invalid Transaction State',
+                 '26': 'Invalid SQL Statement Name',
+                 '27': 'Triggered Data Change Violation',
+                 '28': 'Invalid Authorization Specification',
+                 '2B': 'Dependent Privilege Descriptors Still Exist',
+                 '2D': 'Invalid Transaction Termination',
+                 '2F': 'SQL Routine Exception',
+                 '34': 'Invalid Cursor Name',
+                 '38': 'External Routine Exception',
+                 '39': 'External Routine Invocation Exception',
+                 '3B': 'Savepoint Exception',
+                 '3D': 'Invalid Catalog Name',
+                 '3F': 'Invalid Schema Name',
+                 '40': 'Transaction Rollback',
+                 '42': 'Syntax Error or Access Rule Violation',
+                 '44': 'WITH CHECK OPTION Violation',
+                 '53': 'Insufficient Resources',
+                 '54': 'Program Limit Exceeded',
+                 '55': 'Object Not In Prerequisite State',
+                 '57': 'Operator Intervention',
+                 '58': 'System Error',
+                 '72': 'Snapshot Failure',
+                 'F0': 'Configuration File Error',
+                 'HV': 'Foreign Data Wrapper Error (SQL/MED)',
+                 'P0': 'PL/pgSQL Error',
+                 'XX': 'Internal Error',
+                 }
+    if err_code[0:2] in err_class.keys():
+        return err_class[err_code[0:2]]
+
+    return "Uncategorized Error"
+
+
+def remove_comments(string):
+    pattern = r"(\".*?\"|\'.*?\')|(/\*.*?\*/|//[^\r\n]*$)"
+    # first group captures quoted strings (double or single)
+    # second group captures comments (//single-line or /* multi-line */)
+    regex = re.compile(pattern, re.MULTILINE|re.DOTALL)
+    def _replacer(match):
+        # if the 2nd group (capturing comments) is not None,
+        # it means we have captured a non-quoted (real) comment string.
+        if match.group(2) is not None:
+            return "" # so we will return empty to remove the comment
+        else: # otherwise, we will return the 1st group
+            return match.group(1) # captured quoted-string
+    return regex.sub(_replacer, string)
+
+
+def parse_error(error, user, db, qtxt):
+    err_entry = {'timestamp': datetime.datetime.now(tz=datetime.timezone.utc).isoformat(timespec='seconds'),
+                 'user': user,
+                 'db': db,
+                 'query_text': remove_comments(qtxt)
+                }
+
+    temp = error.__str__().replace("\"", r"\"")
+    raw_error_string = json.loads(temp.replace("\'", "\""))
+    err_entry['detail'] = ""
+
+    if 'D' in raw_error_string:
+        detail_string = raw_error_string['D']
+        try:
+            detail = detail_string[detail_string.find("context:"):detail_string.find("query")].split(":", maxsplit=1)[-1].strip()
+            err_entry['detail'] = detail
+        except Exception as e:
+            print(e)
+            err_entry['detail'] = ""
+
+    err_entry['code'] = raw_error_string['C']
+    err_entry['message'] = raw_error_string['M']
+    err_entry['severity'] = raw_error_string['S']
+    err_entry['category'] = categorize_error(err_entry['code'])
+
+    return err_entry
+
+
+def create_json(replay, cluster, workload, complete, stats, tag=""):
+    """Generates a JSON containing cluster details for the replay
+    """
+
+    if cluster['start_time'] and cluster['end_time']:
+        duration = cluster['end_time'] - cluster['start_time']
+        duration = duration - datetime.timedelta(microseconds=duration.microseconds)
+
+        cluster['start_time'] = str(cluster['start_time'].isoformat(timespec='seconds'))
+        cluster['end_time'] = str(cluster['end_time'].isoformat(timespec='seconds'))
+        cluster['duration'] = str(duration)
+
+    if complete:
+        cluster['status'] = "Complete"
+    else:
+        cluster['status'] = "Incomplete"
+
+    cluster['replay_id'] = replay
+    cluster['replay_tag'] = tag
+    cluster['workload'] = workload
+
+    for k, v in enumerate(stats):
+        cluster[v] = stats[v]
+
+    cluster["connection_success"] = cluster['connection_count'] - cluster['connection_errors']
+
+    json_object = json.dumps(cluster, indent=4)
+    with open(f"info.json", "w") as outfile:
+        outfile.write(json_object)
+        return outfile.name
+
+
