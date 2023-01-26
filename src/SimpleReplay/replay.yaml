@@ -71,7 +71,7 @@ filters:
 ##
 
 # Set the amount of logging
-log_level: info
+log_level: "info"
 
 # number of proceses to use to parallelize the work. If omitted or null, uses
 # one process per cpu - 1 

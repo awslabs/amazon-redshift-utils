@@ -1,3 +1,8 @@
+## SimpleReplay 2.2.5
+- New self-service analysis UI for analyzing replay runs
+- Ability to replicate objects external to Redshift that a workload interacts with
+- Refactor extract code to be more modular
+
 ## SimpleReplay 2.2.4
 - Reverting AutoCommit mode to FALSE
 

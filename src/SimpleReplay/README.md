@@ -129,7 +129,7 @@ This script extracts query and connection info from User Activity Log (audit) an
 Once the above configuration parameters are set in extraction.yaml, the workload from the source cluster can be extracted using the following command:
 
 ```
-python3 extract.py extract.yaml
+python3 extract.py extract/extract.yaml
 ```
 
 ### Output
@@ -229,6 +229,63 @@ python3 replay.py replay.yaml
 * Any errors from replay will be saved to workload_location provided in the `replay.yaml`
 * Any output from UNLOADs will be saved to the replay_output provided in the `replay.yaml`
 * Any system tables logs will be saved to the replay_output provided in the `replay.yaml`
+
+## Replay Analysis 
+
+Replay Analysis utility enhances auditing in the Simple Replay process to extract information about the errors that occurred, the validity of the run, and the performance of the replay.
+
+This is also a user interface in which customers can choose multiple replays to analyze, validate, and compare using the extracted audit logs.
+
+### Running Replay Analysis utility
+
+To execute replay analysis utility, the following two parameters must be specified in the replay.yaml
+
+* analysis_output 
+* analysis_iam_role
+
+### Prerequisites
+
+Only requirement to run Replay Analysis is to have Node.js pre installed
+
+### Command
+To run the utility, run the following command
+
+```
+python3 replay_analysis.py
+````
+The script will automatically install the required node modules and will start the front and back end.
+
+This will automatically open the webpage in the default browser.
+
+### Additional arguments
+
+| Command   | Description |
+| ----------- | ----------- |
+| `python3 replay_analysis.py --bucket s3bucket`      | This command lists all the replays in the bucket       |
+| `python3 replay_analysis.py --bucket s3bucket --replay_id1 replayid`   |   This command provides the output of each individual replay by providing the pre-signed urls   |
+| `python3 replay_analysis.py --bucket s3bucket --replay_id1 replayid --sql`   | This command provides links to each of the raw data files unloaded from Redshift   |
+
+Alternate shorthand notations for the arguments  
+| Argument     | Notation |
+| ----------- | ----------- |
+| `--bucket`      |  `-b`      |
+| `--replay_id1`   | `-r1`       |
+| `--sql`   | `-s`       |
+
+### Output
+Once the replay is executed, Replay will create an analysis folder in the s3 location specified in the analysis output.\
+The folder structure is as follows
+
+* out
+  - info.json: Cluster id, run start time, run end time, instance type, node count
+  - replayid_report.pdf  
+* raw_data
+  - raw csv files containing UNLOADed data
+* aggregated_data
+  - formatted csv files as the data appears in the report
+<br>
+<br>
+
 
 ## Limitations 
 

@@ -10,6 +10,8 @@ import os
 import random
 import re
 import signal
+
+import boto3
 import sqlparse
 import string
 import sys
@@ -28,7 +30,7 @@ from queue import Empty, Full
 from urllib.parse import urlparse
 
 from util import init_logging, set_log_level, prepend_ids_to_logs, add_logfile, log_version, db_connect, cluster_dict, \
-    load_config, load_file, retrieve_compressed_json, get_secret
+    load_config, load_file, retrieve_compressed_json, get_secret, parse_error, bucket_dict
 from replay_analysis import run_replay_analysis
 
 import redshift_connector
@@ -177,6 +179,7 @@ class ConnectionThread(threading.Thread):
         odbc_driver,
         replay_start,
         first_event_time,
+        error_logger,
         thread_stats,
         num_connections,
         peak_connections,
@@ -191,6 +194,7 @@ class ConnectionThread(threading.Thread):
         self.odbc_driver = odbc_driver
         self.replay_start = replay_start
         self.first_event_time = first_event_time
+        self.error_logger = error_logger
         self.thread_stats = thread_stats
         self.num_connections = num_connections
         self.peak_connections = peak_connections
@@ -396,6 +400,10 @@ class ConnectionThread(threading.Thread):
                         f"Failed DB={transaction.database_name}, USER={transaction.username}, PID={transaction.pid}, "
                         f"XID:{transaction.xid}, Query: {idx + 1}/{len(transaction.queries)}{substatement_txt}: {err}"
                     )
+                    self.error_logger.append(parse_error(err,
+                                                         transaction.username,
+                                                         g_config["target_cluster_endpoint"].split('/')[-1],
+                                                         query.text))
 
                 self.save_query_stats(exec_start, exec_end, transaction.xid, transaction_query_idx)
             if success:
@@ -443,7 +451,7 @@ def validate_and_normalize_filters(object, filters):
     if 'exclude' not in normalized_filters:
         normalized_filters['exclude'] = {}
 
-    for f in object.supported_filters():
+    for f in object.supported_filters(): 
         normalized_filters['include'].setdefault(f, ['*'])
         normalized_filters['exclude'].setdefault(f, [])
 
@@ -513,6 +521,7 @@ def parse_connections(workload_directory, time_interval_between_transactions, ti
         workload_s3_location = workload_directory[5:].partition("/")
         bucket_name = workload_s3_location[0]
         prefix = workload_s3_location[2]
+        
 
         s3_object = client("s3").get_object(
             Bucket=bucket_name, Key=prefix.rstrip('/') + "/connections.json"
@@ -534,7 +543,7 @@ def parse_connections(workload_directory, time_interval_between_transactions, ti
             "all on": "all on",
             "all off": "all off",
         }[time_interval_between_queries]
-
+    
         try:
             if connection_json["session_initiation_time"]:
                 session_initiation_time = dateutil.parser.isoparse(
@@ -832,7 +841,7 @@ def join_finished_threads(connection_threads, worker_stats, wait=False):
     return len(finished_threads)
 
 
-def replay_worker(process_idx, replay_start_time, first_event_time, queue, worker_stats, default_interface, odbc_driver,
+def replay_worker(process_idx, replay_start_time, first_event_time, queue, error_logger, worker_stats, default_interface, odbc_driver,
                   connection_semaphore,
                   num_connections, peak_connections):
     """ Worker process to distribute the work among several processes.  Each
@@ -928,6 +937,7 @@ def replay_worker(process_idx, replay_start_time, first_event_time, queue, worke
                 odbc_driver,
                 replay_start_time,
                 first_event_time,
+                error_logger,
                 thread_stats,
                 num_connections,
                 peak_connections,
@@ -988,7 +998,7 @@ def sigint_handler(signum, frame):
 
 
 def start_replay(connection_logs, default_interface, odbc_driver, first_event_time, last_event_time,
-                 num_workers, manager, per_process_stats, total_transactions, total_queries):
+                 num_workers, manager, error_logger, per_process_stats, total_transactions, total_queries):
     """ create a queue for passing jobs to the workers.  the limit will cause
     put() to block if the queue is full """
     queue = manager.Queue(maxsize=1000000)
@@ -1023,7 +1033,7 @@ def start_replay(connection_logs, default_interface, odbc_driver, first_event_ti
         per_process_stats[idx] = manager.dict()
         init_stats(per_process_stats[idx])
         g_workers.append(multiprocessing.Process(target=replay_worker,
-                                                 args=(idx, g_replay_timestamp, first_event_time, queue,
+                                                 args=(idx, g_replay_timestamp, first_event_time, queue, error_logger,
                                                        per_process_stats[idx], default_interface, odbc_driver,
                                                        connection_semaphore, num_connections, peak_connections)))
         g_workers[-1].start()
@@ -1271,7 +1281,7 @@ def assign_time_intervals(connection_logs):
             elif connection_log.time_interval_between_queries == "all off":
                 is_calculate_time_interval = False
             else:
-                is_calculate_time_interval = transaction.time_interval.lower() == "true"
+                is_calculate_time_interval = str(transaction.time_interval).lower() == "true"
             if is_calculate_time_interval:
                 for index, sql in enumerate(transaction.queries[1:]):
                     prev_sql = transaction.queries[
@@ -1332,7 +1342,6 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
         cluster_host = cluster_endpoint.split(":")[0]
 
     cluster_port = cluster_endpoint_split[5].split("/")[0][4:]
-    cluster_database = cluster_endpoint_split[5].split("/")[1]
 
     additional_args = {}
     if os.environ.get('ENDPOINT_URL'):
@@ -1431,7 +1440,7 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
         "Driver={}; Server={}; Database={}; IAM=1; DbUser={}; DbPassword={}; Port={}".format(
             odbc_driver,
             cluster_host,
-            cluster_database,
+            database,
             db_user.split(":")[1] if ":" in db_user else db_user,
             db_password,
             cluster_port,
@@ -1443,7 +1452,7 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
         "password": db_password,
         "host": cluster_host,
         "port": cluster_port,
-        "database": cluster_database,
+        "database": database,
     }
 
     credentials = {  # old params
@@ -1454,7 +1463,7 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
         'password': db_password,
         'host': cluster_host,
         'port': cluster_port,
-        'database': cluster_database,
+        'database': database,
         'odbc_driver': g_config["odbc_driver"]
     }
     logger.debug("Successfully retrieved database credentials for {}".format(username))
@@ -1508,8 +1517,10 @@ def unload_system_table(
                 unload_query,
                 flags=re.IGNORECASE,
             )
-
-            cursor.execute(unload_query)
+            try:
+                cursor.execute(unload_query)
+            except Exception as e:
+                logger.error(f"Failed to unload query. {e}")
             logger.debug(f"Executed unload query: {unload_query}")
 
 
@@ -1836,8 +1847,10 @@ def main():
 
     # Actual replay
     logger.debug("Starting replay")
+    error_list = manager.list()
     per_process_stats = {}
     complete = False
+
     try:
         start_replay(connection_logs,
                      g_config["default_interface"],
@@ -1846,6 +1859,7 @@ def main():
                      last_event_time,
                      g_config.get("num_workers"),
                      manager,
+                     error_list,
                      per_process_stats,
                      transaction_count,
                      query_count)
@@ -1890,6 +1904,31 @@ def main():
         error_location,
         replay_id,
     )
+
+    summary_stats = {"query_count": query_count,
+                     "connection_count": len(connection_logs),
+                     "transaction_count": transaction_count,
+                     "query_success": aggregated_stats.get('query_success', 0),
+                     "connection_errors": len(aggregated_stats['connection_error_log']),
+                     "transaction_errors": len(aggregated_stats['transaction_error_log']),
+                     }
+
+    if len(error_list) != 0:
+        bucket = bucket_dict(g_config["analysis_output"])
+        with open('replayerrors000', 'w', newline='') as output_file:
+            try:
+                dict_writer = csv.DictWriter(output_file, fieldnames=error_list[0].keys())
+                dict_writer.writeheader()
+                dict_writer.writerows(error_list)
+            except Exception as e:
+                logger.debug(f"Failed to write replay errors to CSV. {e}")
+
+        try:
+            boto3.resource('s3').Bucket(bucket.get('bucket_name')) \
+                .upload_file(output_file.name, f"{bucket['prefix']}analysis/{replay_id}/raw_data/{output_file.name}")
+        except Exception as e:
+            logger.debug(f"Error upload to S3 {bucket['bucket_name']} failed. {e}")
+
     replay_end_time = datetime.datetime.now(tz=datetime.timezone.utc)
     replay_summary.append(f"Replay finished in {replay_end_time - g_replay_timestamp}.")
     for line in replay_summary:
@@ -1907,15 +1946,17 @@ def main():
                                 iam_role=g_config["analysis_iam_role"],
                                 user=g_config["master_username"],
                                 tag=g_config["tag"],
+                                workload=g_config["workload_location"],
                                 is_serverless=g_is_serverless,
                                 secret_name=g_config["secret_name"],
                                 nlb_nat_dns=g_config["nlb_nat_dns"],
                                 complete=complete,
+                                stats=summary_stats,
                                 summary=replay_summary)
         except Exception as e:
-            logging.error(f"Could not generate a report for this replay. {e}")
+            logger.error(f"Could not complete replay analysis. {e}")
     else:
-        logging.info("Analysis not enable for this replay.")
+        logger.info("Analysis not enabled for this replay.")
 
     if (
             g_config["replay_output"]
