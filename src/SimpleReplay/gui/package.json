@@ -5,7 +5,7 @@
   "proxy": "http://127.0.0.1:5000",
   "dependencies": {
     "@awsui/collection-hooks": "^1.0.28",
-    "@awsui/components-react": "^3.0.534",
+    "@awsui/components-react": "^3.0.722",
     "@awsui/design-tokens": "^3.0.21",
     "@awsui/global-styles": "^1.0.16",
     "@awsui/test-utils-core": "^1.0.23",
