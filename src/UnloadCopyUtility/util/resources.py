@@ -10,6 +10,8 @@ from util.sql.sql_text_helpers import SQLTextHelper, GET_SAFE_LOG_STRING
 from global_config import config_parameters
 from util.sql_queries import GET_DATABASE_NAME_OWNER_ACL, GET_SCHEMA_NAME_OWNER_ACL, GET_TABLE_NAME_OWNER_ACL
 
+logger = logging.getLogger('UnloadCopy')
+logger.debug('Starting resources')
 
 global resources
 if 'resources' not in globals():
@@ -26,7 +28,7 @@ class Resource(object):
         pass
 
     def get_create_sql(self, generate=False):
-        logging.debug('get_create_sql for {self}'.format(self=self))
+        logger.debug('get_create_sql for {self}'.format(self=self))
         if generate:
             ddl_dict = self.get_cluster().get_query_full_result_as_list_of_dict(
                 self.get_statement_to_retrieve_ddl_create_statement_text()
@@ -58,11 +60,11 @@ class Resource(object):
         if self.created:
             return
         if hasattr(self, 'parent'):
-            logging.debug('Object {self} has a parent that needs to be present.'.format(self=self))
+            logger.debug('Object {self} has a parent that needs to be present.'.format(self=self))
             if not self.parent.is_present():
                 self.parent.create(sql_text=sql_text)
             else:
-                logging.debug('Parent of {self} is present.'.format(self=self))
+                logger.debug('Parent of {self} is present.'.format(self=self))
         if isinstance(self, TableResource):
             if 'destinationTableAutoCreate' in config_parameters \
                     and not config_parameters['destinationTableAutoCreate']:
@@ -76,11 +78,11 @@ class Resource(object):
                     and not config_parameters['destinationDatabaseAutoCreate']:
                 raise Resource.AutoCreateRequiresConfigurationException(self, 'destinationDatabaseAutoCreate')
 
-        logging.debug('Getting sql_text to create {self}.'.format(self=self))
+        logger.debug('Getting sql_text to create {self}.'.format(self=self))
         if sql_text is None:
             sql_text = self.get_create_sql()
-        logging.info('Creating {self} with: '.format(self=self))
-        logging.info('{sql_text}'.format(sql_text=sql_text))
+        logger.info('Creating {self} with: '.format(self=self))
+        logger.info('{sql_text}'.format(sql_text=sql_text))
 
         self.get_cluster().execute_update(sql_text)
         self.created = True
@@ -213,8 +215,7 @@ class DBResource(Resource):
         if 'region' in command_parameters and command == 'copy_table' and command_parameters['region'] is not None:
             command_to_execute += " REGION '{region}' "
         update_sql_command = command_to_execute.format(**command_parameters)
-        logging.info('Executing {command} against {resource}:'.format(command=command, resource=self))
-        logging.info(GET_SAFE_LOG_STRING(update_sql_command))
+        logger.info('Executing {command} against {resource}:'.format(command=command, resource=self))
         self.get_cluster().execute_update(update_sql_command)
 
 
@@ -377,15 +378,15 @@ class ResourceFactory:
         try:
             schema = resource1.get_schema()
         except AttributeError:
-            logging.info('Destination did not have a schema declared fetching from resource2.')
+            logger.info('Destination did not have a schema declared fetching from resource2.')
             schema = resource2.get_schema()
-            logging.info('Using resource2 schema {s}'.format(s=schema))
+            logger.info('Using resource2 schema {s}'.format(s=schema))
         try:
             table = resource1.get_table()
         except AttributeError:
-            logging.info('Destination did not have a table declared fetching from resource2.')
+            logger.info('Destination did not have a table declared fetching from resource2.')
             table = resource2.get_table()
-            logging.info('Using resource2 table {t}'.format(t=table))
+            logger.info('Using resource2 table {t}'.format(t=table))
         return TableResource(cluster, schema, table)
 
     @staticmethod

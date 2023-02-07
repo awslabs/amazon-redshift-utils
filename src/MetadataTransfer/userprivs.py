@@ -1,11 +1,16 @@
-#!/usr/bin/python
-import psycopg2
+#!/usr/bin/python3
+import redshift_connector
+from redshiftfunc import getiamcredentials
+import log
+import logging
 import re
 import argparse
 import queries
 from datetime import datetime
-from dbconstring import executequery, cleanup, connstring
 
+__version__ = "1.0"
+logger = log.setup_custom_logger('UserPrivilegesTransfer')
+logger.info('Starting the MetadataTransferUtility - UserPrivileges')
 
 grantdict = {
     'a': 'INSERT',
@@ -113,30 +118,50 @@ def deriveddls(privlist, targetuser):
                             ddllist.append(ddl)
         return ddllist
     except Exception as err:
-        print "[%s] ERROR: %s" % (str(datetime.now()), err)
+        logger.error(err)
         exit()
       
         
 def executeddls(srccursor, tgtcursor, privquery, tgtuser, ddltype=None):
-    srcobjs = executequery(srccursor, privquery)
-    tgtobjs = executequery(tgtcursor, privquery)
+
+    srcobjconfig = srccursor.execute(privquery)
+    tgtobjconfig = tgtcursor.execute(privquery)
+
+    srcobjconf = srcobjconfig.fetchall()
+    srcobjs = ()
+
+    tgtobjconf = tgtobjconfig.fetchall()
+    tgtobjs = ()
+
+    for tps in srcobjconf:
+        srcobjs = srcobjs + (tuple(tps),)
+
+    for tps in tgtobjconf:
+        tgtobjs = tgtobjs + (tuple(tps),)
+
+
     if ddltype == 'defacl':
-        srcdefaclprivs = executequery(srccursor, privquery)
-        tgtschemalist = executequery(tgtcursor, queries.schemalist)
+
+        srcdefaclprivs = srccursor.execute(privquery)
+        tgtschemalist = tgtcursor.execute(queries.schemalist)
         tgtobjprivs = [x for x in srcdefaclprivs if (x[1]) in set((y[0]) for y in tgtschemalist) or x[2] is None]
+    
     else:
         objintersect = [x for x in srcobjs if (x[1], x[2], x[3]) in set((y[1], y[2], y[3]) for y in tgtobjs)
                         and x[4] is not None]
         # Find common objects with missing grants
         tgtobjprivs = list(set(objintersect) - set(tgtobjs))
+    
     objddl = deriveddls(tgtobjprivs, tgtuser)
+    
+
     if objddl:
         try:
             for i in objddl:
                 tgtcursor.execute(i)
-                print "[%s] INFO: %s" % (str(datetime.now()), i)
+                logger.info(i)
         except Exception as err:
-            print "[%s] ERROR: %s" % (str(datetime.now()), err)
+            logger.error(err)
             exit()
 
 
@@ -159,32 +184,63 @@ def main():
     tgtuser = args.tgtuser
     tgthost = args.tgtcluster
     tgtclusterid = tgthost.split('.')[0]
+    rsport = args.dbport
+
+    logger.info("Starting UserPrivileges migration")
+
 
     if srchost is None or tgthost is None or srcuser is None or tgtuser is None:
         parser.print_help()
         exit()
-    # Build connection string for target and source clusters
-    tgtconstring = connstring(dbname=tgtdbname, dbhost=tgthost, clusterid=tgtclusterid, dbuser=tgtuser)
-    srcconstring = connstring(dbname=srcdbname, dbhost=srchost, clusterid=srclusterid, dbuser=srcuser)
+    
+    # Get IAM Credentials
+    src_credentials = getiamcredentials(srchost,srcdbname,srcuser)
+    tgt_credentials = getiamcredentials(tgthost,tgtdbname,tgtuser)
 
-    # Create cursor and connection objects for source and target clusters
-    srccon = psycopg2.connect(srcconstring)
-    srccur = srccon.cursor()
-    tgtcon = psycopg2.connect(tgtconstring)
-    tgtcur = tgtcon.cursor()
-    # Transfer privileges
+    # Extract temp credentials
+    src_rs_user=src_credentials['DbUser']
+    src_rs_pwd =src_credentials['DbPassword']
 
-    executeddls(srccur, tgtcur, queries.languageprivs, tgtuser)
-    executeddls(srccur, tgtcur, queries.databaseprivs, tgtuser)
-    executeddls(srccur, tgtcur, queries.schemaprivs, tgtuser)
-    executeddls(srccur, tgtcur, queries.tableprivs, tgtuser)
-    executeddls(srccur, tgtcur, queries.functionprivs, tgtuser)
-    executeddls(srccur, tgtcur, queries.defaclprivs, tgtuser, 'defacl')
+    tgt_rs_user=tgt_credentials['DbUser']
+    tgt_rs_pwd =tgt_credentials['DbPassword']
+
+    try:
+        src_rs_conn = redshift_connector.connect(database=srcdbname, user=src_rs_user, password=src_rs_pwd, host=srchost, port=rsport, ssl=True)
+        src_rs_conn.autocommit = True
+
+        logger.info("Successfully connected to Redshift cluster: %s" % srchost)
+        srccur: redshift_connector.Cursor = src_rs_conn.cursor()
+
+
+        tgt_rs_conn = redshift_connector.connect(database=tgtdbname, user=tgt_rs_user, password=tgt_rs_pwd, host=tgthost, port=rsport, ssl=True)
+        tgt_rs_conn.autocommit = True
+        logger.info("Successfully connected to Redshift cluster: %s" % tgthost)
+        tgtcur: redshift_connector.Cursor = tgt_rs_conn.cursor()
+
+        #Set the Application Name
+        set_name = "set application_name to 'MetadataTransferUtility-v%s'" % __version__
+
+        srccur.execute(set_name)
+        tgtcur.execute(set_name)
+    
+        # Transfer privileges
+        logger.info("Executing language privileges")
+        executeddls(srccur, tgtcur, queries.languageprivs, tgtuser)
+        logger.info("Executing database privileges")
+        executeddls(srccur, tgtcur, queries.databaseprivs, tgtuser)
+        logger.info("Executing schema privileges")
+        executeddls(srccur, tgtcur, queries.schemaprivs, tgtuser)
+        logger.info("Executing table privileges")
+        executeddls(srccur, tgtcur, queries.tableprivs, tgtuser)
+        logger.info("Executing function privileges")
+        executeddls(srccur, tgtcur, queries.functionprivs, tgtuser)
+        logger.info("Executing ACL privileges")
+        executeddls(srccur, tgtcur, queries.defaclprivs, tgtuser, 'defacl')
 
     # Commit all transactions and cleaup cursor and connection objects
-
-    cleanup(tgtcur, tgtcon, 'target')
-    cleanup(srccur, srccon, 'source')
+    except Exception as err:
+        logger.error(err)
+        exit()
 
 
 if __name__ == "__main__":

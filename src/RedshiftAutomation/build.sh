@@ -1,7 +1,7 @@
 #!/bin/bash
 # set -x
 
-version=1.5.1
+version=1.6
 ARCHIVE=dist/lambda-redshift-util-runner-$version.zip
 
 if [ -f $ARCHIVE ]; then

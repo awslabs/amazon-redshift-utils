@@ -35,14 +35,14 @@ import argparse
 try:
     sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-except:
+except Exception:
     pass
 
 import getopt
 import analyze_vacuum
 import config_constants
 
-__version__ = ".9.2.1"
+__version__ = ".10"
 
 OK = 0
 ERROR = 1
@@ -53,22 +53,22 @@ NO_CONNECTION = 5
 
 # setup cli args
 parser = argparse.ArgumentParser()
-parser.add_argument("--analyze-flag", dest="analyze_flag", default=True, type=bool,
-                    help="Flag to turn ON/OFF ANALYZE functionality (True or False : Default = True ")
+parser.add_argument("--analyze-flag", dest="analyze_flag", required=True, default='False',
+                    help="Flag to turn ON/OFF ANALYZE functionality (True or False): Default = False ")
 parser.add_argument("--max-unsorted-pct", dest="max_unsorted_pct",
-                    help="Maximum unsorted percentage(% to consider a table for vacuum : Default = 50%")
+                    help="Maximum unsorted percentage( to consider a table for vacuum : Default = 50")
 parser.add_argument("--min-interleaved-cnt", dest="min_interleaved_cnt", type=int,
                     help="Minimum stv_interleaved_counts records to consider a table for vacuum reindex: Default = 0")
 parser.add_argument("--min-interleaved-skew", dest="min_interleaved_skew",
                     help="Minimum index skew to consider a table for vacuum reindex: Default = 1.4")
 parser.add_argument("--min-unsorted-pct", dest="min_unsorted_pct",
-                    help="Minimum unsorted percentage(% to consider a table for vacuum : Default = 5%")
+                    help="Minimum unsorted percentage( to consider a table for vacuum : Default = 5")
 parser.add_argument("--stats-off-pct ", dest="stats_off_pct",
-                    help="Minimum stats off percentage(% to consider a table for analyze : Default = 10%")
+                    help="Minimum stats off percentage( to consider a table for analyze : Default = 10")
 parser.add_argument("--table-name", dest="table_name",
                     help="A specific table to be Analyzed or Vacuumed if analyze-schema is not desired")
-parser.add_argument("--vacuum-flag", dest="vacuum_flag", default=True, type=bool,
-                    help="Flag to turn ON/OFF VACUUM functionality (True or False :  Default = True")
+parser.add_argument("--vacuum-flag", dest="vacuum_flag", required=True, default='False',
+                    help="Flag to turn ON/OFF VACUUM functionality (True or False): Default = False")
 parser.add_argument("--vacuum-parameter", dest="vacuum_parameter",
                     help="Vacuum parameters [ FULL | SORT ONLY | DELETE ONLY | REINDEX ] Default = FULL")
 parser.add_argument("--blacklisted-tables", dest="blacklisted_tables", help="The tables we do not want to Vacuum")
@@ -88,8 +88,6 @@ parser.add_argument("--max-table-size-mb", dest="max_table_size_mb", type=int,
 parser.add_argument("--output-file", dest="output_file", help="The full path to the output file to be generated")
 parser.add_argument("--predicate-cols", dest="predicate_cols", help="Analyze predicate columns only")
 parser.add_argument("--query-group", dest="query_group", help="Set the query_group for all queries")
-parser.add_argument("--require-ssl", dest="require_ssl", default=False,
-                    help="Does the connection require SSL? (True | False")
 parser.add_argument("--schema-name", dest="schema_name",
                     help="The Schema to be Analyzed or Vacuumed (REGEX: Default = public")
 parser.add_argument("--slot-count", dest="slot_count", help="Modify the wlm_query_slot_count : Default = 1")
@@ -97,6 +95,7 @@ parser.add_argument("--suppress-cloudwatch", dest="suppress_cw",
                     help="Don't emit CloudWatch metrics for analyze or vacuum when set to True")
 parser.add_argument("--db", dest="db", help="The Database to Use")
 full_args = parser.parse_args()
+
 parse_args = {}
 # remove args that end up as None
 for k, v in vars(full_args).items():
@@ -104,13 +103,8 @@ for k, v in vars(full_args).items():
         parse_args[k] = v
 
 
-def main(argv):
-    # get environmental args
-    args = {config_constants.DB_NAME: os.environ.get('PGDATABASE', None),
-            config_constants.DB_USER: os.environ.get('PGUSER', None),
-            config_constants.DB_PASSWORD: os.environ.get('PGPASSWORD', None),
-            config_constants.DB_HOST: os.environ.get('PGHOST', None),
-            config_constants.DB_PORT: os.environ.get('PGPORT', 5439)}
+def main():
+    args = {}
 
     # add argparse args
     args.update(parse_args)
@@ -128,4 +122,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main()

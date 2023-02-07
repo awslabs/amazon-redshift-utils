@@ -49,7 +49,7 @@ else
     if [ "${NEW_SORT_KEYS}" != "" ]; then NEW_SORT_KEYS_CMD="--new-sort-keys ${NEW_SORT_KEYS}"; fi
     if [ "${STATEMENT_TIMEOUT}" != "" ]; then STATEMENT_TIMEOUT_CMD="--statement-timeout ${STATEMENT_TIMEOUT}"; fi
 
-    python ColumnEncodingUtility/analyze-schema-compression.py \
+    python3 ColumnEncodingUtility/analyze-schema-compression.py \
         --db ${DB} \
         --db-user ${DB_USER} \
         --db-pwd ${DB_PWD} \

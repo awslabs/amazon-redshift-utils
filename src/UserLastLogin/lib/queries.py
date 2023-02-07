@@ -1,6 +1,6 @@
 # Schema and Tables creation related statements
 CHECK_DB_OBJECTS="""
-select count(1) from pg_class inner join pg_namespace on pg_class.relkind='r' and pg_class.relnamespace=pg_namespace.oid 
+select count(1) as table_count from pg_class inner join pg_namespace on pg_class.relkind='r' and pg_class.relnamespace=pg_namespace.oid 
 where pg_namespace.nspname='history' and pg_class.relname IN ('user_last_login', 'stg_user_last_login');
 """
 CREATE_SCHEMA='CREATE SCHEMA IF NOT EXISTS history';
@@ -21,14 +21,15 @@ TRUNCATE_STAGE_TABLE = "truncate table history.stg_user_last_login;"
 
 LOAD_STAGE_TABLE="""
 insert into history.stg_user_last_login
-select 
-NVL(
-       substring(NULLIF(regexp_substr(username, ':[^:]*'),''),2)
-    ,  trim(username)
+select
+     NVL(
+       substring(NULLIF(regexp_substr(pui.usename, ':[^:]*'),''),2)
+    ,  trim(pui.usename)
   ) as extracted_username
-, max(recordtime) lastlogin
-from stl_connection_log 
-where event='authenticated' and username<>'rdsdb'
+  ,max(start_time) as lastlogin
+from sys_query_history sqh
+left join pg_user_info pui
+On sqh.user_id = pui.usesysid
 group by 1
 ;
 """

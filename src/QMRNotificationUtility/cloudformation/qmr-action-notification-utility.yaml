@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Creates KMS Key , SNS topic , IAM Lambda Role , Lambda Function and Scheduled Event to run lambda function.
+Description: Creates SNS topic , IAM Lambda Role , Lambda Function and Scheduled Event to run lambda function.
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -24,12 +24,9 @@ Metadata:
       Parameters:
       - RedshiftMonitoringUser
       - RedshiftClusterPort
-      - RedshiftClusterEndpoint
+      - RedshiftClusterIdentifier
       - RedshiftClusterDatabase
-    - Label:
-        default: Monitoring user ciphertext (blank on initial create)
-      Parameters:
-      - MonitoringDBPasswordCiphertext
+      - RedshiftClusterRegion
 Parameters:
   SNSEmailParameter:
     Type: String
@@ -50,85 +47,23 @@ Parameters:
   S3Key:
     Description: String of S3 path to the Lambda Function Deployment Package(.zip file).
     Type: String
-  RedshiftMonitoringUser:
-    Description: Username of Amazon Redshift monitoring user to poll STL_WLM_QUERY_ACTIONS as.
-    Type: String
   RedshiftClusterPort:
     Description: Port of Amazon Redshift cluster to attempt connection from Lambda on.
     Type: Number
-  RedshiftClusterEndpoint:
+  RedshiftClusterIdentifier:
     Description: Amazon Redshift cluster endpoint to attempt connection from Lambda on.
     Type: String
   RedshiftClusterDatabase: 
     Description: Amazon Redshift cluster database to attempt connection from Lambda on.
     Type: String
-  MonitoringDBPasswordCiphertext:
-    Description: LEAVE BLANK during initial creation. The ciphertext of a KMS encrypted password for your MonitoringDBUser to connect with.
+  RedshiftMonitoringUser:
+    Description: Username of Amazon Redshift monitoring user to poll STL_WLM_QUERY_ACTIONS as.
     Type: String
-Conditions:
-  HasCipher: !Not [!Equals [!Ref MonitoringDBPasswordCiphertext, '']]
-Resources:
-  RedshiftKMSKey:
-    Type: "AWS::KMS::Key"
-    Properties:
-      Description: 'Redshift Lambda KMS Key'
-      Enabled: true
-      EnableKeyRotation: true
-      KeyPolicy:
-          Version: "2012-10-17"
-          Id:
-            Fn::Sub: "${AWS::StackName}-RedshiftKeyPolicy"
-          Statement:
-            - Sid: "Allow administration of the key"
-              Effect: "Allow"
-              Principal:
-                #AWS: arn:aws:iam::121969496650:root
-                AWS:
-                  Fn::Join:
-                  - ":"
-                  - - 'arn:aws:iam:'
-                    - Ref: AWS::AccountId
-                    - root
-              Action:
-                - kms:Create*
-                - kms:Describe*
-                - kms:Enable*
-                - kms:List*
-                - kms:Put*
-                - kms:Update*
-                - kms:Revoke*
-                - kms:Disable*
-                - kms:Get*
-                - kms:Delete*
-                - kms:ScheduleKeyDeletion
-                - kms:CancelKeyDeletion
-              Resource: "*"
-            # Policy to allow Lambda:
-            - Sid: Allow access for all principals in the account that are authorized to use KMS
-              Effect: Allow
-              Principal:
-                AWS:
-                  Fn::Join:
-                  - ":"
-                  - - 'arn:aws:iam:'
-                    - Ref: AWS::AccountId
-                    - root
-              Action:
-              - kms:Encrypt
-              - kms:Decrypt
-              - kms:ReEncrypt*
-              - kms:GenerateDataKey*
-              - kms:CreateGrant
-              - kms:DescribeKey
-              Resource: "*"
+  RedshiftClusterRegion:
+    Description: The AWS Region where the Redshift cluster is deployed.
+    Type: String
 
-  RedshiftKMSKeyAlias:
-    Type: "AWS::KMS::Alias"
-    Properties:
-      AliasName:
-        Fn::Sub: "alias/${AWS::StackName}-RedshiftKMSKey"
-      TargetKeyId:
-        Ref: RedshiftKMSKey
+Resources:
 
   LambdaSNSTopic:
     Type: "AWS::SNS::Topic"
@@ -146,7 +81,6 @@ Resources:
   LambdaRedshiftRole:
     Type: AWS::IAM::Role
     DependsOn: LambdaSNSTopic
-    DependsOn: RedshiftKMSKey
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -166,16 +100,11 @@ Resources:
               Resource: !Ref 'LambdaSNSTopic'
               Action:
               - sns:Publish
-            - Effect: Allow
-              Action:
-              - kms:Decrypt
-              Resource:
-                #"arn:aws:kms:us-west-2:123456:key/qwerty-8e14-4b68-8b47-1234rtyu"
-                - Fn::GetAtt:
-                  - RedshiftKMSKey
-                  - Arn
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - arn:aws:iam::aws:policy/AmazonRedshiftDataFullAccess
+        - arn:aws:iam::aws:policy/AmazonRedshiftQueryEditor
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
       Path: "/"
 
   RedshiftQMRLambdaFunction:
@@ -198,18 +127,17 @@ Resources:
         S3Bucket: !Ref 'S3Bucket'
         S3Key: !Ref 'S3Key'
 
-      Runtime: python2.7
+      Runtime: python3.9
       Timeout: '300'
       FunctionName:
         Fn::Sub: "${AWS::StackName}-RedshiftQMRLambda"
       Environment:
         Variables:
           sns_arn: !Ref 'LambdaSNSTopic'
-          enc_password: !If [HasCipher, !Ref MonitoringDBPasswordCiphertext, !Ref 'AWS::NoValue']
-          user: !Ref 'RedshiftMonitoringUser' 
-          host: !Ref 'RedshiftClusterEndpoint'
+          host: !Ref 'RedshiftClusterIdentifier'
           port: !Ref 'RedshiftClusterPort'
           database: !Ref 'RedshiftClusterDatabase'
+          user: !Ref 'RedshiftMonitoringUser'
 
   ScheduledRule:
     Type: "AWS::Events::Rule"
@@ -240,12 +168,6 @@ Resources:
           - "Arn"
 
 Outputs:
-  RedshiftKMSKeyArn:
-    Description: 'Redshift Lambda Key'
-    Value:
-      Fn::GetAtt:
-      - RedshiftKMSKey
-      - Arn
 
   LambdaSNSTopicArn:
     Description: 'SNS Topic Arn'
@@ -257,12 +179,10 @@ Outputs:
     Value:
         !Ref 'LambdaRedshiftRole'
 
-
   RedshiftQMRLambdaArn:
     Description: 'Lambda Redshift QMR Arn'
     Value:
         !Ref 'RedshiftQMRLambdaFunction'
-
 
   LambdaRedshiftScheduleArn:
     Description: 'Lambda Redshift Scheduled Rule Arn'

@@ -50,16 +50,16 @@ class Report:
 
         # cluster info section
         self.cluster_details = {"Cluster ID": self.cluster.get('id'),
-                                "Start Time": str(self.cluster.get('start_time').isoformat(timespec='seconds')),
-                                "End Time": str(self.cluster.get('end_time').isoformat(timespec='seconds')),
+                                "Start Time": self.cluster.get('start_time'),
+                                "End Time": self.cluster.get('end_time'),
                                 "Instance Type": self.cluster.get('instance'),
                                 "Nodes": self.cluster.get('num_nodes'),
                                 "Replay Tag": tag,
                                 }
 
-        self.query_columns = ['Statement Type', 'Total Count', 'Aborted Count', 'Burst Count']
+        self.query_columns = ['Statement Type', 'Total Count', 'Aborted Count']
         self.metrics_columns = ['Measure', 'Avg(s)', 'Std Dev(s)', 'P25(s)', 'P50(s)', 'P75(s)', 'P99(s)']
-        self.measure_columns = ['User', 'Service Class', 'Query Count', 'Avg(s)', 'Std Dev(s)', 'P25(s)', 'P50(s)',
+        self.measure_columns = ['User', 'Query Count', 'Avg(s)', 'Std Dev(s)', 'P25(s)', 'P50(s)',
                                 'P75(s)', 'P99(s)']
 
         # maps table titles to tables, matching column names, tables types, and query result file

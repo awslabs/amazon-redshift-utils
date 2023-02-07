@@ -21,6 +21,9 @@ History:
 2015-02-16 ericfe created
 2017-03-23 thiyagu Added percentage encoded column metric (pct_enc) and fixes  
 2017-10-01 mscaer Fixed columns "rows", pct_stats_off, and pct_unsorted to be correct for DISTSTYLE ALL.
+2021-03-05 edsonune Fixed column "Enc" to correctly show values for non-compressed tables.
+2022-08-17 timjell Update pg_attribute select to exclude system columns
+2022-08-17 saeedma8 Increased the size of decimal field to prevent Numeric data overflow
 **********************************************************************************************/
 
 SELECT TRIM(pgn.nspname) AS SCHEMA,
@@ -33,7 +36,7 @@ SELECT TRIM(pgn.nspname) AS SCHEMA,
        ) AS DistKey,
        decode(pgc.reldiststyle,
              8,NULL,
-             dist_ratio.ratio::DECIMAL(20,4)
+             dist_ratio.ratio::DECIMAL(32,4)
        ) AS Skew,
        det.head_sort AS "SortKey",
        det.n_sortkeys AS "#SKs",
@@ -46,15 +49,15 @@ SELECT TRIM(pgn.nspname) AS SCHEMA,
        det.pct_enc,
        decode(b.mbytes,
              0,0,
-             ((b.mbytes/part.total::DECIMAL)*100)::DECIMAL(20,2)
+             ((b.mbytes/part.total::DECIMAL(32,2))*100)::DECIMAL(32,2)
        ) AS pct_of_total,
-       (CASE WHEN a.rows = 0 THEN NULL ELSE 
-          CASE WHEN pgc.reldiststyle = 8 THEN ((a.rows_all_dist - pgc.reltuples)::DECIMAL(20,3) / a.rows_all_dist::DECIMAL(20,3)*100)::DECIMAL(20,2)
-                ELSE ((a.rows - pgc.reltuples)::DECIMAL(20,3) / a.rows::DECIMAL(20,3)*100)::DECIMAL(20,2) END END
+       (CASE WHEN a.rows = 0 THEN NULL
+             WHEN pgc.reldiststyle = 8 THEN ((a.rows_all_dist - pgc.reltuples)::DECIMAL(32,3) / a.rows_all_dist::DECIMAL(32,3)*100)::DECIMAL(32,2)
+             ELSE ((a.rows - pgc.reltuples)::DECIMAL(32,3) / a.rows::DECIMAL(32,3)*100)::DECIMAL(32,2) END
        ) AS pct_stats_off,
        CASE WHEN pgc.reldiststyle = 8 
-          THEN decode( det.n_sortkeys,0, NULL,DECODE( a.rows_all_dist,0,0, (a.unsorted_rows_all_dist::DECIMAL(32)/a.rows_all_dist)*100))::DECIMAL(20,2)
-          ELSE decode( det.n_sortkeys,0, NULL,DECODE( a.rows,0,0, (a.unsorted_rows::DECIMAL(32)/a.rows)*100))::DECIMAL(20,2) END
+          THEN decode( det.n_sortkeys,0, NULL,DECODE( a.rows_all_dist,0,0, (a.unsorted_rows_all_dist::DECIMAL(32,2)/a.rows_all_dist)*100))::DECIMAL(32,2)
+          ELSE decode( det.n_sortkeys,0, NULL,DECODE( a.rows,0,0, (a.unsorted_rows::DECIMAL(32,2)/a.rows)*100))::DECIMAL(32,2) END
         AS pct_unsorted
 FROM (SELECT db_id,
              id,
@@ -74,12 +77,13 @@ FROM (SELECT db_id,
                      MIN(CASE attisdistkey WHEN 't' THEN attname ELSE NULL END) AS "distkey",
                      MIN(CASE attsortkeyord WHEN 1 THEN attname ELSE NULL END) AS head_sort,
                      MAX(attsortkeyord) AS n_sortkeys,
-                     MAX(attencodingtype) AS max_enc,
-                     SUM(case when attencodingtype <> 0 then 1 else 0 end)::DECIMAL(20,3)/COUNT(attencodingtype)::DECIMAL(20,3)  *100.00 as pct_enc
+                     MAX(case when attencodingtype not in (0,128) THEN attencodingtype ELSE 0 END) AS max_enc,
+                     ROUND(SUM(case when attencodingtype <> 0 then 1 else 0 end)::DECIMAL(32,3)/COUNT(attencodingtype)::DECIMAL(32,3)*100.00,2) as pct_enc
               FROM pg_attribute
+	      WHERE attnum > 0
               GROUP BY 1) AS det ON det.attrelid = a.id
   INNER JOIN (SELECT tbl,
-                     MAX(Mbytes)::DECIMAL(32) /MIN(Mbytes) AS ratio
+                     MAX(Mbytes)::DECIMAL(32,2) /MIN(Mbytes) AS ratio
               FROM (SELECT tbl,
                            TRIM(name) AS name,
                            slice,

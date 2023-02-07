@@ -39,9 +39,9 @@ import traceback
 from multiprocessing import Pool
 
 import boto3
-import pg8000
 import pgpasslib
 import shortuuid
+import redshift_connector
 
 try:
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -114,7 +114,7 @@ def execute_query(string):
 
     try:
         results = cursor.fetchall()
-    except pg8000.ProgrammingError as e:
+    except Exception as e:
         if "no result set" in str(e):
             return None
         else:
@@ -175,12 +175,12 @@ def get_pg_conn():
             comment('Connect [%s] %s:%s:%s:%s' % (pid, db_host, db_port, db, db_user))
 
         try:
-            conn = pg8000.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd,
+            conn = redshift_connector.connect(user=db_user, host=db_host, port=db_port, database=db, password=db_pwd,
                                   ssl=ssl, timeout=None)
             # Enable keepalives manually untill pg8000 supports it
             # For future reference: https://github.com/mfenniak/pg8000/issues/149
             # TCP keepalives still need to be configured appropriately on OS level as well
-            conn._usock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            #conn._usock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             conn.autocommit = True
         except Exception as e:
             print(e)

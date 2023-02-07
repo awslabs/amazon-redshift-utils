@@ -1,5 +1,12 @@
 # Amazon Redshift WLM Query Monitoring Rule (QMR) Action Notification Utility
 
+## Release Notes
+Version 2.0 has had significant changes to the code.
+* Redshift queries submitted via Data API, not via ODBC connection
+* No password details required. Data API calls obtain temporary database credentials. Permission to call the `redshift:GetClusterCredentials` operation is required. See the [Data API Documentation](https://docs.aws.amazon.com/redshift/latest/mgmt/data-api.html)
+* The cluster identifier used is NOT the same as the cluster endpoint. Instead of creating the stack with the `RedshiftClusterIdentifier` having the value of `cluster-name.random-letters.region.redshift.amazonaws.com` only the cluster identifier such as `cluster-name` is required.
+* Future updates will allow the utility to be utilised with serverless clusters. This release is limited to provisioned clusters only.
+
 ## Goals
 This utility uses a scheduled Lambda function to pull records from the QMR action system log table (`stl_wlm_rule_action`) and publish them to an SNS topic. This utility can be used to send periodic notifications based on the WLM query monitoring rule actions taken for your unique workload and rules configuration.
 
@@ -18,19 +25,19 @@ This utility requires the following items:
 
 * Security Group: A VPC security group which allows the Lambda function access to your Amazon Redshift cluster on the port specified for SQL connections. ***NOTE: VPC Security Group ID***
 
-* An Amazon Redshift cluster in the above VPC. ***NOTE: Amazon Redshift cluster's Endpoint, Port, Database***
+* An Amazon Redshift cluster in the above VPC. The cluster identifier is shown on the 'General Information' page on the AWS Redshift console ***NOTE: Amazon Redshift cluster identifier, Port, Database***
 
-* Database user credentials for an Amazon Redshift user with access to [`STL_WLM_RULE_ACTION`](http://docs.aws.amazon.com/redshift/latest/dg/r_STL_WLM_RULE_ACTION.html). A superuser will be able to see all rows in this table, and a non-privileged user will be able to see only their own rows. More on visibility here: [Visibility of Data in System Tables and Views](http://docs.aws.amazon.com/redshift/latest/dg/c_visibility-of-data.html). ***NOTE: Amazon Redshift cluster's user name and password***
+* Amazon Redshift username with access to [`STL_WLM_RULE_ACTION`](http://docs.aws.amazon.com/redshift/latest/dg/r_STL_WLM_RULE_ACTION.html). A superuser will be able to see all rows in this table, and a non-privileged user will be able to see only their own rows. More on visibility here: [Visibility of Data in System Tables and Views](http://docs.aws.amazon.com/redshift/latest/dg/c_visibility-of-data.html). Note that only the username is required here. Database access uses the Redshift Data API which handles authentication through the IAM roles created as part of the stack.
 
 * An active WLM configuration with QMR enabled ([Documentation](http://docs.aws.amazon.com/redshift/latest/mgmt/workload-mgmt-config.html)).
 
-* Access to an IAM user with privileges to create and modify the necessary CloudFormation, KMS, IAM, SNS, and CloudWatch Events resources.
+* Access to an IAM user with privileges to create and modify the necessary CloudFormation, IAM, SNS, and CloudWatch Events resources.
 
 * A locally cloned amazon-redshift-utils project containing this utility and AWS CLI and/or AWS Console access. 
 
 ### Installation from CloudFormation Template:
 
-The quickest way to get up and running with the QMRNotificationUtility is by leveraging the packaged CloudFormation template and the AWS CLI.
+The quickest way to get up and running with the QMRNotificationUtility is by leveraging the packaged CloudFormation template and the AWS CLI. Making sure AWS CLI default region is configured correctly to be matched with Redshift cluster region otherwise, use --region switch in front of aws command to set the correct region in each step going forward.
 
 #### 1. Navigate to the QMRNotificationUtility's directory within the amazon-redshift-utils project:
 
@@ -42,7 +49,7 @@ cd amazon-redshift-utils/src/QMRNotificationUtility
 #### 2. Copy the zipped python Deployment Package for the Lambda function to a location of your choosing in S3:
 
 ```bash
-aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.4.zip s3://yourbucket/qmr-action-notification-utility-1.4.zip
+aws s3 cp ./lambda/dist/qmr-action-notification-utility-2.0.zip s3://yourbucket/qmr-action-notification-utility-2.0.zip
 ```
 
 #### 3. Gather the necessary identifiers noted in the prerequistes section above:
@@ -50,10 +57,10 @@ aws s3 cp ./lambda/dist/qmr-action-notification-utility-1.4.zip s3://yourbucket/
 * VPC ID
 * Subnet ID(s)
 * Security Group ID(s)
-* Cluster Endpoint
+* Cluster Identifier
 * Cluster Port
 * Cluster Database
-* Cluster Credentials (Username and Password)
+* Cluster Credentials (Username)
 * Bucket to host the Lambda Deployment Package
 * Email address to be notified of WLM actions
 
@@ -67,16 +74,15 @@ aws cloudformation create-stack \
 --template-body file://./cloudformation/qmr-action-notification-utility.yaml \
 --parameters \
   ParameterKey=S3Bucket,ParameterValue=yourbucket \
-  ParameterKey=S3Key,ParameterValue=qmr-action-notification-utility-1.4.zip \
+  ParameterKey=S3Key,ParameterValue=qmr-action-notification-utility-2.0.zip \
   ParameterKey=SNSEmailParameter,ParameterValue=test@email.com \
   ParameterKey=VPC,ParameterValue=vpc-abcd1234 \
-  ParameterKey=SubnetIds,ParameterValue=subnet-abcd1234 \
+  ParameterKey=SubnetIds,ParameterValue=subnet-abcdid1\\,subnet-abcdid2 \
   ParameterKey=SecurityGroupIds,ParameterValue=sg-abcd1234 \
   ParameterKey=RedshiftMonitoringUser,ParameterValue=monitoring_user \
   ParameterKey=RedshiftClusterPort,ParameterValue=cluster_port \
-  ParameterKey=RedshiftClusterEndpoint,ParameterValue=examplecluster.abcd12340987.us-east-1.redshift.amazonaws.com \
+  ParameterKey=RedshiftClusterIdentifier,ParameterValue=examplecluster \
   ParameterKey=RedshiftClusterDatabase,ParameterValue=db_name \
-  ParameterKey=MonitoringDBPasswordCiphertext,ParameterValue= \
 --capabilities CAPABILITY_IAM
 ```
 
@@ -88,58 +94,10 @@ It may take a few mintues for the stack's resources to be provisioned, and is co
 aws cloudformation describe-stacks --stack-name qmr-action-notification-utility --query 'Stacks[0].StackStatus' --output text
 ```
 
-#### 6. Add an encrypted password
-
-From the completed stack creation, extract the KMS Key ID, and use that Key to process your plaintext database password to ciphertext:
-
-```bash
-# Extract KMS Key ID
-KMSKEYID=`aws cloudformation describe-stack-resource --stack-name qmr-action-notification-utility --logical-resource-id RedshiftKMSKey --query 'StackResourceDetail.PhysicalResourceId' --output text`
-# Generate a read restricted local file to store your plaintext password
-(umask 077; touch passwd.txt)
-# Insert your plaintext password into file. If using vi ensure binary mode and no automatic EOL
-vi -b -c 'set noeol' passwd.txt
-# Read plaintext password file contents into kms encrypt to generate ciphertext
-CIPHERTEXT=`aws kms encrypt --key-id $KMSKEYID --plaintext file://./passwd.txt --query 'CiphertextBlob' --output text`
-# Cleanup password file
-rm passwd.txt
-```
-
-#### 7. Update your CloudFormation stack 
-
-Add the `MonitoringDBPasswordCiphertext` parameter with the ciphertext generated from the previous step, leaving all other parameters unchanged:
-
-```bash
-aws cloudformation update-stack \
---stack-name qmr-action-notification-utility \
---use-previous-template \
---parameters \
-  ParameterKey=MonitoringDBPasswordCiphertext,ParameterValue=$CIPHERTEXT \
-  ParameterKey=S3Bucket,UsePreviousValue=true \
-  ParameterKey=S3Key,UsePreviousValue=true \
-  ParameterKey=SNSEmailParameter,UsePreviousValue=true \ 
-  ParameterKey=VPC,UsePreviousValue=true \
-  ParameterKey=SubnetIds,UsePreviousValue=true \
-  ParameterKey=SecurityGroupIds,UsePreviousValue=true \
-  ParameterKey=RedshiftMonitoringUser,UsePreviousValue=true \
-  ParameterKey=RedshiftClusterPort,UsePreviousValue=true \
-  ParameterKey=RedshiftClusterEndpoint,UsePreviousValue=true \
-  ParameterKey=RedshiftClusterDatabase,UsePreviousValue=true \
---capabilities CAPABILITY_IAM
-```
-
-#### 8. Verify the modification is complete
-
-It may take a moment for the stack's resources to be updated, and is done when the following command returns "UPDATE_COMPLETE":
-
-```bash
-aws cloudformation describe-stacks --stack-name qmr-action-notification-utility --query 'Stacks[0].StackStatus' --output text
-```
-
-#### 9. Check the inbox of the email address you included for SNSEmailParameter. 
+#### 6. Check the inbox of the email address you included for SNSEmailParameter. 
 There should be an "AWS Notification - Subscription Confirmation" from no-reply@sns.amazonaws.com asking that you confirm your subscription. Click the link if you wish to receive updates on this email address.  
 
-#### 10. Verify the email address receives an email notification within 5 minutes
+#### 7. Verify the email address receives an email notification within 5 minutes
 
 By purposely triggering a QMR action by manually running SQL that is known to violate a rule defined in your active WLM configuration. Below is one example SNS notification email message:
 

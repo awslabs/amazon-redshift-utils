@@ -6,10 +6,12 @@ import os
 import logging
 from abc import abstractmethod
 
+logger = logging.getLogger('UnloadCopy')
+logger.info("Starting SQL Text Helper")
 
 class DDLHelper:
     def __init__(self, path_to_v_generate, view_start):
-        logging.debug('From {cwd} open v_generate {path}'.format(
+        logger.debug('From {cwd} open v_generate {path}'.format(
             cwd=os.getcwd(),
             path=path_to_v_generate
         ))
@@ -89,7 +91,7 @@ class DDLTransformer:
 
     @staticmethod
     def get_ddl_for_different_relation(ddl, new_table_name=None, new_schema_name=None):
-        logging.debug('Transforming ddl: {ddl}'.format(ddl=ddl))
+        logger.debug('Transforming ddl: {ddl}'.format(ddl=ddl))
         clean_ddl = SQLTextHelper.get_sql_without_commands_newlines_and_whitespace(ddl)
         if clean_ddl.upper().startswith('CREATE TABLE IF NOT EXISTS '):
             return TableDDLTransformer.get_create_table_ddl_for_different_relation(
@@ -184,7 +186,7 @@ class DDLTransformer:
             new_ddl = '('.join(round_bracket_separated_parts)
             return new_ddl
         except:
-            logging.debug('Clean ddl: {ddl}\nRelation name: {rel_name}'.format(
+            logger.debug('Clean ddl: {ddl}\nRelation name: {rel_name}'.format(
                 ddl=ddl,
                 rel_name=relation_specification
             ))

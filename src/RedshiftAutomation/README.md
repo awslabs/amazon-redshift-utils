@@ -166,7 +166,7 @@ You can change the CRON schedule for each event so they don't run at the same ti
 
 If you don't want to deploy this module using AWS Lambda, then we've also provided a command line based mechanism that will allow you to run all utilities using a host command or through a Cron job. You still need to go through the configuration step to create a config file and place this on S3, then you need to build the RedshiftAutomation project, so that it downloads all its dependencies:
 
-```./build.sh```
+```./build_venv.sh```
 
 You can then invoke the automation unified client `ra`:
 
@@ -180,7 +180,13 @@ ra <utility> <config>
 
 ## Rebuilding the Project 
 
-If you do need to rebuild, this module imports the required utilities from other parts of this GitHub project as required. It also imports its required dependencies and your ```config.json``` and builds a zipfile that is suitable for use by AWS Lambda. To build this module after customising your config file or the code, just run ```build.sh```. This will result in zipfile ```lambda-redshift-util-runner-$version.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python(2.7|3.5)', and the timeout to a value long enough to accomodate running against all your tables.
+If you do need to rebuild, this module imports the required utilities from other parts of this GitHub project as required. It also imports its required dependencies and your ```config.json``` and builds a zipfile that is suitable for use by AWS Lambda. 
+
+To build this module after customising your config file or the code, just run:
+
+```./build_venv.sh```
+
+This will result in zipfile ```lambda-redshift-util-runner-$version.zip``` being created in the root of the ```LambdaRunner``` project. You can then deploy this zip file to AWS Lambda , but be sure to set your runtime language to 'python(3.9)' or later, and the timeout to a value long enough to accomodate running against all your tables.
 
 Also, when you include a config.json, this function connects to only one Redshift cluster. If you do this, we encourate you to use a Lambda function name that will be easy to understand which instance you have pointed to. For instance, you might name it ```RedshiftUtilitiesMyClusterMyUser```.
 

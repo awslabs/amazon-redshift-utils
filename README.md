@@ -59,7 +59,7 @@ This [project](src/RedshiftAutomation) includes code that is able to run the Ama
 
 # Snapshot Manager
 
-This [project](src/SnapshotManager) includes a Lambda function that will ensure that your Redshift cluster is backed up as frequently as you require, and that the snapshots that it creates are cleaned up automatically when they are no longer needed.
+This [project](src/SnapshotManager) is now deprecated. The automatic capture and management of cluster snapshots is handled by AWS. Documentation is [available](https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-snapshots.html)
 
 # WLM Query Monitoring Rule (QMR) Action Notification Utility
 
@@ -101,10 +101,12 @@ docker run --net host --rm -it -e CONFIG_FILE=s3://.... amazon-redshift-utils un
 
 The docker [entrypoint scripts](src/bin/) work off of environment variables, so you'd want to provide those in your run scripts above.
 
-For convenience, you can create a `.env` file locally and upload them to the docker container via the `--env-file` argument. E.g.:
+For convenience, you can create a `.env` file locally and upload them to the docker container via the `--env-file` argument. For example if your environment variables file is named redshift_utils.env then you could execute with:
 
 ```bash
-docker run --net host --rm -it --env-file .env .... amazon-redshift-utils analyze-vacuum
+docker run --net host --rm -it --env-file redshift_utils.env .... amazon-redshift-utils analyze-vacuum
+
+docker run --net host --rm -it --env-file redshift_utils.env -e CONFIG_FILE=s3://<bucket_name>/<config_file>.json amazon-redshift-utils unload-copy
 ```
 
 Please see the [entrypoint scripts](src/bin/) for the environment variable configuration references that are needed.

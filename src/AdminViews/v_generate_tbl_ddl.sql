@@ -48,6 +48,8 @@ History:
 2019-03-24 adedotua added filter for diststyle AUTO distribution style
 2020-11-11 leisersohn Added COMMENT section
 2021-25-03 venkat.yerneni Fixed Table COMMENTS and added Column COMMENTS
+2022-08-15 timjell Remove double quotes from COMMENTS string (Issue #604)
+2022-08-15 timjell Add MOD to unique constraints to prevent incorrect ordering (Issue #595)
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_generate_tbl_ddl
 AS
@@ -133,7 +135,7 @@ FROM
    c.oid::bigint as table_id
    ,n.nspname AS schemaname
    ,c.relname AS tablename
-   ,200000000 + CAST(con.oid AS INT) AS seq
+   ,200000000 + MOD(CAST(con.oid AS INT),100000000) AS seq
    ,'\t,' + pg_get_constraintdef(con.oid) AS ddl
   FROM pg_constraint AS con
   INNER JOIN pg_class AS c ON c.relnamespace = con.connamespace AND c.oid = con.conrelid
@@ -263,7 +265,7 @@ from (SELECT
        n.nspname     AS schemaname,
        c.relname     AS tablename,
        600250000     AS seq,
-       ('COMMENT ON '::text + nvl2(cl.column_name, 'column '::text, 'table '::text) + quote_ident(n.nspname::text) + '.'::text + quote_ident(c.relname::text) + nvl2(cl.column_name, '.'::text + cl.column_name::text, ''::text) + ' IS \''::text + quote_ident(des.description) + '\'; '::text)::character VARYING AS ddl
+       ('COMMENT ON '::text + nvl2(cl.column_name, 'column '::text, 'table '::text) + quote_ident(n.nspname::text) + '.'::text + quote_ident(c.relname::text) + nvl2(cl.column_name, '.'::text + cl.column_name::text, ''::text) + ' IS \''::text + trim(des.description) + '\'; '::text)::character VARYING AS ddl
   FROM pg_description des
   JOIN pg_class c ON c.oid = des.objoid
   JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -284,8 +286,8 @@ from (SELECT
   UNION (
     SELECT c.oid::bigint as table_id,'zzzzzzzz' || n.nspname AS schemaname,
        'zzzzzzzz' || c.relname AS tablename,
-       700000000 + CAST(con.oid AS INT) AS seq,
-       'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(1024) + ';' AS ddl
+       700000000 + MOD(CAST(con.oid AS INT),100000000) AS seq,
+       'ALTER TABLE ' + QUOTE_IDENT(n.nspname) + '.' + QUOTE_IDENT(c.relname) + ' ADD ' + pg_get_constraintdef(con.oid)::VARCHAR(10240) + ';' AS ddl
     FROM pg_constraint AS con
       INNER JOIN pg_class AS c
              ON c.relnamespace = con.connamespace

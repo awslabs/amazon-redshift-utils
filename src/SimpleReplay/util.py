@@ -1,3 +1,5 @@
+import re
+
 import boto3
 import gzip
 import io
@@ -9,11 +11,13 @@ import redshift_connector
 import time
 from urllib.parse import urlparse
 import yaml
+import base64
+from botocore.exceptions import ClientError
+import datetime
 
 logger = logging.getLogger("SimpleReplayLogger")
 
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-
 
 def init_logging(level=logging.INFO):
     """ Initialize logging to stdio """
@@ -42,7 +46,7 @@ def add_logfile(filename, dir="simplereplay_logs", level=logging.DEBUG, backup_c
     file_exists = os.path.isfile(filename)
     fh = logging.handlers.RotatingFileHandler(filename, backupCount=backup_count)
 
-    # if the file exists from a previous run, rotate it 
+    # if the file exists from a previous run, rotate it
     if file_exists:
         fh.doRollover()
 
@@ -97,13 +101,14 @@ def db_connect(interface="psql",
       :param drop_return: if True, don't store returned value.
     """
     if interface == "psql":
-        conn = redshift_connector.connect(user=username,password=password,host=host,
-                        port=port, database=database)
+        conn = redshift_connector.connect(user=username, password=password, host=host,
+                                          port=port, database=database)
 
         # if drop_return is set, monkey patch driver to not store result set in memory
         if drop_return:
             def drop_data(self, data) -> None:
                 pass
+
             # conn.handle_DATA_ROW = drop_data
             conn.message_types[redshift_connector.core.DATA_ROW] = drop_data
 
@@ -142,8 +147,9 @@ def load_file(location, decode=False):
         if decode:
             content = content.decode('utf-8')
     except Exception as e:
-        logger.error(f"Unable to load file from {location}. Does the file exist and do you have correct permissions? {str(e)}")
-        raise(e)
+        logger.error(
+            f"Unable to load file from {location}. Does the file exist and do you have correct permissions? {str(e)}")
+        raise (e)
 
     return content
 
@@ -162,11 +168,14 @@ def load_config(location):
     return config_yaml
 
 
-def cluster_dict(endpoint, start_time=None, end_time=None):
+def cluster_dict(endpoint, is_serverless=False, start_time=None, end_time=None):
     '''Create a object-like dictionary from cluster endpoint'''
     parsed = urlparse(endpoint)
     url_split = parsed.scheme.split(".")
     port_database = parsed.path.split("/")
+
+    if is_serverless:
+        workgroup_name = url_split[0]
 
     cluster = {
         "endpoint": endpoint,
@@ -174,7 +183,8 @@ def cluster_dict(endpoint, start_time=None, end_time=None):
         "host": parsed.scheme,
         "region": url_split[2],
         "port": port_database[0],
-        "database": port_database[1]
+        "database": port_database[1],
+        "is_serverless": is_serverless
     }
 
     if start_time is not None:
@@ -182,17 +192,39 @@ def cluster_dict(endpoint, start_time=None, end_time=None):
     if end_time is not None:
         cluster["end_time"] = end_time
 
-    rs_client = boto3.client('redshift', region_name=cluster.get("region"))
     logger = logging.getLogger("SimpleReplayLogger")
-    try:
-        response = rs_client.describe_clusters(ClusterIdentifier=cluster.get('id'))
-        cluster["num_nodes"] = (response['Clusters'][0]['NumberOfNodes'])
-        cluster["instance"] = (response['Clusters'][0]['NodeType'])
-    except Exception as e:
-        logger.warning(f"Unable to get cluster information. Please ensure IAM permissions include "
-                       f"Redshift:DescribeClusters. {e}")
-        cluster["num_nodes"] = "N/A"
-        cluster["instance"] = "N/A"
+
+    if not is_serverless:
+        rs_client = boto3.client('redshift', region_name=cluster.get("region"))
+        try:
+            response = rs_client.describe_clusters(ClusterIdentifier=cluster.get('id'))
+
+            cluster["num_nodes"] = (response['Clusters'][0]['NumberOfNodes'])
+            cluster["instance"] = (response['Clusters'][0]['NodeType'])
+        except Exception as e:
+            logger.warning(f"Unable to get cluster information. Please ensure IAM permissions include "
+                           f"Redshift:DescribeClusters. {e}")
+            cluster["num_nodes"] = "N/A"
+            cluster["instance"] = "N/A"
+    else:
+        rs_client = boto3.client('redshift-serverless', region_name=cluster.get("region"))
+        try:
+            response = rs_client.get_workgroup(workgroupName=workgroup_name)
+
+            cluster["num_nodes"] = "N/A"
+            cluster["instance"] = "Serverless"
+            cluster["base_rpu"] = response['workgroup']['baseCapacity']
+        except Exception as e:
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                logger.warning(f"Serverless endpoint could not be found "
+                               f"RedshiftServerless:GetWorkGroup. {e}")
+            else:
+                logger.warning(f"Exception during fetching work group details for Serverless endpoint "
+                               f"RedshiftServerless:GetWorkGroup. {e}")
+                cluster["num_nodes"] = "N/A"
+                cluster["instance"] = "Serverless"
+                cluster["base_rpu"] = "N/A"
+
     return cluster
 
 
@@ -215,3 +247,182 @@ def bucket_dict(bucket_url):
     return {'url': bucket_url,
             'bucket_name': bucket,
             'prefix': path}
+
+
+def get_secret(secret_name, region_name):
+    # Create a Secrets Manager client
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name=region_name
+    )
+
+    get_secret_value_response = None
+
+    try:
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secret_name
+        )
+        # secret_string = json.loads(get_secret_value_response['SecretString'])
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'DecryptionFailureException':
+            # Secrets Manager can't decrypt the protected secret text using the provided KMS key.
+            # Deal with the exception here, and/or rethrow at your discretion.
+            raise e
+        elif e.response['Error']['Code'] == 'InternalServiceErrorException':
+            # An error occurred on the server side.
+            # Deal with the exception here, and/or rethrow at your discretion.
+            raise e
+        elif e.response['Error']['Code'] == 'InvalidParameterException':
+            # You provided an invalid value for a parameter.
+            # Deal with the exception here, and/or rethrow at your discretion.
+            raise e
+        elif e.response['Error']['Code'] == 'InvalidRequestException':
+            # You provided a parameter value that is not valid for the current state of the resource.
+            # Deal with the exception here, and/or rethrow at your discretion.
+            raise e
+        elif e.response['Error']['Code'] == 'ResourceNotFoundException':
+            # We can't find the resource that you asked for.
+            # Deal with the exception here, and/or rethrow at your discretion.
+            raise e
+        elif e.response['Error']['Code'] == 'AccessDeniedException':
+            # Use is not authorized to perform secretsmanager:GetSecretValue on requested resource
+            raise e
+
+    # Decrypts secret using the associated KMS key.
+    # Depending on whether the secret is a string or binary, one of these fields will be populated.
+    if 'SecretString' in get_secret_value_response:
+        secret = json.loads(get_secret_value_response['SecretString'])
+    else:
+        secret = json.loads(base64.b64decode(get_secret_value_response['SecretBinary']))
+
+    return secret
+
+
+def categorize_error(err_code):
+    # https://www.postgresql.org/docs/current/errcodes-appendix.html
+    err_class = {'00': 'Successful Completion',
+                 '01': 'Warning',
+                 '02': 'No Data',
+                 '03': 'SQL Statement Not Yet Complete',
+                 '08': 'Connection Exception',
+                 '09': 'Triggered Action Exception',
+                 '0A': 'Feature Not Supported',
+                 '0B': 'Invalid Transaction Initiation',
+                 '0F': 'Locator Exception',
+                 '0L': 'Invalid Grantor',
+                 '0P': 'Invalid Role Specification',
+                 '0Z': 'Diagnostics Exception',
+                 '20': 'Case Not Found',
+                 '21': 'Cardinality Violation',
+                 '22': 'Data Exception',
+                 '23': 'Integrity Constraint Violation',
+                 '24': 'Invalid Cursor State',
+                 '25': 'Invalid Transaction State',
+                 '26': 'Invalid SQL Statement Name',
+                 '27': 'Triggered Data Change Violation',
+                 '28': 'Invalid Authorization Specification',
+                 '2B': 'Dependent Privilege Descriptors Still Exist',
+                 '2D': 'Invalid Transaction Termination',
+                 '2F': 'SQL Routine Exception',
+                 '34': 'Invalid Cursor Name',
+                 '38': 'External Routine Exception',
+                 '39': 'External Routine Invocation Exception',
+                 '3B': 'Savepoint Exception',
+                 '3D': 'Invalid Catalog Name',
+                 '3F': 'Invalid Schema Name',
+                 '40': 'Transaction Rollback',
+                 '42': 'Syntax Error or Access Rule Violation',
+                 '44': 'WITH CHECK OPTION Violation',
+                 '53': 'Insufficient Resources',
+                 '54': 'Program Limit Exceeded',
+                 '55': 'Object Not In Prerequisite State',
+                 '57': 'Operator Intervention',
+                 '58': 'System Error',
+                 '72': 'Snapshot Failure',
+                 'F0': 'Configuration File Error',
+                 'HV': 'Foreign Data Wrapper Error (SQL/MED)',
+                 'P0': 'PL/pgSQL Error',
+                 'XX': 'Internal Error',
+                 }
+    if err_code[0:2] in err_class.keys():
+        return err_class[err_code[0:2]]
+
+    return "Uncategorized Error"
+
+
+def remove_comments(string):
+    pattern = r"(\".*?\"|\'.*?\')|(/\*.*?\*/|//[^\r\n]*$)"
+    # first group captures quoted strings (double or single)
+    # second group captures comments (//single-line or /* multi-line */)
+    regex = re.compile(pattern, re.MULTILINE|re.DOTALL)
+    def _replacer(match):
+        # if the 2nd group (capturing comments) is not None,
+        # it means we have captured a non-quoted (real) comment string.
+        if match.group(2) is not None:
+            return "" # so we will return empty to remove the comment
+        else: # otherwise, we will return the 1st group
+            return match.group(1) # captured quoted-string
+    return regex.sub(_replacer, string)
+
+
+def parse_error(error, user, db, qtxt):
+    err_entry = {'timestamp': datetime.datetime.now(tz=datetime.timezone.utc).isoformat(timespec='seconds'),
+                 'user': user,
+                 'db': db,
+                 'query_text': remove_comments(qtxt)
+                }
+
+    temp = error.__str__().replace("\"", r"\"")
+    raw_error_string = json.loads(temp.replace("\'", "\""))
+    err_entry['detail'] = ""
+
+    if 'D' in raw_error_string:
+        detail_string = raw_error_string['D']
+        try:
+            detail = detail_string[detail_string.find("context:"):detail_string.find("query")].split(":", maxsplit=1)[-1].strip()
+            err_entry['detail'] = detail
+        except Exception as e:
+            print(e)
+            err_entry['detail'] = ""
+
+    err_entry['code'] = raw_error_string['C']
+    err_entry['message'] = raw_error_string['M']
+    err_entry['severity'] = raw_error_string['S']
+    err_entry['category'] = categorize_error(err_entry['code'])
+
+    return err_entry
+
+
+def create_json(replay, cluster, workload, complete, stats, tag=""):
+    """Generates a JSON containing cluster details for the replay
+    """
+
+    if cluster['start_time'] and cluster['end_time']:
+        duration = cluster['end_time'] - cluster['start_time']
+        duration = duration - datetime.timedelta(microseconds=duration.microseconds)
+
+        cluster['start_time'] = str(cluster['start_time'].isoformat(timespec='seconds'))
+        cluster['end_time'] = str(cluster['end_time'].isoformat(timespec='seconds'))
+        cluster['duration'] = str(duration)
+
+    if complete:
+        cluster['status'] = "Complete"
+    else:
+        cluster['status'] = "Incomplete"
+
+    cluster['replay_id'] = replay
+    cluster['replay_tag'] = tag
+    cluster['workload'] = workload
+
+    for k, v in enumerate(stats):
+        cluster[v] = stats[v]
+
+    cluster["connection_success"] = cluster['connection_count'] - cluster['connection_errors']
+
+    json_object = json.dumps(cluster, indent=4)
+    with open(f"info.json", "w") as outfile:
+        outfile.write(json_object)
+        return outfile.name
+
+

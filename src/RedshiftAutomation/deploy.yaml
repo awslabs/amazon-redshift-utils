@@ -50,7 +50,7 @@ Parameters:
     Default: s3://my-bucket/prefix/config-file.json
     Description: Configuration File for this Utility instance
     Type: String
-    AllowedPattern: ^s3:\/\/([A-z0-9\-]+)\/(.*)$
+    AllowedPattern: ^(?!(.*(\d{1,3}\.){2,3}\d{1,3}.*$))(^s3:\/\/([a-z0-9]+([-.\/]?[a-z0-9]?))+[a-z0-9]+$)
   SecurityGroups:
     Default: mygroup1, mygroup2
     Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
@@ -98,16 +98,16 @@ Parameters:
     Default: s3://mybucket/prefix/config.json
     Description: Configuration File Location for the WLM Scheduler
     Type: String
-    AllowedPattern: ^s3:\/\/([A-z0-9\-]+)\/(.*)$
+    AllowedPattern: ^(?!(.*(\d{1,3}\.){2,3}\d{1,3}.*$))(^s3:\/\/([a-z0-9]+([-.\/]?[a-z0-9]?))+[a-z0-9]+$)
 Resources:
   LambdaRedshiftAutomation:
     Type: AWS::Serverless::Function
     Properties:
       Handler: lambda_function.event_handler
-      Runtime: python2.7
+      Runtime: python3.9
       CodeUri:
         Bucket: !Sub awslabs-code-${AWS::Region}
-        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.5.1.zip
+        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.6.zip
       MemorySize: 192
       Timeout: 300
       Tags:

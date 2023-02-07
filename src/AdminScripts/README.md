@@ -4,7 +4,6 @@ If you are using psql, you can use `psql [option] -f <script.sql>` to run.
 
 | Script                       | Purpose                                                                                   |
 |------------------------------|-------------------------------------------------------------------------------------------|
-| commit_stats.sql             | Shows information on consumption of cluster resources through COMMIT statements           |
 | copy_performance.sql         | Shows longest running copy for past 7 days                                                |
 | current_session_info.sql     | Query showing information about sessions with currently running queries                   |
 | filter_used.sql              | Return filter applied to tables on scans. To aid on choosing sortkey                      |

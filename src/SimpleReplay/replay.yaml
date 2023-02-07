@@ -9,6 +9,9 @@ target_cluster_endpoint: "host:port/database"
 target_cluster_region: ""
 master_username: ""
 
+# NLB or NAT endpoint for Simple Replay to connect to. This NLB or NAT should have connectivity to target_cluster_endpoint
+nlb_nat_dns: ""
+
 # Required only for playback using ODBC (pyodbc)
 odbc_driver: ""
 
@@ -52,6 +55,7 @@ unload_system_table_queries: "unload_system_tables.sql"
 target_cluster_system_table_unload_iam_role: ""
 
 # Include filters will work as "db AND user AND pid". Exclude filters will work as "db OR user OR pid".
+# In case of multiple values for any specific filter, please enclose each in single quotes
 filters:
   include:
     database_name: ['*']
@@ -67,7 +71,7 @@ filters:
 ##
 
 # Set the amount of logging
-log_level: info
+log_level: "info"
 
 # number of proceses to use to parallelize the work. If omitted or null, uses
 # one process per cpu - 1 
@@ -88,3 +92,7 @@ limit_concurrent_connections: ~
 
 # Should multistatement SQL be split
 split_multi: true
+
+# In case of Serverless, set up a secret to store admin username and password. Specify the name of the secret below
+# Note: This admin username maps to the username specified as `master_username` in this file.  This will be updated to `admin_username` in a future release.
+secret_name: ""

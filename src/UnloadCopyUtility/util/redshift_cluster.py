@@ -1,31 +1,47 @@
 from datetime import datetime, timedelta
 import sys
 import logging
-import pg
+import redshift_connector
 import re
 from util.sql.sql_text_helpers import GET_SAFE_LOG_STRING
 import pytz
-
-
 import boto3
-from pg import connect
+
+__version__ = "1.0"
+
+logger = logging.getLogger('UnloadCopy')
+logger.info('Starting redshift cluster...')
 
 options = "keepalives=1 keepalives_idle=200 keepalives_interval=200 keepalives_count=6 connect_timeout=10"
 
 set_timeout_stmt = "set statement_timeout = 0"
 
+# Generates IAM credentials for the cluster and specified user.
+# The user is expected to be already present on the cluster. This user will not be created automatically.
+def getiamcredentials(dbhost=None,dbname=None, dbuser=None):
+    # Redshift <clusterid>.<randomid>.<region>.redshift.amazonaws.com:5439
+    clusterid = dbhost.split('.')[0]
+    region = dbhost.split('.')[2]
+
+    try:
+        redshift = boto3.client('redshift',region_name=region )
+        credentials = redshift.get_cluster_credentials(DbUser=dbuser, DbName=dbname,
+                                                              ClusterIdentifier=clusterid, AutoCreate=False)
+        return credentials
+    except Exception as err:
+        return 'Failed'
 
 class RedshiftClusterFactory:
     def __init__(self):
         pass
 
     @staticmethod
-    def from_pg_details(pg_details):
-        c = RedshiftCluster(cluster_endpoint=pg_details.host)
-        c.set_db(pg_details.database)
-        c.set_user(pg_details.user)
-        c.set_port(pg_details.port)
-        c.set_password(pg_details.password)
+    def from_rs_details(rs_details):
+        c = RedshiftCluster(cluster_endpoint=rs_details.host)
+        c.set_db(rs_details.database)
+        c.set_user(rs_details.user)
+        c.set_port(rs_details.port)
+        c.set_password(rs_details.password)
         return c
 
     @staticmethod
@@ -128,7 +144,7 @@ class RedshiftCluster:
         return False
 
     def refresh_temporary_credentials(self):
-        logging.debug("Try getting DB credentials for {u}@{c}".format(u=self.get_user(), c=self.get_host()))
+        logger.debug("Try getting DB credentials for {u}@{c}".format(u=self.get_user(), c=self.get_host()))
         redshift_client = boto3.client('redshift', region_name=self.get_region_name())
         get_creds_params = {
             'DbUser': self.get_user(),
@@ -139,11 +155,11 @@ class RedshiftCluster:
             get_creds_params['AutoCreate'] = True
         if len(self.get_user_db_groups()) > 0:
             get_creds_params['DbGroups'] = self.get_user_db_groups()
-        # Change botocore.parsers to avoid logging of boto3 response since it contains the credentials
-        log_level = logging.getLogger('botocore.parsers').getEffectiveLevel()
-        logging.getLogger('botocore.parsers').setLevel(logging.INFO)
+        # Change botocore.parsers to avoid logger of boto3 response since it contains the credentials
+        log_level = logger.getLogger('botocore.parsers').getEffectiveLevel()
+        logger.getLogger('botocore.parsers').setLevel(logger.INFO)
         response = redshift_client.get_cluster_credentials(**get_creds_params)
-        logging.getLogger('botocore.parsers').setLevel(log_level)
+        logger.getLogger('botocore.parsers').setLevel(log_level)
 
         self.set_user(response['DbUser'])
         self.set_password(response['DbPassword'])
@@ -199,7 +215,7 @@ class RedshiftCluster:
         if match_result is not None:
             return match_result.groupdict()[element]
         else:
-            logging.fatal('Could not extract region from cluster endpoint {cluster_endpoint}'.format(
+            logger.fatal('Could not extract region from cluster endpoint {cluster_endpoint}'.format(
                 cluster_endpoint=self.cluster_endpoint.lower()))
 
     def get_region_name(self):
@@ -208,39 +224,13 @@ class RedshiftCluster:
     def get_cluster_identifier(self):
         return self.get_element_from_cluster_endpoint('cluster_identifier')
 
-    def _conn_to_rs(self, opt=options, timeout=set_timeout_stmt, database=None):
-        rs_conn_string = "host={host} port={port} dbname={db} user={user} password={password} {opt}".format(
-            host=self.get_host(),
-            port=self.get_port(),
-            db=self.get_db(),
-            password=self.get_password(),  # First fetch the password because temporary password updates user!
-            user=self.get_user(),
-            opt=opt)
-        logging.debug(GET_SAFE_LOG_STRING(rs_conn_string))
-        try:
-            # noinspection PyArgumentList
-            rs_conn = connect(rs_conn_string)
-        except pg.InternalError as ie:
-            if hasattr(ie, 'args') and len(ie.args) > 0 \
-                    and ('Operation timed out' in ie.args[0] or 'timeout expired' in ie.args[0]):
-                msg = 'Connection timeout when connecting to {h}:{p}.\n'
-                msg += 'Make sure that firewalls and security groups allow connections.'
-                logging.fatal(msg.format(h=self.get_host(), p=self.get_port()))
-            else:
-                logging.fatal('Internal error encountered when trying to connect: {ie}'.format(ie=ie))
-            raise sys.exc_info()[0](sys.exc_info()[1]).with_traceback(sys.exc_info()[2])
-        if self._configured_timeout is not None and not self._configured_timeout == timeout:
-            rs_conn.query(timeout)
-            self.database_timeouts[database][opt] = timeout
-        return rs_conn
-
     def get_conn_to_rs(self, opt=options, timeout=set_timeout_stmt, database=None):
         database = database or self.get_db()
         if database in self.database_connections:
             if opt in self.database_connections[database]:
                 if not (opt in self.database_timeouts[database] and self.database_timeouts[database][opt] == timeout):
-                    logging.debug('Timeout is different from last configured timeout.')
-                    self.database_connections[database][opt].query(timeout)
+                    logger.debug('Timeout is different from last configured timeout.')
+                    self.database_connections[database][opt].execute(timeout)
                 return self.database_connections[database][opt]
         else:
             self.database_connections[database] = {}
@@ -248,20 +238,57 @@ class RedshiftCluster:
         self.database_connections[database][opt] = self._conn_to_rs(opt=opt, timeout=timeout, database=database)
         return self.database_connections[database][opt]
 
+    def _conn_to_rs(self, opt=options, timeout=set_timeout_stmt, database=None):
+        host=self.get_host()
+        port=self.get_port()
+        db=self.get_db()
+        pwd=self.get_password()  # First fetch the password because temporary password updates user!
+        user=self.get_user()
+        opt=opt
+        
+        credentials = getiamcredentials(host,db,user)
+        logger.debug( ( "IAM User:%s , Expiration: %s " % (credentials['DbUser'], credentials['Expiration']  )   ) )
+        
+        # Extract temp credentials
+        rs_user=credentials['DbUser']
+        rs_pwd =credentials['DbPassword']
+
+
+        try:
+            rs_conn = redshift_connector.connect(database=db, user=rs_user, password=rs_pwd, host=host, port=port, ssl=True)
+            logger.info("Successfully connected to Redshift cluster: %s" % host)
+            rs_cursor: redshift_connector.Cursor = rs_conn.cursor()
+            
+            #Set the Application Name
+            set_name = "set application_name to 'UnloadCopyUtility-v%s'" % __version__
+
+            rs_cursor.execute(set_name)
+
+
+        
+        except Exception as ie:
+            logger.fatal('Error encountered when trying to connect: {ie}'.format(ie=ie))
+        return rs_cursor
+
     def execute_update(self, command, opt=options, timeout=set_timeout_stmt, database=None):
-        conn_rs = self.get_conn_to_rs(opt=opt, timeout=timeout, database=database)
-        logging.debug('Executing update:' + GET_SAFE_LOG_STRING(command))
-        conn_rs.query(command)
+        cursor_rs = self.get_conn_to_rs(opt=opt, timeout=timeout, database=database)
+        logger.info('Executing command:' + GET_SAFE_LOG_STRING(command))
+        cursor_rs.execute(command)
 
     def get_query_full_result_as_list_of_dict(self, sql, opt=options, timeout=set_timeout_stmt, database=None):
         """
         Inefficient way to store data but nice and easy for queries with small result sets.
         :return:
         """
-        conn_rs = self.get_conn_to_rs(opt=opt, timeout=timeout, database=database)
-        logging.debug('Executing query:' + GET_SAFE_LOG_STRING(sql))
-        result = conn_rs.query(sql)
-        dict_result = result.dictresult()
+        cursor_rs = self.get_conn_to_rs(opt=opt, timeout=timeout, database=database)
+        cursor_rs.execute(sql)
+
+        # Results in a dictionary format:
+        result: pandas.DataFrame = cursor_rs.fetch_dataframe()
+
+        #dict_result = result.dict()
+        dict_result = result.to_dict('records')
+        
         return dict_result
 
     def __del__(self):
@@ -272,7 +299,7 @@ class RedshiftCluster:
                     try:
                         self.database_connections[database][option].close()
                     except:
-                        logging.warning('Could not correctly close self.database_connections{db}{opt}'.format(
+                        logger.warning('Could not correctly close self.database_connections{db}{opt}'.format(
                             db=database,
                             opt=option
                         ))

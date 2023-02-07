@@ -31,7 +31,7 @@ SELECT owner.objtype,
 FROM (
 -- Functions owned by the user
      SELECT 'Function',pgu.usename,pgu.usesysid,nc.nspname,textin (regprocedureout (pproc.oid::regprocedure)),
-     'alter function ' || QUOTE_IDENT(nc.nspname) || '.' ||textin (regprocedureout (pproc.oid::regprocedure)) || ' owner to ' 
+     'alter '|| case when prorettype = 0::oid then 'procedure' else 'function' end || ' ' ||  textin (regprocedureout (pproc.oid::regprocedure)) || ' owner to ' 
      FROM pg_proc pproc,pg_user pgu,pg_namespace nc
 WHERE pproc.pronamespace = nc.oid
 AND   pproc.proowner = pgu.usesysid

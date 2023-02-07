@@ -4,6 +4,7 @@ History:
 2013-10-29 jjschmit Created
 2016-05-24 chriz-bigdata addressed edge case for objects with names containing '.'
 2018-01-15 pvbouwel replaces tabs with spaces for nicer behavior in psql client
+2022-08-15 saeedma8 excluded system tables
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_get_obj_priv_by_user
 AS
@@ -23,10 +24,10 @@ FROM
     FROM
         (
         SELECT schemaname, 't' AS obj_type, tablename AS objectname, QUOTE_IDENT(schemaname) || '.' || QUOTE_IDENT(tablename) AS fullobj FROM pg_tables
-        WHERE schemaname not in ('pg_internal')
+        WHERE schemaname !~ '^information_schema|catalog_history|pg_'
         UNION
         SELECT schemaname, 'v' AS obj_type, viewname AS objectname, QUOTE_IDENT(schemaname) || '.' || QUOTE_IDENT(viewname) AS fullobj FROM pg_views
-        WHERE schemaname not in ('pg_internal')
+        WHERE schemaname !~ '^information_schema|catalog_history|pg_'
         ) AS objs
         ,(SELECT * FROM pg_user) AS usrs
     ORDER BY fullobj

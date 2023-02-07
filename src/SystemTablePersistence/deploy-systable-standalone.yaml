@@ -32,12 +32,12 @@ Parameters:
     Default: s3://my-bucket/prefix/config-file.json
     Description: Configuration File for this Utility instance
     Type: String
-    AllowedPattern: ^s3:\/\/([A-z\-]+)\/(.*)$
+    AllowedPattern: ^(?!(.*(\d{1,3}\.){2,3}\d{1,3}.*$))(^s3:\/\/([a-z0-9]+([-.\/]?[a-z0-9]?))+[a-z0-9]+$)
   KmsKeyARN:
-    Default: arn:aws:kms:us-east-1/123456789012:key/MyKey
+    Default: arn:aws:kms:us-east-1:123456789012:key/MyKey
     Description: KMS Key ARN used to decrypt the password
     Type: String
-    AllowedPattern: arn:aws:kms:[a-zA-Z0-9-]+\/\d{12}:key\/.*
+    AllowedPattern: arn:aws:kms:[a-zA-Z0-9-]+:\d{12}:key\/.*
   SecurityGroups:
     Default: mygroup1, mygroup2
     Description: Security Groups as CSV list to use for the deployed function (may be required for Redshift security policy)
@@ -56,10 +56,10 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: lambda_function.event_handler
-      Runtime: python2.7
+      Runtime: python3.9
       CodeUri:
         Bucket: !Sub awslabs-code-${AWS::Region}
-        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.4.zip
+        Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.6.zip
       MemorySize: 192
       Timeout: 300
       Tags:

@@ -9,8 +9,7 @@ import traceback
 import socket
 import boto3
 import datetime
-import pg8000
-import pgpasslib
+import redshift_connector
 
 try:
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -20,7 +19,7 @@ except:
 import redshift_utils_helper as aws_utils
 import config_constants
 
-__version__ = ".9.2.1"
+__version__ = ".10"
 
 # set default values to vacuum, analyze variables
 goback_no_of_days = -1
@@ -49,7 +48,7 @@ def execute_query(conn, query):
 
         if debug:
             comment('Query Execution returned %s Results' % (len(results)))
-    except pg8000.ProgrammingError as e:
+    except Exception as e:
         if "no result set" in str(e):
             return None
         else:
@@ -88,7 +87,7 @@ def print_statements(statements):
                 print(s)
 
 
-def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_group=None, query_slot_count=1,
+def get_rs_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_group=None, query_slot_count=1,
                 ssl=True, **kwargs):
     conn = None
 
@@ -96,7 +95,7 @@ def get_pg_conn(db_host, db, db_user, db_pwd, schema_name, db_port=5439, query_g
         comment('Connect %s:%s:%s:%s' % (db_host, db_port, db, db_user))
 
     try:
-        conn = pg8000.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd,
+        conn = redshift_connector.connect(user=db_user, host=db_host, port=int(db_port), database=db, password=db_pwd,
                               ssl=ssl, timeout=None)
         conn._usock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
         conn.autocommit = True
@@ -214,7 +213,10 @@ def run_vacuum(conn,
                                          "table" as table_name,
                                          "schema" as schema_name
                                   FROM svv_table_info
-                                  WHERE (unsorted > %s or stats_off > %s)
+                                  WHERE 
+                                    ( NVL(unsorted,0) > %s 
+                                      OR stats_off > %s
+                                    )
                                     AND   size < %s
                                     AND  "schema" ~ '%s'
                                     AND  "table" = '%s';
@@ -233,7 +235,9 @@ def run_vacuum(conn,
                                          "table" as table_name,
                                          "schema" as schema_name
                                   FROM svv_table_info
-                                  WHERE (unsorted > %s or stats_off > %s)
+                                  WHERE 
+                                    (NVL(unsorted) > %s
+                                     OR stats_off > %s)
                                     AND   size < %s
                                     AND  "schema" ~ '%s'
                                     AND  "table" NOT IN (%s);
@@ -279,7 +283,7 @@ def run_vacuum(conn,
                   JOIN svv_table_info info_tbl
                     ON info_tbl.schema = feedback_tbl.schema_name
                    AND info_tbl.table = feedback_tbl.table_name
-                WHERE (info_tbl.unsorted > %s OR info_tbl.stats_off > %s)
+                WHERE (NVL(info_tbl.unsorted) > %s OR info_tbl.stats_off > %s)
                 AND   info_tbl.size < %s
                 AND   TRIM(info_tbl.schema) ~ '%s'
                 ORDER BY info_tbl.size,
@@ -324,12 +328,12 @@ def run_vacuum(conn,
                                                 AND
                                                  (
                                                 --If the size of the table is less than the max_table_size_mb then , run vacuum based on condition: >min_unsorted_pct
-                                                    ((size < %s) AND (unsorted > %s or stats_off > %s))
+                                                    ((size < %s) AND (NVL(unsorted,0) > %s or stats_off > %s))
                                                     OR
                                                 --If the size of the table is greater than the max_table_size_mb then , run vacuum based on condition:
                                                 -- >min_unsorted_pct AND < max_unsorted_pct
                                                 --This is to avoid big table with large unsorted_pct
-                                                     ((size > %s) AND (unsorted > %s AND unsorted < %s ))
+                                                     ((size > %s) AND (NVL(unsorted) > %s AND unsorted < %s ))
                                                  )
                                         ORDER BY "size" ASC ,skew_rows ASC;
                                         ''' % (vacuum_parameter,
@@ -638,6 +642,8 @@ def run_analyze_vacuum(**kwargs):
     else:
         aws_region = 'us-east-1'
 
+    print("Connecting to AWS_REGION : %s" % aws_region)
+
     cw = None
     if config_constants.SUPPRESS_CLOUDWATCH not in kwargs or not kwargs[config_constants.SUPPRESS_CLOUDWATCH]:
         try:
@@ -661,17 +667,10 @@ def run_analyze_vacuum(**kwargs):
 
     if debug:
         comment("Using Cluster Name %s" % cluster_name)
-
         comment("Supplied Args:")
         print(kwargs)
 
-    # get the password using .pgpass, environment variables, and then fall back to config
     db_pwd = None
-    try:
-        db_pwd = pgpasslib.getpass(kwargs[config_constants.DB_HOST], kwargs[config_constants.DB_PORT],
-                                   kwargs[config_constants.DB_NAME], kwargs[config_constants.DB_USER])
-    except pgpasslib.FileNotFound as e:
-        pass
 
     if db_pwd is None:
         db_pwd = kwargs[config_constants.DB_PASSWORD]
@@ -680,7 +679,7 @@ def run_analyze_vacuum(**kwargs):
         kwargs[config_constants.SCHEMA_NAME] = 'public'
 
     # get a connection for the controlling processes
-    master_conn = get_pg_conn(kwargs[config_constants.DB_HOST],
+    master_conn = get_rs_conn(kwargs[config_constants.DB_HOST],
                               kwargs[config_constants.DB_NAME],
                               kwargs[config_constants.DB_USER],
                               db_pwd,
@@ -695,22 +694,36 @@ def run_analyze_vacuum(**kwargs):
     if master_conn is None:
         raise Exception("No Connection was established")
 
-    vacuum_flag = kwargs.get(config_constants.DO_VACUUM, True)
-    if vacuum_flag is True:
+    # Retrieve the flags from the arguments:
+    vacuum_flag = kwargs.get("vacuum_flag",'False')
+    analyze_flag = kwargs.get("analyze_flag",'False')
+
+    # Convert to Boolean
+    if(vacuum_flag == 'True'):
+        vacuum_flag_b = True
+    else:
+        vacuum_flag_b = False
+
+    if( analyze_flag == 'True'):
+        analyze_flag_b = True
+    else:
+        analyze_flag_b = False
+
+    # Evaluate wether to run vacuum or analyze or both
+    if vacuum_flag_b is True:
         # Run vacuum based on the Unsorted , Stats off and Size of the table
         run_vacuum(master_conn, cluster_name, cw, **kwargs)
     else:
-        comment("Vacuum flag arg is not set. Vacuum not performed.")
+        comment("Vacuum flag arg is set as '%s'. Vacuum not performed." % vacuum_flag )
 
-    analyze_flag = kwargs.get(config_constants.DO_ANALYZE, True)
-    if analyze_flag is True:
-        if not vacuum_flag:
+    if analyze_flag_b is True:
+        if not vacuum_flag_b:
             comment("Warning - Analyze without Vacuum may result in sub-optimal performance")
 
         # Run Analyze based on the  Stats off Metrics table
         run_analyze(master_conn, cluster_name, cw, **kwargs)
     else:
-        comment("Analyze flag arg is set as %s. Analyze is not performed." % analyze_flag)
+        comment("Analyze flag arg is set as '%s'. Analyze is not performed." % analyze_flag )
 
     comment('Processing Complete')
 

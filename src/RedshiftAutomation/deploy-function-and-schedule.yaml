@@ -29,7 +29,7 @@ Parameters:
     Default: s3://my-bucket/prefix/config-file.json
     Description: Configuration File for this Utility instance
     Type: String
-    AllowedPattern: ^s3:\/\/([A-z\-]+)\/(.*)$
+    AllowedPattern: ^(?!(.*(\d{1,3}\.){2,3}\d{1,3}.*$))(^s3:\/\/([a-z0-9]+([-.\/]?[a-z0-9]?))+[a-z0-9]+$)
   CronExpression:
     Default: 0 0 * * ? *
     Description: Cron expression indicating how frequently to run the specified utility (default is once a day at midnight)
@@ -40,7 +40,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: lambda_function.event_handler
-      Runtime: python2.7
+      Runtime: python3.9
       CodeUri:         
         Bucket: !Sub awslabs-code-${AWS::Region}
         Key: LambdaRedshiftRunner/lambda-redshift-util-runner-1.5.1.zip

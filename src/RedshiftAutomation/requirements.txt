@@ -1,0 +1,6 @@
+redshift_connector
+boto3
+requests
+pgpasslib
+shortuuid
+pg8000

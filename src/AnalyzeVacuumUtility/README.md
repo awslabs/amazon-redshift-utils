@@ -71,8 +71,8 @@ Run ANALYZE based the `stats_off` metric in `svv_table_info`. If table has a `st
 |--slot-count | No | 1 |
 |--ignore-errors | No | False |
 |--query_group | No | None |
-|--analyze-flag | No | False |
-|--vacuum-flag | No | False |
+|--analyze-flag | Yes | False |
+|--vacuum-flag | Yes | False |
 |--vacuum-parameter | No | FULL |
 |--min-unsorted-pct | No | 0.05 |
 |--max-unsorted-pct | No | 0.5 |

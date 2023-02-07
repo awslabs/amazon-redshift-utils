@@ -2,6 +2,7 @@
 Purpose: View to get the tables that a user group has access to
 History:
 2021-09-27 milindo Created
+2022-08-15 saeedma8 excluded system tables
 **********************************************************************************************/
 create or replace view admin.v_get_tbl_priv_by_group as
 select
@@ -26,7 +27,7 @@ from
       left join pg_namespace nsp on (c.relnamespace = nsp.oid)
       left join pg_user use2 on (c.relowner = use2.usesysid)
       where c.relowner = use.usesysid
-      and nsp.nspname not in ('pg_catalog', 'pg_toast', 'information_schema', 'pg_internal')
+      and nsp.nspname !~ '^information_schema|catalog_history|pg_'
       ) t
 join pg_group pu on array_to_string(t.relacl, '|') like '%'||pu.groname||'%'
 ;

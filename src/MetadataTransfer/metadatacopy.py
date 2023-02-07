@@ -1,131 +1,188 @@
-#!/usr/bin/python
-import psycopg2
+#!/usr/bin/python3
+import boto3
+import redshift_connector
+from redshiftfunc import getiamcredentials
 from datetime import datetime
 import queries
 import argparse
-from dbconstring import executequery, cleanup, connstring
 from userprivs import executeddls
+import log
 
+__version__ = "1.0"
+
+logger = log.setup_custom_logger('MetadataTransfer')
+logger.info('Starting the MetadataTransferUtility')
 
 def createobjs(objtype, query, objcon, srccursor, tgtcursor, tgtcluster):
-    srcobjlist = executequery(srccursor, query)
-    tgtobjlist = executequery(tgtcursor, query)
-    objlist = list(set(srcobjlist) - set(tgtobjlist))
+
+
+    logger.debug("Executing query: %s" % query)
+    
+    srcres = srccursor.execute(query)
+    srcobjlist_2 = srcres.fetchall()
+
+    src_tup = ()
+
+    # Convert from a tuple of lists ([a,b],[c,d])
+    # into a tuple of tuples: ((a,b),(c,d))
+    for tps in srcobjlist_2:
+        src_tup = src_tup + (tuple(tps),)
+
+    # Target
+    tgtres = tgtcursor.execute(query)
+    tgtobjlist_2 = tgtres.fetchall()
+
+    tgt_tup = ()
+    
+    for tpt in tgtobjlist_2:
+        tgt_tup = tgt_tup + (tuple(tpt),)
+
+    objlist = set(src_tup) - set(tgt_tup)
+
     objcnt = 0
     objerr = False
-    print "[%s] INFO: Starting creation of %s in target cluster" \
-          % (str(datetime.now()), objtype + 's')
+
+    logger.info( "Starting creation of %s in target cluster" \
+          % (objtype + 's'))
+
     if objlist:
+        logger.info("Starting objlist...")
         if objtype == 'database':
+            logger.info("Starting database...")
             objcon.commit()
-            objcon.set_session(autocommit=True)
+            objcon.autocommit = True
         try:
             for i in objlist:
+                logger.info("Starting objlist...")
                 objname = i[0]
                 objddl = i[1]
+                
+                logger.info("-> Object Name: " + i[0])
                 tgtcursor.execute(objddl)
                 objcnt += 1
-                print "[%s] INFO: %s '%s' created" % (str(datetime.now()), objtype.title(), objname)
+                logger.info("%s '%s' created" % (objtype.title(), objname))
         except Exception as objerr:
+            logger.error(objerr)
             if objtype != 'database':
-                print "[%s] ERROR: Creating %s '%s' failed. All created %ss will be rolled back. %s" % \
-                      (str(datetime.now()), objtype, objname, objtype, str(objerr).rstrip('\n'))
+                logger.error( "Creating %s '%s' failed. All created %ss will be rolled back. %s" % \
+                      (objtype, objname, objtype, str(objerr).rstrip('\n')))
         finally:
             if objerr:
                 objcnt = 0
                 if objtype == 'database':
-                    objcon.set_session(autocommit=False)
-                    print "[%s] ERROR: %s '%s' failed to create successfully" \
-                          % (str(datetime.now()), objtype.title(), objname)
+                    objcon.autocommit = False
+                    logger.info( "%s '%s' failed to create successfully" \
+                          % (objtype.title(), objname))
                 else:
-                    print "[%s] ERROR: Rolling back transaction on target cluster '%s'" \
-                          % (str(datetime.now()), tgtcluster)
-                    print "[%s] ERROR: %d %s created successfully" % (str(datetime.now()), objcnt, objtype + 's')
+                    logger.info( "Rolling back transaction on target cluster '%s'" % (tgtcluster))
+                    logger.info( "%d %s created successfully" % (objcnt, objtype + 's'))
                     objcon.rollback()
             else:
-                print "[%s] INFO: Transaction committed" % (str(datetime.now()))
-                print "[%s] INFO: %d %s created successfully in target cluster '%s'" \
-                      % (str(datetime.now()), objcnt, objtype + 's', tgtcluster)
+                logger.info( "Transaction committed" )
+                logger.info( "%d %s created successfully in target cluster '%s'" \
+                      % (objcnt, objtype + 's', tgtcluster))
                 objcon.commit()
                 if objtype == 'database':
-                    objcon.set_session(autocommit=False)
+                    objcon.autocommit = False
     else:
-        print "[%s] INFO: All %s already exist!" % (str(datetime.now()), objtype + 's')
+        logger.info( "All %s already exist!" % (objtype + 's'))
     return objerr
 
 
 def objconfig(srccursor, tgtcursor, query, objtype, tgtdb, tgtconn):
-    srcobjconfig = executequery(srccursor, query)
-    tgtobjconfig = executequery(tgtcursor, query)
+    srcobjconfig = srccursor.execute(query)
+    tgtobjconfig = tgtcursor.execute(query)
+
+    srcobjconf = srcobjconfig.fetchall()
+    src_tup = ()
+
+    tgtobjconf = tgtobjconfig.fetchall()
+    tgt_tup = ()
+
+    for tps in srcobjconf:
+        src_tup = src_tup + (tuple(tps),)
+
+    for tps in tgtobjconf:
+        tgt_tup = tgt_tup + (tuple(tps),)
 
     # Find privileges that are on source but not in target cluster
-    usrobjconfig = list(set(srcobjconfig) - set(tgtobjconfig))
+    usrobjconfig = list(set(src_tup) - set(tgt_tup))
 
     # Add users to their respective groups
     if objtype == 'usrtogrp':
-        print "[%s] INFO: Adding users to groups in database '%s' on target" % (str(datetime.now()), tgtdb)
+        logger.info( "Adding users to groups in database '%s' on target" % (tgtdb))
         if usrobjconfig:
             for i in usrobjconfig:
                 tgtcursor.execute(i[2])
-                print "[%s] INFO: User '%s' added to group '%s'" % (str(datetime.now()), i[0], i[1])
-            print "[%s] INFO: Users added to groups successfully" % (str(datetime.now()))
+                logger.info( "User '%s' added to group '%s'" % (i[0], i[1]))
+            logger.info( "Users added to groups successfully" )
         else:
-            print "[%s] INFO: All users already added to groups!" % (str(datetime.now()))
+            logger.info( "All users already added to groups!" )
 
     # Add user settings usecreatedb,valuntil and useconnlimit from source to target cluster
     elif objtype == 'usrprofile':
-        print "[%s] INFO: Copying user profiles to database '%s' on target" % (str(datetime.now()), tgtdb)
+        logger.info( "Copying user profiles to database '%s' on target" % tgtdb)
         if usrobjconfig:
             for i in usrobjconfig:
                 tgtcursor.execute(i[1])
-                print "[%s] INFO: User '%s' profile copied" % (str(datetime.now()), i[0])
-            print "[%s] INFO: User profiles copied successfully" % (str(datetime.now()))
+                logger.info( "User '%s' profile copied" % (i[0]))
+            logger.info( "User profiles copied successfully" )
         else:
-            print "[%s] INFO: All user profiles already copied!" % (str(datetime.now()))
+            logger.info( "All user profiles already copied!" )
 
     # Add useconfig settings from source to target cluster
     elif objtype == 'usrconfig':
-        print "[%s] INFO: Copying user configs to database '%s' on target" % (str(datetime.now()), tgtdb)
+        logger.info( "Copying user configs to database '%s' on target" % tgtdb)
         if usrobjconfig:
             for i in usrobjconfig:
                 tgtcursor.execute(i[2])
-                print "[%s] INFO: User '%s' config '%s' copied" % (str(datetime.now()), i[0], i[1])
-            print "[%s] INFO: User configs copied successfully" % (str(datetime.now()))
+                logger.info( "User '%s' config '%s' copied" % (i[0], i[1]))
+            logger.info( "User configs copied successfully" )
         else:
-            print "[%s] INFO: All user configs already copied!" % (str(datetime.now()))
+            logger.info( "All user configs already copied!" )
     if usrobjconfig:
         tgtconn.commit()
-        print "[%s] INFO: Transaction committed" % (str(datetime.now()))
+        logger.info( "Transaction committed" )
 
 
 def transferprivs(srccursor, tgtcursor, gettablequery, usrgrntquery, tgtdb):
-    print "[%s] INFO: Starting transfer of user object privileges to database '%s' on target" \
-          % (str(datetime.now()), tgtdb)
+    
+    logger.info( "Starting transfer of user object privileges to database '%s' on target" % (tgtdb))
+    
     # Get tables from target cluster to be used in extracting user privileges from source cluster
-    tgttables = executequery(tgtcursor, gettablequery)
-    # print tgttables
+    logger.info(query)
+
+    srctables = srccursor.execute(query)
+
+    srctbls = srctables.fetchall()
+    src_tup = ()
+
+    for tps in srctbls:
+        src_tup = src_tup + (tuple(tps),)
+
+
     tablelist = tuple([i for sub in tgttables for i in sub])
-    # print tablelist
+
     if tablelist:
         tgtddl = executequery(tgtcursor, usrgrntquery, (tablelist,))
-        # print tgtddl
+        
         srcddl = executequery(srccursor, usrgrntquery, (tablelist,))
-        # print srcddl
+        
         # Find difference between privileges on source and target clusters
         ddl = list(set(srcddl) - set(tgtddl))
-        print ddl
+        logger.info(ddl)
         if ddl:
             for i in ddl:
                 # Copy user privileges from source cluster to target cluster
                 tgtcursor.execute(i[2])
-                print "[%s] INFO: %s" % (str(datetime.now()), i[2])
-            print "[%s] INFO: User object privileges copied to database '%s' on target successfully" \
-                  % (str(datetime.now()), tgtdb)
+                logger.info( "[%s] INFO: %s" % (str(datetime.now()), i[2]))
+            logger.info( "[%s] INFO: User object privileges copied to database '%s' on target successfully" \
+                  % (str(datetime.now()), tgtdb))
         else:
-            print "[%s] INFO: All user object privileges already in database '%s' on target!" \
-                  % (str(datetime.now()), tgtdb)
+            logger.info( "[%s] INFO: All user object privileges already in database '%s' on target!" \
+                  % (str(datetime.now()), tgtdb))
     else:
-        print "[%s] INFO: No tables found in database '%s' on target!" % (str(datetime.now()), tgtdb)
+        logger.info( "[%s] INFO: No tables found in database '%s' on target!" % (str(datetime.now()), tgtdb))
 
 
 def main():
@@ -136,57 +193,88 @@ def main():
     parser.add_argument("--srcuser", help="<superuser on source cluster>")
     parser.add_argument("--srcdbname", help="<source cluster database>")
     parser.add_argument("--tgtdbname", help="<target cluster database>")
-    parser.add_argument("--dbport", help="set database port", default=5439)
+    parser.add_argument("--dbport", help="set database port", default=5439, type=int)
     args = parser.parse_args()
 
     srchost = args.srccluster
-    srclusterid = srchost.split('.')[0]
+    srcclusterid = srchost.split('.')[0]
     srcuser = args.srcuser
     srcdbname = args.srcdbname
     tgtdbname = args.tgtdbname
     tgtuser = args.tgtuser
     tgthost = args.tgtcluster
     tgtclusterid = tgthost.split('.')[0]
+    rsport = args.dbport
 
     if srchost is None or tgthost is None or srcuser is None or tgtuser is None:
-        parser.print_help()
+        parser.print.help()
         exit()
 
-    tgtconstring = connstring(dbname=tgtdbname, dbhost=tgthost, clusterid=tgtclusterid, dbuser=tgtuser)
-    srcconstring = connstring(dbname=srcdbname, dbhost=srchost, clusterid=srclusterid, dbuser=srcuser)
+    src_credentials = getiamcredentials(srchost,srcdbname,srcuser)
+    logger.debug( ( "Source IAM User:%s , Expiration: %s " % (src_credentials['DbUser'], src_credentials['Expiration']  )   ) )
+
+    tgt_credentials = getiamcredentials(tgthost,tgtdbname,tgtuser)
+    logger.debug( ( "Target IAM User:%s , Expiration: %s " % (tgt_credentials['DbUser'], tgt_credentials['Expiration']  )   ) )
+
+    # Extract temp credentials
+    src_rs_user=src_credentials['DbUser']
+    src_rs_pwd =src_credentials['DbPassword']
+
+    tgt_rs_user=tgt_credentials['DbUser']
+    tgt_rs_pwd =tgt_credentials['DbPassword']
 
     try:
-        srccon = psycopg2.connect(srcconstring)
-        srccur = srccon.cursor()
-        tgtcon = psycopg2.connect(tgtconstring)
-        tgtcur = tgtcon.cursor()
+        src_rs_conn = redshift_connector.connect(database=srcdbname, user=src_rs_user, password=src_rs_pwd, host=srchost, port=rsport, ssl=True)
+        src_rs_conn.autocommit = True
 
-        print "[%s] INFO: Starting transfer of metadata from source cluster %s to target cluster %s" % \
-              (str(datetime.now()), srclusterid.title(), tgtclusterid.title())
-        createobjs('database', queries.dblist, tgtcon, srccur, tgtcur, tgtclusterid)
-        createobjs('schema', queries.schemalist, tgtcon, srccur, tgtcur, tgtclusterid)
-        grperr = createobjs('group', queries.grouplist, tgtcon, srccur, tgtcur, tgtclusterid)
-        usrerr = createobjs('user', queries.userlist, tgtcon, srccur, tgtcur, tgtclusterid)
+        logger.info("Successfully connected to Redshift cluster: %s" % srchost)
+        srccur: redshift_connector.Cursor = src_rs_conn.cursor()
+    
+
+        tgt_rs_conn = redshift_connector.connect(database=tgtdbname, user=tgt_rs_user, password=tgt_rs_pwd, host=tgthost, port=rsport, ssl=True)
+        tgt_rs_conn.autocommit = True
+        logger.info("Successfully connected to Redshift cluster: %s" % tgthost)
+        tgtcur: redshift_connector.Cursor = tgt_rs_conn.cursor()
+        
+        #Set the Application Name
+        set_name = "set application_name to 'MetadataTransferUtility-v%s'" % __version__
+
+        srccur.execute(set_name)
+        tgtcur.execute(set_name)
+
+        logger.info( "Starting transfer of metadata from source cluster %s to target cluster %s" % \
+              (srcclusterid.title(), tgtclusterid.title()))
+        
+        createobjs('database', queries.dblist, tgt_rs_conn, srccur, tgtcur, tgtclusterid)
+        createobjs('schema', queries.schemalist, tgt_rs_conn, srccur, tgtcur, tgtclusterid)
+        
+        grperr = createobjs('group', queries.grouplist, tgt_rs_conn, srccur, tgtcur, tgtclusterid)
+        usrerr = createobjs('user', queries.userlist, tgt_rs_conn, srccur, tgtcur, tgtclusterid)
 
         if not usrerr and not grperr:
-            objconfig(srccur, tgtcur, queries.addusrtogrp, 'usrtogrp', tgtdbname, tgtcon)
-            objconfig(srccur, tgtcur, queries.usrprofile, 'usrprofile', tgtdbname, tgtcon)
-            objconfig(srccur, tgtcur, queries.usrconfig, 'usrconfig', tgtdbname, tgtcon)
+            objconfig(srccur, tgtcur, queries.addusrtogrp, 'usrtogrp', tgtdbname, tgt_rs_conn)
+            objconfig(srccur, tgtcur, queries.usrprofile, 'usrprofile', tgtdbname, tgt_rs_conn)
+            objconfig(srccur, tgtcur, queries.usrconfig, 'usrconfig', tgtdbname, tgt_rs_conn)
         else:
-            print "[%s] ERROR: Error while creating users or groups. Please fix and retry" % (str(datetime.now()))
+            logger.info( "Error while creating users or groups. Please fix and retry" )
 
+        logger.info("Executing language privileges...")
         executeddls(srccur, tgtcur, queries.languageprivs, tgtuser)
+        logger.info("Executing database privileges...")
         executeddls(srccur, tgtcur, queries.databaseprivs, tgtuser)
+        logger.info("Executing schema privileges...")
         executeddls(srccur, tgtcur, queries.schemaprivs, tgtuser)
+        logger.info("Executing table privileges...")
         executeddls(srccur, tgtcur, queries.tableprivs, tgtuser)
+        logger.info("Executing function privileges...")
         executeddls(srccur, tgtcur, queries.functionprivs, tgtuser)
+        logger.info("Executing ACL privileges...")
         executeddls(srccur, tgtcur, queries.defaclprivs, tgtuser, 'defacl') 
 
-        cleanup(tgtcur, tgtcon, 'target')
-        cleanup(srccur, srccon, 'source')
+        logger.info("Completed Metadata Transfer")
 
     except Exception as err:
-        print "[%s] ERROR: %s" % (str(datetime.now()), err)
+        logger.error(err)
         exit()
 
 
