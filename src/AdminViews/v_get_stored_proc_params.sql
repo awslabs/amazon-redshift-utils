@@ -2,7 +2,7 @@
 Purpose: List all stored procedures with their input parameters
 History:
 2020-04-15 joeharris76 Created
-2023-02-20 saeema8 added serverless prolang id
+2023-02-20 saeedma8 added serverless prolang id
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_get_stored_proc_params
 AS
