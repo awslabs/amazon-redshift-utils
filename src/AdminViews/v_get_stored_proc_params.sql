@@ -2,6 +2,7 @@
 Purpose: List all stored procedures with their input parameters
 History:
 2020-04-15 joeharris76 Created
+2023-02-20 saeedma8 added serverless prolang id
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_get_stored_proc_params
 AS
@@ -17,7 +18,7 @@ AS (SELECT oid, arg_num
                      , pronargs    AS arg_count
                 FROM pg_proc
                 WHERE proowner != 1
-                  AND prolang = 100356 ) t) t)
+                  AND prolang in (100356, 101857) ) t) t)
 SELECT n.nspname                     AS schema_name
      , p.proname                     AS proc_name
      , p.oid::INT                    AS proc_id
@@ -28,5 +29,5 @@ FROM pg_proc                p
      LEFT JOIN pg_namespace n   ON n.oid = p.pronamespace
      LEFT JOIN arguments    a   ON a.oid = p.oid
 WHERE p.proowner != 1
-  AND p.prolang = 100356
+  AND p.prolang in (100356, 101857)
 ORDER BY 1,2,3,4;
