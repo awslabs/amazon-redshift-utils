@@ -118,3 +118,12 @@ copy part from 's3://redshift-downloads/TPC-H/2.18/10GB/part.tbl' iam_role defau
 copy supplier from 's3://redshift-downloads/TPC-H/2.18/10GB/supplier.tbl' iam_role default delimiter '|';
 copy partsupp from 's3://redshift-downloads/TPC-H/2.18/10GB/partsupp.tbl' iam_role default delimiter '|';
 copy customer from 's3://redshift-downloads/TPC-H/2.18/10GB/customer.tbl' iam_role default delimiter '|';
+
+select count(*) from customer;  -- 1500000
+select count(*) from lineitem;  -- 59986052
+select count(*) from nation;  -- 25
+select count(*) from orders;  -- 15000000
+select count(*) from part;  -- 2000000
+select count(*) from partsupp;  -- 8000000
+select count(*) from region;  -- 5
+select count(*) from supplier;  -- 100000
