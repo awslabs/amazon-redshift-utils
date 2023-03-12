@@ -110,14 +110,14 @@ For more information check samples in https://docs.aws.amazon.com/redshift/lates
 copy region from's3://redshift-downloads/TPC-H/10GB/region/' IAM_Role 'Replace text inside the quotes with Redshift cluster IAM_Role ARN' gzip delimiter '|';
 */
 
-copy region from 's3://redshift-downloads/TPC-H/2.18/10GB/region.tbl' iam_role default delimiter '|';
-copy nation from 's3://redshift-downloads/TPC-H/2.18/10GB/nation.tbl' iam_role default delimiter '|';
-copy lineitem from 's3://redshift-downloads/TPC-H/2.18/10GB/lineitem.tbl' iam_role default delimiter '|';
-copy orders from 's3://redshift-downloads/TPC-H/2.18/10GB/orders.tbl' iam_role default delimiter '|';
-copy part from 's3://redshift-downloads/TPC-H/2.18/10GB/part.tbl' iam_role default delimiter '|';
-copy supplier from 's3://redshift-downloads/TPC-H/2.18/10GB/supplier.tbl' iam_role default delimiter '|';
-copy partsupp from 's3://redshift-downloads/TPC-H/2.18/10GB/partsupp.tbl' iam_role default delimiter '|';
-copy customer from 's3://redshift-downloads/TPC-H/2.18/10GB/customer.tbl' iam_role default delimiter '|';
+copy region from 's3://redshift-downloads/TPC-H/2.18/10GB/region.tbl' iam_role default delimiter '|' region 'us-east-1';
+copy nation from 's3://redshift-downloads/TPC-H/2.18/10GB/nation.tbl' iam_role default delimiter '|' region 'us-east-1';
+copy lineitem from 's3://redshift-downloads/TPC-H/2.18/10GB/lineitem.tbl' iam_role default delimiter '|' region 'us-east-1';
+copy orders from 's3://redshift-downloads/TPC-H/2.18/10GB/orders.tbl' iam_role default delimiter '|' region 'us-east-1';
+copy part from 's3://redshift-downloads/TPC-H/2.18/10GB/part.tbl' iam_role default delimiter '|' region 'us-east-1';
+copy supplier from 's3://redshift-downloads/TPC-H/2.18/10GB/supplier.tbl' iam_role default delimiter '|' region 'us-east-1';
+copy partsupp from 's3://redshift-downloads/TPC-H/2.18/10GB/partsupp.tbl' iam_role default delimiter '|' region 'us-east-1';
+copy customer from 's3://redshift-downloads/TPC-H/2.18/10GB/customer.tbl' iam_role default delimiter '|' region 'us-east-1';
 
 select count(*) from customer;  -- 1500000
 select count(*) from lineitem;  -- 59986052

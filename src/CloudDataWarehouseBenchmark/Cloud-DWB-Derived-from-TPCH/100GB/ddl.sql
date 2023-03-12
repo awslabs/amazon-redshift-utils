@@ -110,14 +110,14 @@ For more information check samples in https://docs.aws.amazon.com/redshift/lates
 copy region from's3://redshift-downloads/TPC-H/100GB/region/' IAM_Role 'Replace text inside the quotes with Redshift cluster IAM_Role ARN' gzip delimiter '|';
 */
 
-copy region from 's3://redshift-downloads/TPC-H/2.18/100GB/region/' iam_role default delimiter '|';
-copy nation from 's3://redshift-downloads/TPC-H/2.18/100GB/nation/' iam_role default delimiter '|';
-copy lineitem from 's3://redshift-downloads/TPC-H/2.18/100GB/lineitem/' iam_role default delimiter '|';
-copy orders from 's3://redshift-downloads/TPC-H/2.18/100GB/orders/' iam_role default delimiter '|';
-copy part from 's3://redshift-downloads/TPC-H/2.18/100GB/part/' iam_role default delimiter '|';
-copy supplier from 's3://redshift-downloads/TPC-H/2.18/100GB/supplier/' iam_role default delimiter '|';
-copy partsupp from 's3://redshift-downloads/TPC-H/2.18/100GB/partsupp/' iam_role default delimiter '|';
-copy customer from 's3://redshift-downloads/TPC-H/2.18/100GB/customer/' iam_role default delimiter '|';
+copy region from 's3://redshift-downloads/TPC-H/2.18/100GB/region/' iam_role default delimiter '|' region 'us-east-1';
+copy nation from 's3://redshift-downloads/TPC-H/2.18/100GB/nation/' iam_role default delimiter '|' region 'us-east-1';
+copy lineitem from 's3://redshift-downloads/TPC-H/2.18/100GB/lineitem/' iam_role default delimiter '|' region 'us-east-1';
+copy orders from 's3://redshift-downloads/TPC-H/2.18/100GB/orders/' iam_role default delimiter '|' region 'us-east-1';
+copy part from 's3://redshift-downloads/TPC-H/2.18/100GB/part/' iam_role default delimiter '|' region 'us-east-1';
+copy supplier from 's3://redshift-downloads/TPC-H/2.18/100GB/supplier/' iam_role default delimiter '|' region 'us-east-1';
+copy partsupp from 's3://redshift-downloads/TPC-H/2.18/100GB/partsupp/' iam_role default delimiter '|' region 'us-east-1';
+copy customer from 's3://redshift-downloads/TPC-H/2.18/100GB/customer/' iam_role default delimiter '|' region 'us-east-1';
 
 select count(*) from customer;  
 select count(*) from lineitem;  
