@@ -110,14 +110,14 @@ For more information check samples in https://docs.aws.amazon.com/redshift/lates
 copy region from's3://redshift-downloads/TPC-H/3TB/region/' IAM_Role 'Replace text inside the quotes with Redshift cluster IAM_Role ARN' gzip delimiter '|';
 */
 
-copy region from 's3://redshift-downloads/TPC-H/2.18/30TB/region/' iam_role default delimiter '|';
-copy nation from 's3://redshift-downloads/TPC-H/2.18/30TB/nation/' iam_role default delimiter '|';
-copy lineitem from 's3://redshift-downloads/TPC-H/2.18/30TB/lineitem/' iam_role default gzip delimiter '|';
-copy orders from 's3://redshift-downloads/TPC-H/2.18/30TB/orders/' iam_role default gzip delimiter '|';
-copy part from 's3://redshift-downloads/TPC-H/2.18/30TB/part/' iam_role default gzip delimiter '|';
-copy supplier from 's3://redshift-downloads/TPC-H/2.18/30TB/supplier/' iam_role default gzip delimiter '|';
-copy partsupp from 's3://redshift-downloads/TPC-H/2.18/30TB/partsupp/' iam_role default gzip delimiter '|';
-copy customer from 's3://redshift-downloads/TPC-H/2.18/30TB/customer/' iam_role default gzip delimiter '|';
+copy region from 's3://redshift-downloads/TPC-H/2.18/30TB/region/' iam_role default delimiter '|' region 'us-east-1';
+copy nation from 's3://redshift-downloads/TPC-H/2.18/30TB/nation/' iam_role default delimiter '|' region 'us-east-1';
+copy lineitem from 's3://redshift-downloads/TPC-H/2.18/30TB/lineitem/' iam_role default gzip delimiter '|' region 'us-east-1';
+copy orders from 's3://redshift-downloads/TPC-H/2.18/30TB/orders/' iam_role default gzip delimiter '|' region 'us-east-1';
+copy part from 's3://redshift-downloads/TPC-H/2.18/30TB/part/' iam_role default gzip delimiter '|' region 'us-east-1';
+copy supplier from 's3://redshift-downloads/TPC-H/2.18/30TB/supplier/' iam_role default gzip delimiter '|' region 'us-east-1';
+copy partsupp from 's3://redshift-downloads/TPC-H/2.18/30TB/partsupp/' iam_role default gzip delimiter '|' region 'us-east-1';
+copy customer from 's3://redshift-downloads/TPC-H/2.18/30TB/customer/' iam_role default gzip delimiter '|' region 'us-east-1';
 
 select count(*) from customer;  -- 4500000000
 select count(*) from lineitem;  -- 179999978268
