@@ -2,7 +2,7 @@
 Purpose: View to get the tables that a user group has access to
 History:
 2021-09-27 milindo Created
-2022-08-15 saeedma8 excluded system tables
+2023-03-13 amneet13 return results specific for groups.
 **********************************************************************************************/
 create or replace view admin.v_get_tbl_priv_by_group as
 select
