@@ -64,10 +64,9 @@ def cw_describe_log_groups(log_group_name=None, region=None):
             logGroupNamePrefix=log_group_name
         )
     else:
-        response_pg_1 = cloudwatch_client.describe_log_groups()
-        logs = response_pg_1
+        logs = cloudwatch_client.describe_log_groups()
 
-        token = response_pg_1.get('nextToken','')
+        token = logs.get('nextToken','')
         while token != '':
             response_itr = cloudwatch_client.describe_log_groups(nextToken=token)
             logs['logGroups'].extend(response_itr['logGroups'])
