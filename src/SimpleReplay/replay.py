@@ -1399,8 +1399,8 @@ def get_connection_credentials(username, database=None, max_attempts=10, skip_ca
                         time.sleep(retry_delay_sec)
                 else:
                     break
-            db_user = response['DbUser']
-            db_password = response['DbPassword']
+        db_user = response['DbUser']
+        db_password = response['DbPassword']
     else:
         rs_client = client("redshift", region_name=g_config.get("target_cluster_region", None), **additional_args)
         for attempt in range(1, max_attempts + 1):
