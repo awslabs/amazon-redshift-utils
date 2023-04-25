@@ -159,6 +159,7 @@ def run_comparison_analysis(bucket, replay1, replay2):
     # print summary
 
 
+@contextmanager
 def initiate_connection(username, cluster):
     """Initiate connection with Redshift cluster
 
