@@ -15,10 +15,18 @@ from io import StringIO
 from report_gen import pdf_gen
 from report_util import Report, styles
 from tabulate import tabulate
-from util import db_connect, init_logging, cluster_dict, bucket_dict, get_secret, create_json
+from util import (
+    db_connect,
+    init_logging,
+    cluster_dict,
+    bucket_dict,
+    get_secret,
+    create_json,
+    redshift_get_cluster_credentials,
+)
 
 g_stylesheet = styles()
-g_columns = g_stylesheet.get('columns')
+g_columns = g_stylesheet.get("columns")
 
 
 def launch_analysis_v2():
@@ -27,7 +35,7 @@ def launch_analysis_v2():
     # add explicit instructions for user
 
     os.system("pip install -r requirements.txt")
-    os.chdir(f'{os.getcwd()}/gui')
+    os.chdir(f"{os.getcwd()}/gui")
 
     # explicit version checking
     if os.system("node -v") != 0:
@@ -41,10 +49,23 @@ def launch_analysis_v2():
     os.system("npm start")
 
 
-def run_replay_analysis(replay, cluster_endpoint, start_time, end_time, bucket_url, iam_role, user, tag='',
-                        workload="",
-                        is_serverless=False, secret_name=None, nlb_nat_dns=None, complete=True, stats=None,
-                        summary=None):
+def run_replay_analysis(
+    replay,
+    cluster_endpoint,
+    start_time,
+    end_time,
+    bucket_url,
+    iam_role,
+    user,
+    tag="",
+    workload="",
+    is_serverless=False,
+    secret_name=None,
+    nlb_nat_dns=None,
+    complete=True,
+    stats=None,
+    summary=None,
+):
     """End to end data collection, parsing, analysis and pdf generation
 
     @param replay: str, replay id from replay.py
@@ -63,8 +84,7 @@ def run_replay_analysis(replay, cluster_endpoint, start_time, end_time, bucket_u
     @param summary: str list, replay output summary from replay.py
     """
 
-    logger = logging.getLogger("SimpleReplayLogger")
-    s3_client = boto3.client('s3')
+    logger = logging.getLogger("WorkloadReplicatorLogger")
     cluster = cluster_dict(cluster_endpoint, is_serverless, start_time, end_time)
     cluster["is_serverless"] = is_serverless
     cluster["secret_name"] = secret_name
@@ -82,44 +102,48 @@ def run_replay_analysis(replay, cluster_endpoint, start_time, end_time, bucket_u
     queries = unload(bucket, iam_role, cluster, user, replay)
     info = create_json(replay, cluster, workload, complete, stats, tag)
     try:
-        boto3.resource('s3').Bucket(bucket.get('bucket_name')).upload_file(info, f"{replay_path}/{info}")
+        boto3.resource("s3").Bucket(bucket.get("bucket_name")).upload_file(
+            info, f"{replay_path}/{info}"
+        )
     except ClientError as e:
-        logger.error(f"{e} Could not upload info. Confirm IAM permissions include S3::PutObject.")
+        logger.error(
+            f"{e} Could not upload info. Confirm IAM permissions include S3::PutObject."
+        )
+        exit(-1)
 
-    if is_serverless:
-        exit(0)
-    else:
-        report = Report(cluster, replay, bucket, replay_path, tag, complete)
+    report = Report(cluster, replay, bucket, replay_path, tag, complete)
 
-        try:
-            # iterate through query csv results and import
-            for q in queries:
-                get_raw_data(report, bucket, replay_path, q)
+    try:
+        # iterate through query csv results and import
+        for q in queries:
+            get_raw_data(report, bucket, replay_path, q)
 
-        except s3_client.exceptions.NoSuchKey as e:
-            logger.error(f"{e} Raw data does not exist in S3. Error in replay analysis.")
-            exit(-1)
-        except Exception as e:
-            logger.error(f"{e}: Data read failed. Error in replay analysis.")
-            exit(-1)
+    except Exception as e:
+        logger.error(f"{e}: Data read failed. Error in replay analysis.")
+        exit(-1)
 
-        # generate replay_id_report.pdf and info.json
-        logger.info(f"Generating report.")
-        pdf = pdf_gen(report, summary)
+    # generate replay_id_report.pdf and info.json
+    logger.info(f"Generating report.")
+    pdf = pdf_gen(report, summary)
 
-        s3_resource = boto3.resource('s3')
-        # upload to s3 and output presigned urls
-        try:
-            s3_resource.Bucket(bucket.get('bucket_name')).upload_file(pdf, f"{replay_path}/out/{pdf}")
-            s3_resource.Bucket(bucket.get('bucket_name')).upload_file(info, f"{replay_path}/out/{info}")
-            analysis_summary(bucket.get('url'), replay)
-        except ClientError as e:
-            logger.error(f"{e} Could not upload report. Confirm IAM permissions include S3::PutObject.")
-            exit(-1)
+    # upload to s3 and output presigned urls
+    try:
+        boto3.resource("s3").Bucket(bucket.get("bucket_name")).upload_file(
+            pdf, f"{replay_path}/out/{pdf}"
+        )
+        boto3.resource("s3").Bucket(bucket.get("bucket_name")).upload_file(
+            info, f"{replay_path}/out/{info}"
+        )
+        analysis_summary(bucket.get("url"), replay)
+    except ClientError as e:
+        logger.error(
+            f"{e} Could not upload report. Confirm IAM permissions include S3::PutObject."
+        )
+        exit(-1)
 
 
 def run_comparison_analysis(bucket, replay1, replay2):
-    """ Compares two given replays using aggregated_data/ from S3
+    """Compares two given replays using aggregated_data/ from S3
 
     @param bucket: str, S3 bucket location
     @param replay1: str, replay id 1
@@ -137,42 +161,59 @@ def run_comparison_analysis(bucket, replay1, replay2):
 
 @contextmanager
 def initiate_connection(username, cluster):
-    """ Initiate connection with Redshift cluster
+    """Initiate connection with Redshift cluster
 
     @param username: master username from replay.yaml
     @param cluster: cluster dictionary
     """
 
     response = None
-    logger = logging.getLogger("SimpleReplayLogger")
+    logger = logging.getLogger("WorkloadReplicatorLogger")
+    secret_keys = ["admin_username", "admin_password"]
 
     if cluster.get("is_serverless"):
-        secret_name = get_secret(cluster.get('secret_name'), cluster.get("region"))
-        response = {'DbUser': secret_name["admin_username"], 'DbPassword': secret_name["admin_password"]}
-    else:
-        rs_client = client('redshift', region_name=cluster.get("region"))
-        # get response from redshift to get cluster credentials using provided cluster info
-        try:
-            response = rs_client.get_cluster_credentials(
-                DbUser=username,
-                DbName=cluster.get("database"),
-                ClusterIdentifier=cluster.get("id"),
-                DurationSeconds=900,
-                AutoCreate=False,
+        if cluster.get("secret_name"):
+            logger.info(f"Fetching secrets from: {cluster.get['secret_name']}")
+            secret_name = get_secret(cluster.get("secret_name"), cluster.get("region"))
+            if not len(set(secret_keys) - set(secret_name.keys())):
+                response = {
+                    "DbUser": secret_name["admin_username"],
+                    "DbPassword": secret_name["admin_password"],
+                }
+            else:
+                logger.error(f"Required secrets not found: {secret_keys}")
+                exit(-1)
+        else:
+            serverless_cluster_id = f"redshift-serverless-{cluster.get('id')}"
+            logger.debug(
+                f"Serverless cluster id {serverless_cluster_id} passed to get_cluster_credentials"
             )
-        except rs_client.exceptions.ClusterNotFoundFault:
-            logger.error(
-                f"Cluster {cluster.get('id')} not found. Please confirm cluster endpoint, account, and region.")
-            exit(-1)
+            response = redshift_get_cluster_credentials(
+                cluster.get("region"),
+                username,
+                cluster.get("database"),
+                serverless_cluster_id,
+            )
+
+    else:
+        try:
+            response = redshift_get_cluster_credentials(
+                cluster.get("region"),
+                username,
+                cluster.get("database"),
+                cluster.get("id"),
+            )
         except Exception as e:
             logger.error(
                 f"Unable to connect to Redshift. Confirm IAM permissions include Redshift::GetClusterCredentials."
-                f" {e}")
+                f" {e}"
+            )
             exit(-1)
 
-    if response is None or response.get('DbPassword') is None:
+    if response is None or response.get("DbPassword") is None:
         logger.error(f"Failed to retrieve credentials for user {username} ")
         response = None
+        exit(-1)
 
     # define cluster string/dict
     cluster_string = {
@@ -186,15 +227,16 @@ def initiate_connection(username, cluster):
     conn = None
     try:
         logger.info(f"Connecting to {cluster.get('id')}")
-        conn = db_connect(host=cluster_string["host"], port=int(cluster_string["port"]),
-                          username=cluster_string["username"], password=cluster_string["password"],
-                          database=cluster_string["database"])  # yield to reuse connection
+        conn = db_connect(
+            host=cluster_string["host"],
+            port=int(cluster_string["port"]),
+            username=cluster_string["username"],
+            password=cluster_string["password"],
+            database=cluster_string["database"],
+        )  # yield to reuse connection
         yield conn
-    except redshift_connector.error.Error as e:
-        logger.error(f"Unable to connect to Redshift. Please confirm credentials. {e} ")
-        exit(-1)
     except Exception as e:
-        logger.error(f"Unable to connect to Redshift. {e}")
+        logger.error(f"Unable to connect to Redshift. {e}", exc_info=True)
         exit(-1)
     finally:
         if conn is not None:
@@ -215,35 +257,45 @@ def unload(unload_location, iam_role, cluster, user, replay):
 
     logger = logging.getLogger("SimpleReplayLogger")
 
-    directory = r'sql/serverless'
+    directory = r"sql/serverless"
 
     queries = []  # used to return query names
-    with initiate_connection(username=user, cluster=cluster) as conn:  # initiate connection
+    with initiate_connection(
+        username=user, cluster=cluster
+    ) as conn:  # initiate connection
         cursor = conn.cursor()
         logger.info(f"Querying {cluster.get('id')}. This may take some time.")
 
         for file in sorted(os.listdir(directory)):  # iterate local sql/ directory
-            if not file.endswith('.sql'):  # validity check
+            if not file.endswith(".sql"):  # validity check
                 continue
             with open(f"{directory}/{file}", "r") as query_file:  # open sql file
                 # get file name prefix for s3 files
-                query_name = os.path.splitext(file)[0]  # get file/query name for reference
+                query_name = os.path.splitext(file)[
+                    0
+                ]  # get file/query name for reference
                 logger.debug(f"Query: {query_name}")
                 queries.append(query_name)
                 query = query_file.read()  # read file contents as string
 
                 # replace start and end times in sql with variables
-                query = re.sub(r"{{START_TIME}}", f"'{cluster.get('start_time')}'", query)
+                query = re.sub(
+                    r"{{START_TIME}}", f"'{cluster.get('start_time')}'", query
+                )
                 query = re.sub(r"{{END_TIME}}", f"'{cluster.get('end_time')}'", query)
 
                 # format unload query with actual query from sql/
-                unload_query = f"unload ($${query}$$) to '{unload_location.get('url')}/analysis/{replay}/raw_data/" \
-                               f"{query_name}' iam_role '{iam_role}' CSV header allowoverwrite parallel off;"
+                unload_query = (
+                    f"unload ($${query}$$) to '{unload_location.get('url')}/analysis/{replay}/raw_data/"
+                    f"{query_name}' iam_role '{iam_role}' CSV header allowoverwrite parallel off;"
+                )
                 try:
                     cursor.execute(unload_query)  # execute unload
                 except Exception as e:
-                    logger.error(f"Could not unload {query_name} results. Confirm IAM permissions include UNLOAD "
-                                 f"access for Redshift. {e}")
+                    logger.error(
+                        f"Could not unload {query_name} results. Confirm IAM permissions include UNLOAD "
+                        f"access for Redshift. {e}"
+                    )
                     exit(-1)
 
     logger.info(f"Query results available in {unload_location.get('url')}")
@@ -260,19 +312,23 @@ def get_raw_data(report, bucket, replay_path, query):
     """
 
     logger = logging.getLogger("SimpleReplayLogger")
-    s3_client = boto3.client('s3')
+    s3_client = boto3.client("s3")
     try:
-        response = s3_client.get_object(Bucket=bucket.get('bucket_name'), Key=f"{replay_path}/raw_data/{query}000")
+        response = s3_client.get_object(
+            Bucket=bucket.get("bucket_name"), Key=f"{replay_path}/raw_data/{query}000"
+        )
     except Exception as e:
-        logger.error(f"Unable to get raw data from S3. Results for {query} not found. {e}")
+        logger.error(
+            f"Unable to get raw data from S3. Results for {query} not found. {e}"
+        )
     df = pd.read_csv(response.get("Body")).fillna(0)
     logger.debug(f"Parsing results from '{query}' query.")
-    if query == 'latency_distribution':
+    if query == "latency_distribution":
         report.feature_graph = df
     else:
         for t, vals in report.tables.items():
-            if vals.get('sql') == query:
-                vals['data'] = read_data(t, df, vals.get('columns'), report)
+            if vals.get("sql") == query:
+                vals["data"] = read_data(t, df, vals.get("columns"), report)
 
 
 def read_data(table_name, df, report_columns, report):
@@ -291,35 +347,49 @@ def read_data(table_name, df, report_columns, report):
         logger.error("Data is empty. Failed to generate report.")
         exit(-1)
     cols = [g_columns[x] for x in report_columns]
-    table_type = report.tables.get(table_name).get('type')
+    table_type = report.tables.get(table_name).get("type")
 
     report_table = None
-    if table_type == 'breakdown':
+    if table_type == "breakdown":
         report_table = df[cols]
-    elif table_type == 'metric':
-        order = CategoricalDtype(['Query Latency', 'Compile Time', 'Queue Time', 'Execution Time',
-                                  'Commit Queue Time', 'Commit Time'], ordered=True)
-        df[g_columns.get('Measure')] = df[g_columns.get('Measure')].astype(order)
-        frame = df.sort_values(g_columns.get('Measure'))
+    elif table_type == "metric":
+        order = CategoricalDtype(
+            [
+                "Query Latency",
+                "Compile Time",
+                "Queue Time",
+                "Execution Time",
+                "Commit Queue Time",
+                "Commit Time",
+            ],
+            ordered=True,
+        )
+        df[g_columns.get("Measure")] = df[g_columns.get("Measure")].astype(order)
+        frame = df.sort_values(g_columns.get("Measure"))
         report_table = frame[cols]
-    elif table_type == 'measure':  # filter for specific measure type
+    elif table_type == "measure":  # filter for specific measure type
         report_table = df[cols][df[g_columns.get("Measure")] == table_name]
 
-    report_table = pd.DataFrame(report_table).round(2)  # round values in dataframe to thousandths place
-    report_table.reindex(columns=report_columns)        # add columns names to dataframe
+    report_table = pd.DataFrame(report_table).round(
+        2
+    )  # round values in dataframe to thousandths place
+    report_table.reindex(columns=report_columns)  # add columns names to dataframe
 
     # upload formatted dataframe to S3 as csv
     try:
-        s3_resource = boto3.resource('s3')
+        s3_resource = boto3.resource("s3")
         file = f"{table_name.replace(' ', '')}.csv"  # set filename for saving
         csv_buffer = StringIO()
         report_table.to_csv(csv_buffer)
         logger.debug(report.bucket)
-        s3_resource.Object(report.bucket.get("bucket_name"),
-                           f'{report.path}/aggregated_data/{file}').put(Body=csv_buffer.getvalue())
+        s3_resource.Object(
+            report.bucket.get("bucket_name"), f"{report.path}/aggregated_data/{file}"
+        ).put(Body=csv_buffer.getvalue())
     except Exception as e:
-        logger.error(f"Could not upload aggregated data. Please confirm bucket. Error occurred while processing "
-                     f"data. {e}")
+        logger.error(
+            f"Could not upload aggregated data. Please confirm bucket. Error occurred while processing "
+            f"data. {e}"
+        )
         exit(-1)
     return report_table
 
@@ -334,14 +404,17 @@ def create_presigned_url(bucket_name, object_name):
 
     logger = logging.getLogger("SimpleReplayLogger")
 
-    s3_client = boto3.client('s3')
+    s3_client = boto3.client("s3")
     try:
-        response = s3_client.generate_presigned_url('get_object',
-                                                    Params={'Bucket': bucket_name,
-                                                            'Key': object_name},
-                                                    ExpiresIn=604800)
+        response = s3_client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket_name, "Key": object_name},
+            ExpiresIn=604800,
+        )
     except ClientError as e:
-        logger.error(f"Unable to generate presigned url for object {object_name} in bucket {bucket_name}. {e}")
+        logger.error(
+            f"Unable to generate presigned url for object {object_name} in bucket {bucket_name}. {e}"
+        )
         return None
 
     return response
@@ -358,10 +431,14 @@ def analysis_summary(bucket_url, replay):
 
     bucket = bucket_dict(bucket_url)
     logger.info(f"Simple Replay Workload Analysis: {replay}")
-    replay_path = f'analysis/{replay}/out/'
-    output_str = f"\nBelow is the presigned URLs for the analysis performed for replay: {replay}. " \
-                 f"Click or copy/paste the link into your browser to download."
-    r_url = create_presigned_url(bucket.get('bucket_name'), f'{replay_path}{replay}_report.pdf')
+    replay_path = f"analysis/{replay}/out/"
+    output_str = (
+        f"\nBelow is the presigned URLs for the analysis performed for replay: {replay}. "
+        f"Click or copy/paste the link into your browser to download."
+    )
+    r_url = create_presigned_url(
+        bucket.get("bucket_name"), f"{replay_path}{replay}_report.pdf"
+    )
     output_str += f"\n\nReplay Analysis Report | Click to Download:\n{r_url}\n"
     logger.info(output_str)
 
@@ -377,39 +454,60 @@ def list_replays(bucket_url):
     table = []
     bucket = bucket_dict(bucket_url)
     try:
-        resp = client("s3").list_objects_v2(Bucket=bucket.get('bucket_name'), Delimiter='/', Prefix='analysis/')
-        if resp['KeyCount'] == 0:
-            logger.error(f"No replays available in S3. Please run a replay with replay analysis to access replays "
-                         f"from the command line.")
+        resp = client("s3").list_objects_v2(
+            Bucket=bucket.get("bucket_name"), Delimiter="/", Prefix="analysis/"
+        )
+        if resp["KeyCount"] == 0:
+            logger.error(
+                f"No replays available in S3. Please run a replay with replay analysis to access replays "
+                f"from the command line."
+            )
             exit(-1)
 
     except Exception as e:
         logger.error(f"Unable to access replays in S3. Please confirm bucket. {e}")
         exit(-1)
 
-    s3 = boto3.resource('s3')
-    print(f"Listed below are all the replay reports located in the S3 bucket: {bucket_url}.\n")
+    s3 = boto3.resource("s3")
+    print(
+        f"Listed below are all the replay reports located in the S3 bucket: {bucket_url}.\n"
+    )
 
-    for x in resp['CommonPrefixes']:
+    for x in resp["CommonPrefixes"]:
         try:
-            s3.Object(bucket.get('bucket_name'), f'{x.get("Prefix")}out/info.json').load()
+            s3.Object(
+                bucket.get("bucket_name"), f'{x.get("Prefix")}out/info.json'
+            ).load()
         except ClientError as e:
-            if e.response['Error']['Code'] == "404":  # if info.json does not exist in folder, do not add to list
+            if (
+                e.response["Error"]["Code"] == "404"
+            ):  # if info.json does not exist in folder, do not add to list
                 continue
             else:
                 logger.error(f"Unable to access replay. {e}")
 
-        content_object = s3.Object(bucket.get('bucket_name'), f'{x.get("Prefix")}out/info.json')
-        file_content = content_object.get()['Body'].read().decode('utf-8')
+        content_object = s3.Object(
+            bucket.get("bucket_name"), f'{x.get("Prefix")}out/info.json'
+        )
+        file_content = content_object.get()["Body"].read().decode("utf-8")
         json_content = json.loads(file_content)
 
-        table.append([json_content['replay_id'],
-                      json_content['id'],
-                      json_content['start_time'],
-                      json_content['end_time'],
-                      json_content['replay_tag']])
+        table.append(
+            [
+                json_content["replay_id"],
+                json_content["id"],
+                json_content["start_time"],
+                json_content["end_time"],
+                json_content["replay_tag"],
+            ]
+        )
     # use tabulate lib to format output
-    print(tabulate(table, headers=["Replay", "Cluster ID", "Start Time", "End Time", "Replay Tag"]))
+    print(
+        tabulate(
+            table,
+            headers=["Replay", "Cluster ID", "Start Time", "End Time", "Replay Tag"],
+        )
+    )
 
 
 def list_sql(bucket_url, replay):
@@ -422,19 +520,23 @@ def list_sql(bucket_url, replay):
     logger = logging.getLogger("SimpleReplayLogger")
     bucket = bucket_dict(bucket_url)
     try:
-        resp = client("s3").list_objects_v2(Bucket=bucket.get('bucket_name'),
-                                            Delimiter='/',
-                                            Prefix=f'analysis/{replay}/raw_data/')
+        resp = client("s3").list_objects_v2(
+            Bucket=bucket.get("bucket_name"),
+            Delimiter="/",
+            Prefix=f"analysis/{replay}/raw_data/",
+        )
     except Exception as e:
         logger.error(f"Unable to access raw data in S3. Please confirm bucket. {e}")
         exit(-1)
-    output_str = f"Below are presigned URLs for the raw data for replay id: {replay}. " \
-                 f"Click or copy/paste the link into your browser to download."
-    for x in resp['Contents']:
+    output_str = (
+        f"Below are presigned URLs for the raw data for replay id: {replay}. "
+        f"Click or copy/paste the link into your browser to download."
+    )
+    for x in resp["Contents"]:
         try:
-            prefix = x.get('Key')
-            d_url = create_presigned_url(bucket.get('bucket_name'), x.get('Key'))
-            query_result = prefix.split('/')[-1]
+            prefix = x.get("Key")
+            d_url = create_presigned_url(bucket.get("bucket_name"), x.get("Key"))
+            query_result = prefix.split("/")[-1]
             output_str += f"\nQuery Results: {query_result}\n{d_url}"
         except Exception as e:
             logger.error(f"Unable to access raw data in S3. Please confirm bucket. {e}")
@@ -447,14 +549,24 @@ def main():
 
     parser = argparse.ArgumentParser(
         description="This script analyzes a Redshift cluster and outputs a summary report with statistics"
-                    "its performance."
+        "its performance."
     )
 
-    parser.add_argument('-b', '--bucket', nargs=1, type=str, help='location of replay outputs')
-    parser.add_argument('-r1', '--replay_id1', nargs='?', type=str, default='', help='replay id 1')
-    parser.add_argument('-r2', '--replay_id2', nargs='?', type=str, default='', help='replay id 2, required for '
-                                                                                     'comparison')
-    parser.add_argument('-s', '--sql', action='store_true', help='sql')
+    parser.add_argument(
+        "-b", "--bucket", nargs=1, type=str, help="location of replay outputs"
+    )
+    parser.add_argument(
+        "-r1", "--replay_id1", nargs="?", type=str, default="", help="replay id 1"
+    )
+    parser.add_argument(
+        "-r2",
+        "--replay_id2",
+        nargs="?",
+        type=str,
+        default="",
+        help="replay id 2, required for " "comparison",
+    )
+    parser.add_argument("-s", "--sql", action="store_true", help="sql")
 
     args = parser.parse_args()
 
@@ -469,7 +581,9 @@ def main():
             analysis_summary(args.bucket[0], args.replay_id1)
     elif args.bucket and args.replay_id1 and args.replay_id2:
         if args.replay_id1 == args.replay_id2:
-            logger.error("Cannot compare same replay, please choose two distinct replay ids.")
+            logger.error(
+                "Cannot compare same replay, please choose two distinct replay ids."
+            )
             exit(-1)
         else:
             print(f"Compare replays {args.replay_id1} and {args.replay_id2}.")
@@ -479,5 +593,5 @@ def main():
         exit(-1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
