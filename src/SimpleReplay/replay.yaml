@@ -8,7 +8,7 @@ source_tag: ""
 workload_location: ""
 
 # Endpoint and username of target cluster to replay queries on
-target_cluster_endpoint: ""
+target_cluster_endpoint: "host:port/database"
 target_cluster_region: ""
 master_username: ""
 # NLB or NAT endpoint for Simple Replay to connect to. This NLB or NAT should have connectivity to target_cluster_endpoint
@@ -24,12 +24,12 @@ default_interface: "psql"
 # Optional - Leaving it empty defers to connections.json. "all on" preserves
 # time between transactions. "all off" disregards time between transactions,
 # executing them as a batch.
-time_interval_between_transactions: ""
+time_interval_between_transactions: "all on"
 
 # Optional - Leaving it empty defers to connections.json. "all on" preserves
 # time between queries. "all off" disregards time between queries, executing
 # them as a batch.
-time_interval_between_queries: ""
+time_interval_between_queries: "all on"
 
 # Should COPY statements be executed?
 execute_copy_statements: "false"
@@ -83,7 +83,7 @@ num_workers: ~
 # their expected time.
 connection_tolerance_sec: 300
 
-# Number of TestDrive logfiles to maintain
+# Number of simplereplay logfiles to maintain
 backup_count: 1
 
 # Should we discard the returned data 
