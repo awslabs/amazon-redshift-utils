@@ -397,20 +397,14 @@ class ConnectionThread(threading.Thread):
                 )
 
     def get_tagged_sql(self, query_text, idx, transaction, connection):
-        if g_config["source_tag"]:
+        if g_config.get("source_tag", None):
             json_tags = {
                 "xid": transaction.xid,
                 "query_idx": idx,
                 "replay_start": g_replay_timestamp.isoformat(),
-                "source": g_config.get(["source_tag"]),
+                "source": g_config.get('source_tag', 'SimpleReplay'),
             }
-        else:
-            json_tags = {
-                "xid": transaction.xid,
-                "query_idx": idx,
-                "replay_start": g_replay_timestamp.isoformat(),
-                "source": "SimpleReplay",
-            }
+
 
         return "/* {} */ {}".format(json.dumps(json_tags), query_text)
 

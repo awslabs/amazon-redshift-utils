@@ -5,12 +5,12 @@ tag: ""
 source_tag: ""
 
 # Directory location of extracted workload, relative to current directory
-workload_location: "test-location/Edited_10_Extraction_devsaba-sr-test_2023-01-23T09:46:24.784062+00:00"
+workload_location: ""
 
 # Endpoint and username of target cluster to replay queries on
-target_cluster_endpoint: "replay-dev.254137219717.us-east-1.redshift-serverless.amazonaws.com:5439/dev"
-target_cluster_region: "us-east-1"
-master_username: "awsuser"
+target_cluster_endpoint: ""
+target_cluster_region: ""
+master_username: ""
 # NLB or NAT endpoint for Simple Replay to connect to. This NLB or NAT should have connectivity to target_cluster_endpoint
 nlb_nat_dns: ""
 
@@ -35,26 +35,26 @@ time_interval_between_queries: ""
 execute_copy_statements: "false"
 
 # Should UNLOAD statements be executed?
-execute_unload_statements: "true"
+execute_unload_statements: "false"
 
 # Optional - Where the UNLOADs and system table unload goes.
-replay_output: "s3://simplereplay-v2.2.5-testing/test-drive-testing/provisioned/replay"
+replay_output: ""
 
 # Optional - Where the analysis data and summary report will be uploaded.  Example:  s3://bucket_name/path
-analysis_output: "s3://simplereplay-v2.2.5-testing/test-drive-testing/provisioned"
+analysis_output: ""
 
 # Optional - Leaving this blank means UNLOADs will not be replayed. IAM role for UNLOADs to be performed with.
-unload_iam_role:  "arn:aws:iam::254137219717:role/RedshiftFullAccess"
+unload_iam_role:  ""
 
 # Optional - Leaving this blank means analysis will not be run. IAM role for analysis needs UNLOAD access.
-analysis_iam_role: "arn:aws:iam::254137219717:role/RedshiftFullAccess"
+analysis_iam_role: ""
 
 # Location of the SQL file containing queries to unload system tables
 unload_system_table_queries: "unload_system_tables.sql"
 
 # IAM role to UNLOAD system tables from source cluster to S3 location for later
 # analysis
-target_cluster_system_table_unload_iam_role: "arn:aws:iam::254137219717:role/RedshiftFullAccess"
+target_cluster_system_table_unload_iam_role: ""
 
 # Include filters will work as "db AND user AND pid". Exclude filters will work as "db OR user OR pid".
 # In case of multiple values for any specific filter, please enclose each in single quotes
