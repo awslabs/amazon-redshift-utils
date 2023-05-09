@@ -68,8 +68,12 @@ g_replay_timestamp = None
 
 g_is_serverless = False
 
-g_serverless_cluster_endpoint_pattern = r"(.+)\.(.+)\.(.+).redshift-serverless(-dev)?\.amazonaws\.com:[0-9]{4,5}\/(.)+"
-g_cluster_endpoint_pattern = r"(.+)\.(.+)\.(.+).redshift(-serverless)?\.amazonaws\.com:[0-9]{4,5}\/(.)+"
+g_serverless_cluster_endpoint_pattern = (
+    r"(.+)\.(.+)\.(.+).redshift-serverless(-dev)?\.amazonaws\.com:[0-9]{4,5}\/(.)+"
+)
+g_cluster_endpoint_pattern = (
+    r"(.+)\.(.+)\.(.+).redshift(-serverless)?\.amazonaws\.com:[0-9]{4,5}\/(.)+"
+)
 
 
 class ConnectionLog:
@@ -393,11 +397,15 @@ class ConnectionThread(threading.Thread):
                 )
 
     def get_tagged_sql(self, query_text, idx, transaction, connection):
-        json_tags = {
-            "xid": transaction.xid,
-            "query_idx": idx,
-            "replay_start": g_replay_timestamp.isoformat(),
-        }
+        if g_config.get("source_tag", None):
+            json_tags = {
+                "xid": transaction.xid,
+                "query_idx": idx,
+                "replay_start": g_replay_timestamp.isoformat(),
+                "source": g_config.get('source_tag', 'SimpleReplay'),
+            }
+
+
         return "/* {} */ {}".format(json.dumps(json_tags), query_text)
 
     def execute_transaction(self, transaction, connection):
@@ -2262,7 +2270,7 @@ def main():
     logger.info(
         f"Replay finished in {datetime.datetime.now(tz=datetime.timezone.utc) - g_replay_timestamp}."
     )
-    
+
     if g_config.get("analysis_iam_role") and g_config.get("analysis_output"):
         try:
             run_replay_analysis(

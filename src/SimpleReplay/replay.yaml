@@ -1,6 +1,9 @@
 # Optional - Custom identifier for this replay run
 tag: ""
 
+# Optional - Identifier for queries executed
+source_tag: ""
+
 # Directory location of extracted workload, relative to current directory
 workload_location: ""
 
@@ -8,7 +11,6 @@ workload_location: ""
 target_cluster_endpoint: "host:port/database"
 target_cluster_region: ""
 master_username: ""
-
 # NLB or NAT endpoint for Simple Replay to connect to. This NLB or NAT should have connectivity to target_cluster_endpoint
 nlb_nat_dns: ""
 
@@ -42,7 +44,7 @@ replay_output: ""
 analysis_output: ""
 
 # Optional - Leaving this blank means UNLOADs will not be replayed. IAM role for UNLOADs to be performed with.
-unload_iam_role: ""
+unload_iam_role:  ""
 
 # Optional - Leaving this blank means analysis will not be run. IAM role for analysis needs UNLOAD access.
 analysis_iam_role: ""
@@ -71,7 +73,7 @@ filters:
 ##
 
 # Set the amount of logging
-log_level: "info"
+log_level: "INFO"
 
 # number of proceses to use to parallelize the work. If omitted or null, uses
 # one process per cpu - 1 
