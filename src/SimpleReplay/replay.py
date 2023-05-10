@@ -397,7 +397,6 @@ class ConnectionThread(threading.Thread):
                 )
 
     def get_tagged_sql(self, query_text, idx, transaction, connection):
-        if g_config.get("source_tag", None):
             json_tags = {
                 "xid": transaction.xid,
                 "query_idx": idx,
