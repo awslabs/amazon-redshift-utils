@@ -64,11 +64,11 @@ def _parse_user_activity_log(file, logs, databases, start_time, end_time):
                 if filename in logs:
                     # Check if duplicate. This happens with JDBC connections.
                     prev_query = logs[filename][-1]
-                    if not is_duplicate(prev_query.text, user_activity_log.text):
+                    if not is_duplicate(prev_query.get_text_value(), user_activity_log.get_text_value()):
                         if fetch_pattern.search(
-                                prev_query.text
-                        ) and fetch_pattern.search(user_activity_log.text):
-                            user_activity_log.text = f"--{user_activity_log.text}"
+                                prev_query.get_text_value()
+                        ) and fetch_pattern.search(user_activity_log.get_text_value()):
+                            user_activity_log.clear_and_set_text(f"--{user_activity_log.get_text_value()}")
                             logs[filename].append(user_activity_log)
                         else:
                             logs[filename].append(user_activity_log)
@@ -87,9 +87,9 @@ def _parse_user_activity_log(file, logs, databases, start_time, end_time):
             user_activity_log.database_name = query_information[3][3:]
             user_activity_log.pid = query_information[5][4:]
             user_activity_log.xid = query_information[7][4:]
-            user_activity_log.text = line_split[1]
+            user_activity_log.clear_and_set_text(line_split[1])
         else:
-            user_activity_log.text += line
+            user_activity_log.append_text(line)
 
 
 def _parse_start_node_log(file, logs, databases, start_time, end_time):
@@ -107,7 +107,7 @@ def _parse_start_node_log(file, logs, databases, start_time, end_time):
                 if filename in logs:
                     # Check if duplicate. This happens with JDBC connections.
                     prev_query = logs[filename][-1]
-                    if not is_duplicate(prev_query.text, start_node_log.text):
+                    if not is_duplicate(prev_query.get_text_value(), start_node_log.get_text_value()):
                         logs[filename].append(start_node_log)
                 else:
                     logs[filename] = [start_node_log]
@@ -132,14 +132,14 @@ def _parse_start_node_log(file, logs, databases, start_time, end_time):
                 start_node_log.username = query_information[4][3:].split(":")[0]
                 start_node_log.pid = query_information[5][4:]
                 start_node_log.xid = query_information[7][4:]
-                start_node_log.text = line_split[1].strip()
+                start_node_log.clear_and_set_text(line_split[1].strip())
         else:
-            start_node_log.text += line
+            start_node_log.append_text(line)
 
 
 def _parse_connection_log(file, connections, last_connections, start_time, end_time):
     for line in file.readlines():
-        
+
         line = line.decode("utf-8")
 
         connection_information = line.split("|")

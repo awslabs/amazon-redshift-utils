@@ -3,7 +3,7 @@ auditlogs_parsing.py
 
 This module parses various auditlogs
 """
-
+from io import StringIO
 logger = None
 
 
@@ -16,7 +16,19 @@ class Log:
         self.database_name = ""
         self.pid = ""
         self.xid = ""
-        self.text = ""
+        self.text = StringIO()
+
+    def clear_and_set_text(self, new_value):
+        # Better to create a new instance, rather than truncate and seek - because it’s faster
+        self.text.close()
+        self.text = StringIO()
+        self.text.write(new_value)
+
+    def append_text(self, value):
+        self.text.write(value)
+
+    def get_text_value(self):
+        return self.text.getvalue()
 
     def get_filename(self):
         base_name = (
@@ -44,7 +56,7 @@ class Log:
                     self.database_name,
                     self.pid,
                     self.xid,
-                    self.text,
+                    self.get_text_value(),
                 )
         )
 
@@ -58,11 +70,11 @@ class Log:
                 and self.database_name == other.database_name
                 and self.pid == other.pid
                 and self.xid == other.xid
-                and self.text == other.text
+                and self.get_text_value() == other.get_text_value()
         )
 
     def __hash__(self):
-        return hash((str(self.pid), str(self.xid), self.text.strip("\n")))
+        return hash((str(self.pid), str(self.xid), self.get_text_value().strip("\n")))
 
 
 class ConnectionLog:
