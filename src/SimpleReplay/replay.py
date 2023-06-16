@@ -401,7 +401,7 @@ class ConnectionThread(threading.Thread):
             "xid": transaction.xid,
             "query_idx": idx,
             "replay_start": g_replay_timestamp.isoformat(),
-            "source": g_config.get('source_tag', 'SimpleReplay'),
+            "source": g_config.get("source_tag", "SimpleReplay"),
         }
 
         return "/* {} */ {}".format(json.dumps(json_tags), query_text)
@@ -1424,6 +1424,7 @@ def assign_copy_replacements(connection_logs, replacements):
                         )
 
                         iam_replacements = [
+                            (r"iam_role''", f" IAM_ROLE '{replacement_copy_iam_role}'"),
                             (
                                 r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'",
                                 f" IAM_ROLE '{replacement_copy_iam_role}'",
