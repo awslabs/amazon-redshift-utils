@@ -862,7 +862,7 @@ def parse_copy_replacements(workload_directory):
     copy_replacements = {}
     copy_replacements_reader = None
 
-    replacements_path = workload_directory + "/" + g_copy_replacements_filename
+    replacements_path = workload_directory.rstrip("/") + "/" + g_copy_replacements_filename
 
     if replacements_path.startswith("s3://"):
         workload_s3_location = replacements_path[5:].partition("/")
