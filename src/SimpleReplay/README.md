@@ -12,7 +12,7 @@ This enables the replay to be as close to the source run. It is **strongly recom
 If you want to experiment with different Amazon Redshift cluster configurations to evaluate and compare how your workload performs you can use Amazon Redshift Node Configuration Comparison utility (https://github.com/aws-samples/amazon-redshift-config-compare) which invokes Simple Replay utility. It provides ability to configure the necessary resources and will automatically execute the workload across N number of clusters.
 For more details about this utility please check https://aws.amazon.com/blogs/big-data/compare-different-node-types-for-your-workload-using-amazon-redshift/
 
-**NOTE:** Simple Replay now supports both Redshift Provisioned and Serverless. But Amazon Redshift Node Configuration Comparison utility currently supports only Redshift Provisioned clusters; support for Serverless is coming soon.
+**NOTE:** Simple Replay and Node Configuration Comparison utility supports both Redshift Provisioned clusters and Serverless clusters.
 
 ## Preparation
 
