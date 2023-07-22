@@ -105,7 +105,7 @@ def get_wlm_config(ruleset, region_name):
                 wlm_config = config_file.read()
     else:
         raise Exception(
-            "Malformed Configuration for Ruleset %s. '%s' must be a json based WLM configuration or an S3 file location" % (
+            "Malformed Configuration for Ruleset %s. '%s' must be a json based WLM configuration or a local/S3 json file location" % (
             ruleset[RULESET_NAME_KEY], CONFIG_KEY))
 
     return wlm_config
