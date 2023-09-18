@@ -1,3 +1,5 @@
+## NOTE: SimpleReplay has now been moved to [Redshift Test-Drive](https://github.com/aws/redshift-test-drive). While you can still use SimpleReplay, switch to test-drive to get more frequent updates for this tool. [This blog](https://aws.amazon.com/blogs/big-data/find-the-best-amazon-redshift-configuration-for-your-workload-using-redshift-test-drive/) explains how to use Test-Drive
+
 # Simple Replay README
 
 ## Introduction
