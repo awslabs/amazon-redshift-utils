@@ -11,16 +11,22 @@ import logging
 import pathlib
 import re
 from collections import OrderedDict
-
 import dateutil.parser
+import datetime
+
+
 import redshift_connector
 from boto3 import client
 from tqdm import tqdm
+import asyncio
+
+
 
 from audit_logs_parsing import (
     ConnectionLog,
 )
 from helper import aws_service as aws_service_helper
+import util
 from log_validation import remove_line_comments
 from .cloudwatch_extractor import CloudwatchExtractor
 from .s3_extractor import S3Extractor
@@ -75,6 +81,38 @@ class Extractor:
             else:
                 return self.local_extractor.get_extract_locally(log_location, start_time, end_time)
 
+    def get_stored_procedures(self,start_time,end_time,username,stored_procedures_map,sql_json):
+        result_row ={}
+        parse_start_time = "'" + start_time + "'"
+        parse_end_time = "'" + end_time + "'"
+        for key,value in stored_procedures_map.items():
+            transaction_id = key
+            sys_query_history = f'select transaction_id, query_text \
+                from sys_query_history \
+                WHERE user_id > 1 \
+                AND transaction_id={transaction_id}\
+                AND start_time >= {parse_start_time} \
+                AND start_time <= {parse_end_time}\
+                ORDER BY 1;'
+            cluster_object = util.cluster_dict(endpoint=self.config["source_cluster_endpoint"])
+            result = aws_service_helper.redshift_execute_query(
+                redshift_cluster_id=cluster_object['id'],
+                redshift_database_name=cluster_object['database'],
+                redshift_user=username,
+                region=self.config['region'],
+                query=sys_query_history,
+            )
+            column_names = [column['name'] for column in result['ColumnMetadata']]
+            for row in result['Records']:
+                 for field in row:
+                     if 'stringValue' in field and field['stringValue'].startswith('call'):
+                        modified_string_value = field['stringValue'].rsplit('--')[0]
+                        stored_procedures_map[key] = modified_string_value
+            for xid, query_text in stored_procedures_map.items():
+                if xid in sql_json['transactions'] and sql_json['transactions'][xid]['queries']:
+                    sql_json['transactions'][xid]['queries'][0]['text'] = query_text
+        return sql_json
+    
     def save_logs(self, logs, last_connections, output_directory, connections, start_time, end_time):
         """
         saving the extracted logs in S3 location in the following format:
@@ -111,11 +149,17 @@ class Extractor:
             )
             pathlib.Path(output_directory).mkdir(parents=True, exist_ok=True)
 
-        sql_json, missing_audit_log_connections, replacements = self.get_sql_connections_replacements(last_connections,
-                                                                                                      log_items)
-
-        with gzip.open(archive_filename, "wb") as f:
-            f.write(json.dumps(sql_json, indent=2).encode("utf-8"))
+        sql_json, missing_audit_log_connections, replacements,stored_procedures_map = self.get_sql_connections_replacements(last_connections,
+                                                                                                      log_items) 
+        sql_json_with_stored_procedure = asyncio.run(Extractor.get_stored_procedures(self,start_time=self.config['start_time'],end_time=self.config['end_time'],username=self.config['master_username'],stored_procedures_map=stored_procedures_map,sql_json=sql_json))
+        logger.info(f'The total length of stored procedures found are : {len(stored_procedures_map)}')
+        import pdb;pdb.set_trace()
+        if self.config['replay_stored_procedures']:
+            with gzip.open(archive_filename, "wb") as f:
+                f.write(json.dumps(sql_json, indent=2).encode("utf-8"))
+        else:
+            with gzip.open(archive_filename, "wb") as f:
+                f.write(json.dumps(sql_json_with_stored_procedure, indent=2).encode("utf-8"))
 
         if is_s3:
             dest = output_prefix + "/SQLs.json.gz"
@@ -169,6 +213,7 @@ class Extractor:
         sql_json = {"transactions": OrderedDict()}
         missing_audit_log_connections = set()
         replacements = set()
+        stored_procedures_map = {}
         for filename, queries in tqdm(
                 log_items,
                 disable=self.disable_progress_bar,
@@ -220,7 +265,10 @@ class Extractor:
                         query.text,
                         flags=re.IGNORECASE,
                     )
-
+                if self.config.get("replay_stored_procedures", None):
+                    if query.text.lower().startswith("call"):
+                        stored_procedures_map[query.xid] = query.text
+                        continue
                 query.text = f"{query.text.strip()}"
                 if not len(query.text) == 0:
                     if not query.text.endswith(";"):
@@ -231,7 +279,7 @@ class Extractor:
 
                 if not hash((query.database_name, query.username, query.pid)) in last_connections:
                     missing_audit_log_connections.add((query.database_name, query.username, query.pid))
-        return sql_json, missing_audit_log_connections, replacements
+        return sql_json, missing_audit_log_connections, replacements,stored_procedures_map
 
     def unload_system_table(
             self,

@@ -3,6 +3,8 @@ import logging
 
 import boto3
 
+from concurrent.futures import ThreadPoolExecutor
+
 logger = logging.getLogger("SimpleReplayLogger")
 
 
@@ -17,12 +19,14 @@ def redshift_describe_logging_status(source_cluster_endpoint):
     )
     return result
 
-def redshift_execute_query(redshift_cluster_id, redshift_user, redshift_database_name, region, query):
+def redshift_execute_query(
+    redshift_cluster_id, redshift_user, redshift_database_name, region, query
+):
     """
     Executes redshift query and gets response for query when finished
     """
     # get query id
-    redshift_data_api_client =  boto3.client("redshift-data", region)
+    redshift_data_api_client = boto3.client("redshift-data", region)
     response_execute_statement = redshift_data_api_client.execute_statement(
         Database=redshift_database_name,
         DbUser=redshift_user,
@@ -31,16 +35,10 @@ def redshift_execute_query(redshift_cluster_id, redshift_user, redshift_database
     )
     query_id = response_execute_statement["Id"]
 
-    # get query status
-    response_describe_statement = redshift_data_api_client.describe_statement(
-        Id=query_id
-    )
     query_done = False
 
     while not query_done:
-        response_describe_statement = (
-            redshift_data_api_client.describe_statement(Id=query_id)
-        )
+        response_describe_statement = redshift_data_api_client.describe_statement(Id=query_id)
         query_status = response_describe_statement["Status"]
 
         if query_status == "FAILED":
@@ -51,27 +49,11 @@ def redshift_execute_query(redshift_cluster_id, redshift_user, redshift_database
             query_done = True
             # log result if there is a result (typically from Select statement)
             if response_describe_statement["HasResultSet"]:
-                response_get_statement_result = (
-                    redshift_data_api_client.get_statement_result(Id=query_id)
+                response_get_statement_result = redshift_data_api_client.get_statement_result(
+                    Id=query_id
                 )
     return response_get_statement_result
 
-
-def cw_describe_log_groups(log_group_name=None, region=None):
-    cloudwatch_client = boto3.client("logs", region)
-    if log_group_name:
-        return cloudwatch_client.describe_log_groups(
-            logGroupNamePrefix=log_group_name
-        )
-    else:
-        logs = cloudwatch_client.describe_log_groups()
-
-        token = logs.get('nextToken','')
-        while token != '':
-            response_itr = cloudwatch_client.describe_log_groups(nextToken=token)
-            logs['logGroups'].extend(response_itr['logGroups'])
-            token = response_itr['nextToken'] if 'nextToken' in response_itr.keys() else ''
-    return logs
 
 
 def cw_describe_log_streams(log_group_name, region):
