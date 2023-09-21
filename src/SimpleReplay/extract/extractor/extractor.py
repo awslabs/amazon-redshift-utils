@@ -87,36 +87,50 @@ class Extractor:
         '''
         parse_start_time = "'" + start_time + "'"
         parse_end_time = "'" + end_time + "'"
-        async def fetch_procedure_data(transaction_id):
+        query_results = []
+        async def fetch_procedure_data(transaction_ids):
+            transaction_ids_str = ','.join(str(id) for id in transaction_ids)
             sys_query_history = f'select transaction_id, query_text \
-                from sys_query_history \
-                WHERE user_id > 1 \
-                AND transaction_id={transaction_id}\
-                AND start_time >= {parse_start_time} \
-                AND end_time <= {parse_end_time}\
-                ORDER BY 1;'
+                    from sys_query_history \
+                    WHERE user_id > 1 \
+                    AND transaction_id IN ({transaction_ids_str}) \
+                    AND start_time >= {parse_start_time} \
+                    AND end_time <= {parse_end_time}\
+                    ORDER BY 1;'
             cluster_object = util.cluster_dict(endpoint=self.config["source_cluster_endpoint"])
             result = await aws_service_helper.redshift_execute_query_async(
-                redshift_cluster_id=cluster_object['id'],
-                redshift_database_name=cluster_object['database'],
-                redshift_user=username,
-                region=self.config['region'],
-                query=sys_query_history,
-            )
-            return result
+                    redshift_cluster_id=cluster_object['id'],
+                    redshift_database_name=cluster_object['database'],
+                    redshift_user=username,
+                    region=self.config['region'],
+                    query=sys_query_history,
+                )
+            query_results.append(result)
+            return query_results
+        transaction_ids = list(stored_procedures_map.keys())
         tasks = []
-        for key, value in stored_procedures_map.items():
-            transaction_id = key
-            tasks.append(fetch_procedure_data(transaction_id))
+        batch_size = 100
+        for i in range(0, len(transaction_ids),batch_size):
+            # fetching a portion(100) of the transaction ids
+            batch = transaction_ids[i:i + batch_size]
+            tasks.append(fetch_procedure_data(batch))
+
         # Gather all the results when the tasks are completed
-        results = await asyncio.gather(*tasks)
-        for key, result in zip(stored_procedures_map.keys(), results):
+        batch_results = await asyncio.gather(*tasks)
+
+        #Combine results from all batches
+        results = [result for batch_result in batch_results for result in batch_results]
+    
+        #Process the results and update the sql_json
+        for result in results:
             if 'ColumnMetadata' in result and 'Records' in result:
                 for row in result['Records']:
                     for field in row:
                         if 'stringValue' in field and field['stringValue'].startswith('call'):
                             modified_string_value = field['stringValue'].rsplit('--')[0]
-                            stored_procedures_map[key] = modified_string_value
+                            transaction_id = row[0]['longValue']
+                            stored_procedures_map[transaction_id] = modified_string_value
+
         # Update sql_json with the modified query text
         for xid, query_text in stored_procedures_map.items():
             if xid in sql_json['transactions'] and sql_json['transactions'][xid]['queries']:
@@ -166,10 +180,10 @@ class Extractor:
             logger.info(f'The total length of stored procedures found are : {len(stored_procedures_map)}')
             sql_json_with_stored_procedure = asyncio.run(Extractor.get_stored_procedures(self,start_time=self.config['start_time'],end_time=self.config['end_time'],username=self.config['master_username'],stored_procedures_map=stored_procedures_map,sql_json=sql_json))
             with gzip.open(archive_filename, "wb") as f:
-                f.write(json.dumps(sql_json, indent=2).encode("utf-8"))
+                f.write(json.dumps(sql_json_with_stored_procedure, indent=2).encode("utf-8"))
         else:
             with gzip.open(archive_filename, "wb") as f:
-                f.write(json.dumps(sql_json_with_stored_procedure, indent=2).encode("utf-8"))
+                f.write(json.dumps(sql_json, indent=2).encode("utf-8"))
 
         if is_s3:
             dest = output_prefix + "/SQLs.json.gz"
