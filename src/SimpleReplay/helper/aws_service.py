@@ -97,6 +97,41 @@ def redshift_execute_query(
                 )
     return response_get_statement_result
 
+def execute_query_sync(redshift_data_api_client, redshift_database_name, redshift_user, query, cluster_id):
+    response_execute_statement = redshift_data_api_client.execute_statement(
+        Database=redshift_database_name,
+        DbUser=redshift_user,
+        Sql=query,
+        ClusterIdentifier=cluster_id,
+    )
+    query_id = response_execute_statement["Id"]
+    query_done = False
+    while not query_done:
+        response_describe_statement = redshift_data_api_client.describe_statement(Id=query_id)
+        query_status = response_describe_statement["Status"]
+        if query_status == "FAILED":
+            logger.debug(f"SQL execution failed. Query ID = {query_id}")
+            raise Exception
+        elif query_status == "FINISHED":
+            query_done = True
+            # log result if there is a result (typically from Select statement)
+            if response_describe_statement["HasResultSet"]:
+                response_get_statement_result = redshift_data_api_client.get_statement_result(
+                    Id=query_id
+                )
+                return response_get_statement_result
+    return None  # Handle the case where there's no result
+
+async def redshift_execute_query_async(
+    redshift_cluster_id, redshift_user, redshift_database_name, region, query
+):
+    """
+    Executes redshift query asynchronusly and gets response for query when finished 
+    """
+    loop = asyncio.get_event_loop()
+    redshift_data_api_client = boto3.client("redshift-data", region_name=region)
+    return await loop.run_in_executor(None, execute_query_sync, redshift_data_api_client, redshift_database_name, redshift_user, query, redshift_cluster_id)
+
 
 def cw_describe_log_groups(log_group_name=None, region=None):
     cloudwatch_client = boto3.client("logs", region)

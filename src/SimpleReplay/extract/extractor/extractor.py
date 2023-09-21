@@ -81,37 +81,48 @@ class Extractor:
             else:
                 return self.local_extractor.get_extract_locally(log_location, start_time, end_time)
 
-    def get_stored_procedures(self,start_time,end_time,username,stored_procedures_map,sql_json):
-        result_row ={}
+    async def get_stored_procedures(self, start_time, end_time, username, stored_procedures_map, sql_json):
+        '''
+            Handled bind varibales for stored procedures by querying the sys_query_history table
+        '''
         parse_start_time = "'" + start_time + "'"
         parse_end_time = "'" + end_time + "'"
-        for key,value in stored_procedures_map.items():
-            transaction_id = key
+        async def fetch_procedure_data(transaction_id):
             sys_query_history = f'select transaction_id, query_text \
                 from sys_query_history \
                 WHERE user_id > 1 \
                 AND transaction_id={transaction_id}\
                 AND start_time >= {parse_start_time} \
-                AND start_time <= {parse_end_time}\
+                AND end_time <= {parse_end_time}\
                 ORDER BY 1;'
             cluster_object = util.cluster_dict(endpoint=self.config["source_cluster_endpoint"])
-            result = aws_service_helper.redshift_execute_query(
+            result = await aws_service_helper.redshift_execute_query_async(
                 redshift_cluster_id=cluster_object['id'],
                 redshift_database_name=cluster_object['database'],
                 redshift_user=username,
                 region=self.config['region'],
                 query=sys_query_history,
             )
-            column_names = [column['name'] for column in result['ColumnMetadata']]
-            for row in result['Records']:
-                 for field in row:
-                     if 'stringValue' in field and field['stringValue'].startswith('call'):
-                        modified_string_value = field['stringValue'].rsplit('--')[0]
-                        stored_procedures_map[key] = modified_string_value
-            for xid, query_text in stored_procedures_map.items():
-                if xid in sql_json['transactions'] and sql_json['transactions'][xid]['queries']:
-                    sql_json['transactions'][xid]['queries'][0]['text'] = query_text
+            return result
+        tasks = []
+        for key, value in stored_procedures_map.items():
+            transaction_id = key
+            tasks.append(fetch_procedure_data(transaction_id))
+        # Gather all the results when the tasks are completed
+        results = await asyncio.gather(*tasks)
+        for key, result in zip(stored_procedures_map.keys(), results):
+            if 'ColumnMetadata' in result and 'Records' in result:
+                for row in result['Records']:
+                    for field in row:
+                        if 'stringValue' in field and field['stringValue'].startswith('call'):
+                            modified_string_value = field['stringValue'].rsplit('--')[0]
+                            stored_procedures_map[key] = modified_string_value
+        # Update sql_json with the modified query text
+        for xid, query_text in stored_procedures_map.items():
+            if xid in sql_json['transactions'] and sql_json['transactions'][xid]['queries']:
+                sql_json['transactions'][xid]['queries'][0]['text'] = query_text
         return sql_json
+       
     
     def save_logs(self, logs, last_connections, output_directory, connections, start_time, end_time):
         """
@@ -149,12 +160,11 @@ class Extractor:
             )
             pathlib.Path(output_directory).mkdir(parents=True, exist_ok=True)
 
-        sql_json, missing_audit_log_connections, replacements,stored_procedures_map = self.get_sql_connections_replacements(last_connections,
+        sql_json, missing_audit_log_connections, replacements, stored_procedures_map = self.get_sql_connections_replacements(last_connections,
                                                                                                       log_items) 
-        sql_json_with_stored_procedure = asyncio.run(Extractor.get_stored_procedures(self,start_time=self.config['start_time'],end_time=self.config['end_time'],username=self.config['master_username'],stored_procedures_map=stored_procedures_map,sql_json=sql_json))
-        logger.info(f'The total length of stored procedures found are : {len(stored_procedures_map)}')
-        import pdb;pdb.set_trace()
-        if self.config['replay_stored_procedures']:
+        if self.config.get('replay_stored_procedures'):
+            logger.info(f'The total length of stored procedures found are : {len(stored_procedures_map)}')
+            sql_json_with_stored_procedure = asyncio.run(Extractor.get_stored_procedures(self,start_time=self.config['start_time'],end_time=self.config['end_time'],username=self.config['master_username'],stored_procedures_map=stored_procedures_map,sql_json=sql_json))
             with gzip.open(archive_filename, "wb") as f:
                 f.write(json.dumps(sql_json, indent=2).encode("utf-8"))
         else:
@@ -268,7 +278,7 @@ class Extractor:
                 if self.config.get("replay_stored_procedures", None):
                     if query.text.lower().startswith("call"):
                         stored_procedures_map[query.xid] = query.text
-                        continue
+                        
                 query.text = f"{query.text.strip()}"
                 if not len(query.text) == 0:
                     if not query.text.endswith(";"):
