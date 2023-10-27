@@ -194,8 +194,8 @@ order by inv1.w_warehouse_sk,inv1.i_item_sk,inv1.d_moy,inv1.mean,inv1.cov
 ;
 
 -- end template query39.tpl query 5 in stream 0
--- start template query80a.tpl query 6 in stream 0
-with /* TPC-DS query80a.tpl 0.6 */ ssr as
+-- start template query80.tpl query 6 in stream 0
+with /* TPC-DS query80.tpl 0.6 */ ssr as
  (select  s_store_id as store_id,
           sum(ss_ext_sales_price) as sales,
           sum(coalesce(sr_return_amt, 0)) as returns,
@@ -207,8 +207,8 @@ with /* TPC-DS query80a.tpl 0.6 */ ssr as
      item,
      promotion
  where ss_sold_date_sk = d_date_sk
-       and d_date between cast('2002-08-04' as date) 
-                  and dateadd(day,30,cast('2002-08-04' as date)) 
+       and d_date between cast('2002-08-04' as date)
+                  and dateadd(day,30,cast('2002-08-04' as date))
        and ss_store_sk = s_store_sk
        and ss_item_sk = i_item_sk
        and i_current_price > 50
@@ -257,14 +257,12 @@ group by cp_catalog_page_id)
        and ws_promo_sk = p_promo_sk
        and p_channel_tv = 'N'
 group by web_site_id)
-,
-results as
- (select channel
+  select  channel
         , id
         , sum(sales) as sales
         , sum(returns) as returns
         , sum(profit) as profit
- from 
+ from
  (select 'store channel' as channel
         , 'store' || store_id as id
         , sales
@@ -286,24 +284,12 @@ results as
         , profit
  from   wsr
  ) x
- group by channel, id)
- 
-  select  channel
-        , id
-        , sales
-        , returns
-        , profit
- from (
-   select channel, id, sales, returns, profit from  results
-   union
-   select channel, NULL AS id, sum(sales) as sales, sum(returns) as returns, sum(profit) as profit from  results group by channel
-   union
-   select NULL AS channel, NULL AS id, sum(sales) as sales, sum(returns) as returns, sum(profit) as profit from  results
- ) foo
- order by channel, id
+ group by rollup (channel, id)
+ order by channel
+         ,id
  limit 100;
 
--- end template query80a.tpl query 6 in stream 0
+-- end template query80.tpl query 6 in stream 0
 -- start template query32.tpl query 7 in stream 0
 select /* TPC-DS query32.tpl 0.7 */  sum(cs_ext_discount_amt)  as "excess discount amount" 
 from 
@@ -463,9 +449,16 @@ order by
 limit 100;
 
 -- end template query78.tpl query 10 in stream 0
--- start template query86a.tpl query 11 in stream 0
-with /* TPC-DS query86a.tpl 0.11 */ results as
-( select sum(ws_net_paid) as total_sum, i_category, i_class, 0 as g_category, 0 as g_class 
+-- start template query86.tpl query 11 in stream 0
+select /* TPC-DS query86.tpl 0.11 */
+    sum(ws_net_paid) as total_sum
+   ,i_category
+   ,i_class
+   ,grouping(i_category)+grouping(i_class) as lochierarchy
+   ,rank() over (
+        partition by grouping(i_category)+grouping(i_class),
+        case when grouping(i_class) = 0 then i_category end
+        order by sum(ws_net_paid) desc) as rank_within_parent
  from
     web_sales
    ,date_dim       d1
@@ -474,30 +467,14 @@ with /* TPC-DS query86a.tpl 0.11 */ results as
     d1.d_month_seq between 1205 and 1205+11
  and d1.d_date_sk = ws_sold_date_sk
  and i_item_sk  = ws_item_sk
- group by i_category,i_class
- ) ,
-
- results_rollup as
-( select total_sum ,i_category ,i_class, g_category, g_class, 0 as lochierarchy from results
-  union
-  select sum(total_sum) as total_sum, i_category, NULL as i_class, 0 as g_category, 1 as g_class, 1 as lochierarchy from results group by i_category
-  union
-  select sum(total_sum) as total_sum, NULL as i_category, NULL as i_class, 1 as g_category, 1 as g_class, 2 as lochierarchy from results)
- select 
- total_sum ,i_category ,i_class, lochierarchy 
-   ,rank() over (
- 	partition by lochierarchy,
- 	case when g_class = 0 then i_category end 
- 	order by total_sum desc) as rank_within_parent
- from
- results_rollup
+ group by rollup(i_category,i_class)
  order by
    lochierarchy desc,
-   case when lochierarchy = 0 then i_category end,
-   rank_within_parent 
+   case when grouping(i_category)+grouping(i_class) = 0 then i_category end,
+   rank_within_parent
  limit 100;
 
--- end template query86a.tpl query 11 in stream 0
+-- end template query86.tpl query 11 in stream 0
 -- start template query1.tpl query 12 in stream 0
 with /* TPC-DS query1.tpl 0.12 */ customer_total_return as
 (select sr_customer_sk as ctr_customer_sk
@@ -603,14 +580,13 @@ select /* TPC-DS query43.tpl 0.15 */  s_store_name, s_store_id,
  limit 100;
 
 -- end template query43.tpl query 15 in stream 0
--- start template query27a.tpl query 16 in stream 0
-with /* TPC-DS query27a.tpl 0.16 */ results as
- (select i_item_id,
-        s_state, 0 as g_state,
-        ss_quantity agg1,
-        ss_list_price agg2,
-        ss_coupon_amt agg3,
-        ss_sales_price agg4
+-- start template query27.tpl query 16 in stream 0
+select /* TPC-DS query27.tpl 0.16 */  i_item_id,
+        s_state, grouping(s_state) g_state,
+        avg(ss_quantity) agg1,
+        avg(ss_list_price) agg2,
+        avg(ss_coupon_amt) agg3,
+        avg(ss_sales_price) agg4
  from store_sales, customer_demographics, date_dim, store, item
  where ss_sold_date_sk = d_date_sk and
        ss_item_sk = i_item_sk and
@@ -621,25 +597,12 @@ with /* TPC-DS query27a.tpl 0.16 */ results as
        cd_education_status = 'Advanced Degree' and
        d_year = 1999 and
        s_state in ('TX','MI', 'IL', 'MN', 'NM', 'SD')
- )
-
-  select  i_item_id,
-  s_state, g_state, agg1, agg2, agg3, agg4
-   from (
-        select i_item_id, s_state, 0 as g_state, avg(agg1) agg1, avg(agg2) agg2, avg(agg3) agg3, avg(agg4) agg4 from results
-        group by i_item_id, s_state
-         union all
-        select i_item_id, NULL AS s_state, 1 AS g_state, avg(agg1) agg1, avg(agg2) agg2, avg(agg3) agg3,
-         avg(agg4) agg4 from results
-        group by i_item_id
-         union all
-        select NULL AS i_item_id, NULL as s_state, 1 as g_state, avg(agg1) agg1, avg(agg2) agg2, avg(agg3) agg3,
-         avg(agg4) agg4 from results
-        ) foo
-  order by i_item_id, s_state
+ group by rollup (i_item_id, s_state)
+ order by i_item_id
+         ,s_state
  limit 100;
 
--- end template query27a.tpl query 16 in stream 0
+-- end template query27.tpl query 16 in stream 0
 -- start template query94.tpl query 17 in stream 0
 select /* TPC-DS query94.tpl 0.17 */  
    count(distinct ws_order_number) as "order count"
@@ -875,48 +838,36 @@ order by cs1.product_name
        ,cs2.s1;
 
 -- end template query64.tpl query 20 in stream 0
--- start template query36a.tpl query 21 in stream 0
-with /* TPC-DS query36a.tpl 0.21 */ results as
- (select 
-    sum(ss_net_profit) as ss_net_profit, sum(ss_ext_sales_price) as ss_ext_sales_price,
+-- start template query36.tpl query 21 in stream 0
+select /* TPC-DS query36.tpl 0.21 */
     sum(ss_net_profit)/sum(ss_ext_sales_price) as gross_margin
    ,i_category
    ,i_class
-   ,0 as g_category, 0 as g_class
+   ,grouping(i_category)+grouping(i_class) as lochierarchy
+   ,rank() over (
+        partition by grouping(i_category)+grouping(i_class),
+        case when grouping(i_class) = 0 then i_category end
+        order by sum(ss_net_profit)/sum(ss_ext_sales_price) asc) as rank_within_parent
  from
     store_sales
    ,date_dim       d1
    ,item
    ,store
  where
-    d1.d_year = 2002 
-    and d1.d_date_sk = ss_sold_date_sk
-    and i_item_sk  = ss_item_sk 
-    and s_store_sk  = ss_store_sk
-    and s_state in ('MN','TN','MI','WV',
+    d1.d_year = 2002
+ and d1.d_date_sk = ss_sold_date_sk
+ and i_item_sk  = ss_item_sk
+ and s_store_sk  = ss_store_sk
+ and s_state in ('MN','TN','MI','WV',
                  'NC','GA','TN','OH')
- group by i_category,i_class)
- ,
- results_rollup as
- (select gross_margin ,i_category ,i_class,0 as t_category, 0 as t_class, 0 as lochierarchy from results
- union
- select sum(ss_net_profit)/sum(ss_ext_sales_price) as gross_margin,
-   i_category, NULL AS i_class, 0 as t_category, 1 as t_class, 1 as lochierarchy from results group by i_category
- union
- select sum(ss_net_profit)/sum(ss_ext_sales_price) as gross_margin,
-   NULL AS i_category ,NULL AS i_class, 1 as t_category, 1 as t_class, 2 as lochierarchy from results)
-  select 
-  gross_margin ,i_category ,i_class, lochierarchy,rank() over (
- 	partition by lochierarchy, case when t_class = 0 then i_category end 
- 	order by gross_margin asc) as rank_within_parent
- from results_rollup
+ group by rollup(i_category,i_class)
  order by
    lochierarchy desc
-  ,case when lochierarchy = 0 then i_category end
+  ,case when grouping(i_category)+grouping(i_class) = 0 then i_category end
   ,rank_within_parent
   limit 100;
 
--- end template query36a.tpl query 21 in stream 0
+-- end template query36.tpl query 21 in stream 0
 -- start template query33.tpl query 22 in stream 0
 with /* TPC-DS query33.tpl 0.22 */ ss as (
  select
@@ -1484,96 +1435,46 @@ order by substring(r_reason_desc,1,20)
 limit 100;
 
 -- end template query85.tpl query 33 in stream 0
--- start template query70a.tpl query 34 in stream 0
-with /* TPC-DS query70a.tpl 0.34 */ results as
-( select
-    sum(ss_net_profit) as total_sum ,s_state ,s_county, 0 as gstate, 0 as g_county
+-- start template query70.tpl query 34 in stream 0
+select /* TPC-DS query70.tpl 0.34 */
+    sum(ss_net_profit) as total_sum
+   ,s_state
+   ,s_county
+   ,grouping(s_state)+grouping(s_county) as lochierarchy
+   ,rank() over (
+        partition by grouping(s_state)+grouping(s_county),
+        case when grouping(s_county) = 0 then s_state end
+        order by sum(ss_net_profit) desc) as rank_within_parent
  from
     store_sales
-  ,date_dim      d1
-  ,store
+   ,date_dim       d1
+   ,store
  where
-    d1.d_month_seq between 1188 and 1188 + 11
+    d1.d_month_seq between 1188 and 1188+11
  and d1.d_date_sk = ss_sold_date_sk
  and s_store_sk  = ss_store_sk
  and s_state in
-            ( select s_state
-              from  (select s_state as s_state,
-                 rank() over ( partition by s_state order by sum(ss_net_profit) desc) as ranking
-                      from  store_sales, store, date_dim
-                      where d_month_seq between 1188 and 1188 + 11
-                 and d_date_sk = ss_sold_date_sk
-                 and s_store_sk  = ss_store_sk
+             ( select s_state
+               from  (select s_state as s_state,
+                            rank() over ( partition by s_state order by sum(ss_net_profit) desc) as ranking
+                      from   store_sales, store, date_dim
+                      where  d_month_seq between 1188 and 1188+11
+                            and d_date_sk = ss_sold_date_sk
+                            and s_store_sk  = ss_store_sk
                       group by s_state
-                    ) tmp1 
-              where ranking <= 5)
-  group by s_state,s_county) ,  
- results_rollup as 
-(select total_sum ,s_state ,s_county, 0 as g_state, 0 as g_county, 0 as lochierarchy from results
- union
- select sum(total_sum) as total_sum,s_state, NULL as s_county, 0 as g_state, 1 as g_county, 1 as lochierarchy from results group by s_state
- union
- select sum(total_sum) as total_sum ,NULL as s_state ,NULL as s_county, 1 as g_state, 1 as g_county, 2 as lochierarchy from results)
-  select  total_sum ,s_state ,s_county, lochierarchy 
-  ,rank() over (
-     partition by lochierarchy, 
-     case when g_county = 0 then s_state end 
-     order by total_sum desc) as rank_within_parent
- from results_rollup
+                     ) tmp1
+               where ranking <= 5
+             )
+ group by rollup(s_state,s_county)
  order by
-  lochierarchy desc
-  ,case when lochierarchy = 0 then s_state end
+   lochierarchy desc
+  ,case when grouping(s_state)+grouping(s_county) = 0 then s_state end
   ,rank_within_parent
  limit 100;
 
--- end template query70a.tpl query 34 in stream 0
--- start template query67a.tpl query 35 in stream 0
-with /* TPC-DS query67a.tpl 0.35 */ results as
-(     select i_category ,i_class ,i_brand ,i_product_name ,d_year ,d_qoy ,d_moy ,s_store_id
-                  ,sum(coalesce(ss_sales_price*ss_quantity,0)) sumsales
-            from store_sales ,date_dim ,store ,item
-       where  ss_sold_date_sk=d_date_sk
-          and ss_item_sk=i_item_sk
-          and ss_store_sk = s_store_sk
-          and d_month_seq between 1219 and 1219 + 11
-       group by i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy,s_store_id)
- ,
- results_rollup as
- (select i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy, s_store_id, sumsales
-  from results
-  union all
-  select i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy, null s_store_id, sum(sumsales) sumsales
-  from results
-  group by i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy
-  union all
-  select i_category, i_class, i_brand, i_product_name, d_year, d_qoy, null d_moy, null s_store_id, sum(sumsales) sumsales
-  from results
-  group by i_category, i_class, i_brand, i_product_name, d_year, d_qoy
-  union all
-  select i_category, i_class, i_brand, i_product_name, d_year, null d_qoy, null d_moy, null s_store_id, sum(sumsales) sumsales
-  from results
-  group by i_category, i_class, i_brand, i_product_name, d_year
-  union all
-  select i_category, i_class, i_brand, i_product_name, null d_year, null d_qoy, null d_moy, null s_store_id, sum(sumsales) sumsales
-  from results
-  group by i_category, i_class, i_brand, i_product_name
-  union all
-  select i_category, i_class, i_brand, null i_product_name, null d_year, null d_qoy, null d_moy, null s_store_id, sum(sumsales) sumsales
-  from results
-  group by i_category, i_class, i_brand
-  union all
-  select i_category, i_class, null i_brand, null i_product_name, null d_year, null d_qoy, null d_moy, null s_store_id, sum(sumsales) sumsales
-  from results
-  group by i_category, i_class
-  union all
-  select i_category, null i_class, null i_brand, null i_product_name, null d_year, null d_qoy, null d_moy, null s_store_id, sum(sumsales) sumsales
-  from results
-  group by i_category
-  union all
-  select null i_category, null i_class, null i_brand, null i_product_name, null d_year, null d_qoy, null d_moy, null s_store_id, sum(sumsales) sumsales
-  from results)
-
- select  *
+-- end template query70.tpl query 34 in stream 0
+-- start template query67.tpl query 35 in stream 0
+select /* TPC-DS query67.tpl 0.35 */  *
 from (select i_category
             ,i_class
             ,i_brand
@@ -1584,7 +1485,24 @@ from (select i_category
             ,s_store_id
             ,sumsales
             ,rank() over (partition by i_category order by sumsales desc) rk
-      from results_rollup) dw2
+      from (select i_category
+                  ,i_class
+                  ,i_brand
+                  ,i_product_name
+                  ,d_year
+                  ,d_qoy
+                  ,d_moy
+                  ,s_store_id
+                  ,sum(coalesce(ss_sales_price*ss_quantity,0)) sumsales
+            from store_sales
+                ,date_dim
+                ,store
+                ,item
+       where  ss_sold_date_sk=d_date_sk
+          and ss_item_sk=i_item_sk
+          and ss_store_sk = s_store_sk
+          and d_month_seq between 1219 and 1219+11
+       group by  rollup(i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy,s_store_id))dw1) dw2
 where rk <= 100
 order by i_category
         ,i_class
@@ -1598,7 +1516,7 @@ order by i_category
         ,rk
 limit 100;
 
--- end template query67a.tpl query 35 in stream 0
+-- end template query67.tpl query 35 in stream 0
 -- start template query28.tpl query 36 in stream 0
 select /* TPC-DS query28.tpl 0.36 */  *
 from (select avg(ss_list_price) B1_LP
@@ -2174,8 +2092,8 @@ order by item_sk
 limit 100;
 
 -- end template query51.tpl query 46 in stream 0
--- start template query35a.tpl query 47 in stream 0
-select /* TPC-DS query35a.tpl 0.47 */   
+-- start template query35.tpl query 47 in stream 0
+select /* TPC-DS query35.tpl 0.47 */
   ca_state,
   cd_gender,
   cd_marital_status,
@@ -2198,28 +2116,25 @@ select /* TPC-DS query35a.tpl 0.47 */
   customer c,customer_address ca,customer_demographics
  where
   c.c_current_addr_sk = ca.ca_address_sk and
-  cd_demo_sk = c.c_current_cdemo_sk and 
+  cd_demo_sk = c.c_current_cdemo_sk and
   exists (select *
           from store_sales,date_dim
           where c.c_customer_sk = ss_customer_sk and
                 ss_sold_date_sk = d_date_sk and
                 d_year = 1999 and
                 d_qoy < 4) and
-   exists (select * from
-	   (select ws_bill_customer_sk customsk
+   (exists (select *
             from web_sales,date_dim
-            where 
+            where c.c_customer_sk = ws_bill_customer_sk and
                   ws_sold_date_sk = d_date_sk and
                   d_year = 1999 and
-                  d_qoy < 4
-	    union all 
-    	    select cs_ship_customer_sk customsk
+                  d_qoy < 4) or
+    exists (select *
             from catalog_sales,date_dim
-            where 
+            where c.c_customer_sk = cs_ship_customer_sk and
                   cs_sold_date_sk = d_date_sk and
                   d_year = 1999 and
-                  d_qoy < 4)x 
-           where x.customsk = c.c_customer_sk)
+                  d_qoy < 4))
  group by ca_state,
           cd_gender,
           cd_marital_status,
@@ -2234,7 +2149,7 @@ select /* TPC-DS query35a.tpl 0.47 */
           cd_dep_college_count
  limit 100;
 
--- end template query35a.tpl query 47 in stream 0
+-- end template query35.tpl query 47 in stream 0
 -- start template query49.tpl query 48 in stream 0
 select /* TPC-DS query49.tpl 0.48 */  channel, item, return_ratio, return_rank, currency_rank from
  (select
@@ -2636,9 +2551,8 @@ select /* TPC-DS query38.tpl 0.54 */  count(*) from (
 limit 100;
 
 -- end template query38.tpl query 54 in stream 0
--- start template query22a.tpl query 55 in stream 0
-with /* TPC-DS query22a.tpl 0.55 */ results as 
-(select  i_product_name
+-- start template query22.tpl query 55 in stream 0
+select /* TPC-DS query22.tpl 0.55 */  i_product_name
              ,i_brand
              ,i_class
              ,i_category
@@ -2646,37 +2560,17 @@ with /* TPC-DS query22a.tpl 0.55 */ results as
        from inventory
            ,date_dim
            ,item
---         ,warehouse
-       where  inv_date_sk=d_date_sk
+       where inv_date_sk=d_date_sk
               and inv_item_sk=i_item_sk
---            and inv_warehouse_sk = w_warehouse_sk
               and d_month_seq between 1183 and 1183 + 11
-       group by i_product_name,i_brand,i_class,i_category),
-results_rollup as 
-(select i_product_name, i_brand, i_class, i_category,avg(qoh) qoh 
-from results 
-group by i_product_name,i_brand,i_class,i_category
-union all 
-select i_product_name, i_brand, i_class, null i_category,avg(qoh) qoh 
-from results
-group by i_product_name,i_brand,i_class
-union all 
-select i_product_name, i_brand, null i_class, null i_category,avg(qoh) qoh 
-from results
-group by i_product_name,i_brand
-union all 
-select i_product_name, null i_brand, null i_class, null i_category,avg(qoh)  qoh 
-from results
-group by i_product_name
-union all 
-select null i_product_name, null i_brand, null i_class, null i_category,avg(qoh) qoh 
-from results)
- select  i_product_name, i_brand, i_class, i_category,qoh
-      from results_rollup
-      order by qoh, i_product_name, i_brand, i_class, i_category
+       group by rollup(i_product_name
+                       ,i_brand
+                       ,i_class
+                       ,i_category)
+order by qoh, i_product_name, i_brand, i_class, i_category
 limit 100;
 
--- end template query22a.tpl query 55 in stream 0
+-- end template query22.tpl query 55 in stream 0
 -- start template query89.tpl query 56 in stream 0
 select /* TPC-DS query89.tpl 0.56 */  *
 from(
@@ -3296,8 +3190,8 @@ with /* TPC-DS query23.tpl 0.68 part2 */ frequent_ss_items as
   limit 100;
 
 -- end template query23.tpl query 68 in stream 0
--- start template query14a.tpl query 69 in stream 0
-with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
+-- start template query14.tpl query 69 in stream 0
+with /* TPC-DS query14.tpl 0.69 */  cross_items as
  (select i_item_sk ss_item_sk
  from item,
  (select iss.i_brand_id brand_id
@@ -3309,7 +3203,7 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
  where ss_item_sk = iss.i_item_sk
    and ss_sold_date_sk = d1.d_date_sk
    and d1.d_year between 1999 AND 1999 + 2
- intersect 
+ intersect
  select ics.i_brand_id
      ,ics.i_class_id
      ,ics.i_category_id
@@ -3328,7 +3222,7 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
      ,date_dim d3
  where ws_item_sk = iws.i_item_sk
    and ws_sold_date_sk = d3.d_date_sk
-   and d3.d_year between 1999 AND 1999 + 2) x
+   and d3.d_year between 1999 AND 1999 + 2)
  where i_brand_id = brand_id
       and i_class_id = class_id
       and i_category_id = category_id
@@ -3340,14 +3234,14 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
        from store_sales
            ,date_dim
        where ss_sold_date_sk = d_date_sk
-         and d_year between 1999 and 1999 + 2 
-       union all 
-       select cs_quantity quantity 
+         and d_year between 1999 and 1999 + 2
+       union all
+       select cs_quantity quantity
              ,cs_list_price list_price
        from catalog_sales
            ,date_dim
        where cs_sold_date_sk = d_date_sk
-         and d_year between 1999 and 1999 + 2 
+         and d_year between 1999 and 1999 + 2
        union all
        select ws_quantity quantity
              ,ws_list_price list_price
@@ -3355,10 +3249,8 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
            ,date_dim
        where ws_sold_date_sk = d_date_sk
          and d_year between 1999 and 1999 + 2) x)
-,
-  results AS
-(select channel, i_brand_id, i_class_id, i_category_id, sum(sales) sum_sales, sum(number_sales) number_sales
- from (
+  select  channel, i_brand_id,i_class_id,i_category_id,sum(sales), sum(number_sales)
+ from(
        select 'store' channel, i_brand_id,i_class_id
              ,i_category_id,sum(ss_quantity*ss_list_price) sales
              , count(*) number_sales
@@ -3368,7 +3260,7 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
        where ss_item_sk in (select ss_item_sk from cross_items)
          and ss_item_sk = i_item_sk
          and ss_sold_date_sk = d_date_sk
-         and d_year = 1999+2 
+         and d_year = 1999+2
          and d_moy = 11
        group by i_brand_id,i_class_id,i_category_id
        having sum(ss_quantity*ss_list_price) > (select average_sales from avg_sales)
@@ -3380,7 +3272,7 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
        where cs_item_sk in (select ss_item_sk from cross_items)
          and cs_item_sk = i_item_sk
          and cs_sold_date_sk = d_date_sk
-         and d_year = 1999+2 
+         and d_year = 1999+2
          and d_moy = 11
        group by i_brand_id,i_class_id,i_category_id
        having sum(cs_quantity*cs_list_price) > (select average_sales from avg_sales)
@@ -3397,25 +3289,10 @@ with  /* TPC-DS query14a.tpl 0.69 */ cross_items as
        group by i_brand_id,i_class_id,i_category_id
        having sum(ws_quantity*ws_list_price) > (select average_sales from avg_sales)
  ) y
- group by channel, i_brand_id,i_class_id,i_category_id)
-
- select  channel, i_brand_id, i_class_id, i_category_id, sum_sales, number_sales
-from (
-      select channel, i_brand_id, i_class_id, i_category_id, sum_sales, number_sales from results
-      union
-      select channel, i_brand_id, i_class_id,  null as i_category_id, sum(sum_sales), sum(number_sales) from results
-      group by channel, i_brand_id, i_class_id
-      union
-      select channel, i_brand_id, null as i_class_id, null as i_category_id, sum(sum_sales), sum(number_sales) from results
-      group by channel, i_brand_id
-      union
-      select channel, null as i_brand_id, null as i_class_id, null as i_category_id, sum(sum_sales), sum(number_sales) from results
-      group by channel
-      union
-      select null as channel, null as i_brand_id, null as i_class_id, null as i_category_id, sum(sum_sales), sum(number_sales) from results) z
-order by channel, i_brand_id, i_class_id, i_category_id
+ group by rollup (channel, i_brand_id,i_class_id,i_category_id)
+ order by channel,i_brand_id,i_class_id,i_category_id
  limit 100;
-with  /* TPC-DS query14a.tpl 0.69 part2 */ cross_items as
+with /* TPC-DS query14.tpl 0.69 part2 */  cross_items as
  (select i_item_sk ss_item_sk
  from item,
  (select iss.i_brand_id brand_id
@@ -3485,10 +3362,10 @@ with  /* TPC-DS query14a.tpl 0.69 part2 */ cross_items as
                            ,last_year.i_category_id ly_category
                            ,last_year.sales ly_sales
                            ,last_year.number_sales ly_number_sales
-from
+ from
  (select 'store' channel, i_brand_id,i_class_id,i_category_id
         ,sum(ss_quantity*ss_list_price) sales, count(*) number_sales
- from store_sales 
+ from store_sales
      ,item
      ,date_dim
  where ss_item_sk in (select ss_item_sk from cross_items)
@@ -3522,7 +3399,7 @@ from
  order by this_year.channel, this_year.i_brand_id, this_year.i_class_id, this_year.i_category_id
  limit 100;
 
--- end template query14a.tpl query 69 in stream 0
+-- end template query14.tpl query 69 in stream 0
 -- start template query57.tpl query 70 in stream 0
 with /* TPC-DS query57.tpl 0.70 */ v1 as(
  select i_category, i_brand,
@@ -3853,8 +3730,8 @@ from ((select distinct c_last_name, c_first_name, d_date
 ;
 
 -- end template query87.tpl query 77 in stream 0
--- start template query77a.tpl query 78 in stream 0
-with /* TPC-DS query77a.tpl 0.78 */ ss as
+-- start template query77.tpl query 78 in stream 0
+with /* TPC-DS query77.tpl 0.78 */ ss as
  (select s_store_sk,
          sum(ss_ext_sales_price) as sales,
          sum(ss_net_profit) as profit
@@ -3862,8 +3739,8 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
       date_dim,
       store
  where ss_sold_date_sk = d_date_sk
-       and d_date between cast('2000-08-02' as date) 
-                  and dateadd(day,30,cast('2000-08-02' as date))  
+       and d_date between cast('2000-08-02' as date)
+                  and dateadd(day,30,cast('2000-08-02' as date))
        and ss_store_sk = s_store_sk
  group by s_store_sk)
  ,
@@ -3876,9 +3753,9 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
       store
  where sr_returned_date_sk = d_date_sk
        and d_date between cast('2000-08-02' as date)
-                  and dateadd(day,30,cast('2000-08-02' as date))  
+                  and dateadd(day,30,cast('2000-08-02' as date))
        and sr_store_sk = s_store_sk
- group by s_store_sk), 
+ group by s_store_sk),
  cs as
  (select cs_call_center_sk,
         sum(cs_ext_sales_price) as sales,
@@ -3887,9 +3764,9 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
       date_dim
  where cs_sold_date_sk = d_date_sk
        and d_date between cast('2000-08-02' as date)
-                  and dateadd(day,30,cast('2000-08-02' as date))  
- group by cs_call_center_sk 
- ), 
+                  and dateadd(day,30,cast('2000-08-02' as date))
+ group by cs_call_center_sk
+ ),
  cr as
  (select cr_call_center_sk,
          sum(cr_return_amount) as returns,
@@ -3898,8 +3775,9 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
       date_dim
  where cr_returned_date_sk = d_date_sk
        and d_date between cast('2000-08-02' as date)
-                  and dateadd(day,30,cast('2000-08-02' as date))  
- group by cr_call_center_sk), 
+                  and dateadd(day,30,cast('2000-08-02' as date))
+ group by cr_call_center_sk
+ ),
  ws as
  ( select wp_web_page_sk,
         sum(ws_ext_sales_price) as sales,
@@ -3909,9 +3787,9 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
       web_page
  where ws_sold_date_sk = d_date_sk
        and d_date between cast('2000-08-02' as date)
-                  and dateadd(day,30,cast('2000-08-02' as date))  
+                  and dateadd(day,30,cast('2000-08-02' as date))
        and ws_web_page_sk = wp_web_page_sk
- group by wp_web_page_sk), 
+ group by wp_web_page_sk),
  wr as
  (select wp_web_page_sk,
         sum(wr_return_amt) as returns,
@@ -3921,17 +3799,15 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
       web_page
  where wr_returned_date_sk = d_date_sk
        and d_date between cast('2000-08-02' as date)
-                  and dateadd(day,30,cast('2000-08-02' as date))  
+                  and dateadd(day,30,cast('2000-08-02' as date))
        and wr_web_page_sk = wp_web_page_sk
  group by wp_web_page_sk)
- ,
- results as
- (select channel
+  select  channel
         , id
         , sum(sales) as sales
         , sum(returns) as returns
         , sum(profit) as profit
- from 
+ from
  (select 'store channel' as channel
         , ss.s_store_sk as id
         , sales
@@ -3956,20 +3832,12 @@ with /* TPC-DS query77a.tpl 0.78 */ ss as
  from   ws left join wr
         on  ws.wp_web_page_sk = wr.wp_web_page_sk
  ) x
- group by channel, id )
-
-  select  *
- from (
- select channel, id, sales, returns, profit from  results
- union
- select channel, NULL AS id, sum(sales) as sales, sum(returns) as returns, sum(profit) as profit from  results group by channel
- union
- select NULL AS channel, NULL AS id, sum(sales) as sales, sum(returns) as returns, sum(profit) as profit from  results
-) foo
-order by channel, id
+ group by rollup (channel, id)
+ order by channel
+         ,id
  limit 100;
 
--- end template query77a.tpl query 78 in stream 0
+-- end template query77.tpl query 78 in stream 0
 -- start template query73.tpl query 79 in stream 0
 select /* TPC-DS query73.tpl 0.79 */ c_last_name
        ,c_first_name
@@ -4347,62 +4215,40 @@ select /* TPC-DS query79.tpl 0.89 */
 limit 100;
 
 -- end template query79.tpl query 89 in stream 0
--- start template query18a.tpl query 90 in stream 0
-with /* TPC-DS query18a.tpl 0.90 */ results as
- (select i_item_id,
+-- start template query18.tpl query 90 in stream 0
+select /* TPC-DS query18.tpl 0.90 */  i_item_id,
         ca_country,
-        ca_state, 
+        ca_state,
         ca_county,
-        cast(cs_quantity as decimal(12,2)) agg1,
-        cast(cs_list_price as decimal(12,2)) agg2,
-        cast(cs_coupon_amt as decimal(12,2)) agg3,
-        cast(cs_sales_price as decimal(12,2)) agg4,
-        cast(cs_net_profit as decimal(12,2)) agg5,
-        cast(c_birth_year as decimal(12,2)) agg6,
-        cast(cd1.cd_dep_count as decimal(12,2)) agg7
- from catalog_sales, customer_demographics cd1, customer_demographics cd2, customer, customer_address, date_dim, item
+        avg( cast(cs_quantity as decimal(12,2))) agg1,
+        avg( cast(cs_list_price as decimal(12,2))) agg2,
+        avg( cast(cs_coupon_amt as decimal(12,2))) agg3,
+        avg( cast(cs_sales_price as decimal(12,2))) agg4,
+        avg( cast(cs_net_profit as decimal(12,2))) agg5,
+        avg( cast(c_birth_year as decimal(12,2))) agg6,
+        avg( cast(cd1.cd_dep_count as decimal(12,2))) agg7
+ from catalog_sales, customer_demographics cd1,
+      customer_demographics cd2, customer, customer_address, date_dim, item
  where cs_sold_date_sk = d_date_sk and
        cs_item_sk = i_item_sk and
        cs_bill_cdemo_sk = cd1.cd_demo_sk and
        cs_bill_customer_sk = c_customer_sk and
-       cd1.cd_gender = 'M' and 
+       cd1.cd_gender = 'M' and
        cd1.cd_education_status = 'Primary' and
        c_current_cdemo_sk = cd2.cd_demo_sk and
        c_current_addr_sk = ca_address_sk and
        c_birth_month in (9,5,1,2,3,8) and
        d_year = 1999 and
-       ca_state in ('NV','AL','CA','WI','SD','OK','KY')
- )
-  select  i_item_id, ca_country, ca_state, ca_county, agg1, agg2, agg3, agg4, agg5, agg6, agg7
- from (
- 	select i_item_id, ca_country, ca_state, ca_county, avg(agg1) agg1, 
- 		avg(agg2) agg2, avg(agg3) agg3, avg(agg4) agg4, avg(agg5) agg5, avg(agg6) agg6, avg(agg7) agg7 
- 	from results
-	group by i_item_id, ca_country, ca_state, ca_county
- 	union all
- 	select i_item_id, ca_country, ca_state, NULL as county, avg(agg1) agg1, avg(agg2) agg2, avg(agg3) agg3,
-		avg(agg4) agg4, avg(agg5) agg5, avg(agg6) agg6, avg(agg7) agg7 
-	from results
-	group by i_item_id, ca_country, ca_state
- 	union all
-	select i_item_id, ca_country, NULL as ca_state, NULL as county, avg(agg1) agg1, avg(agg2) agg2, avg(agg3) agg3,
-		avg(agg4) agg4, avg(agg5) agg5, avg(agg6) agg6, avg(agg7) agg7 
-	from results
- 	group by i_item_id, ca_country
- 	union all
- 	select i_item_id, NULL as ca_country, NULL as ca_state, NULL as county, avg(agg1) agg1, avg(agg2) agg2, avg(agg3) agg3,
-		avg(agg4) agg4, avg(agg5) agg5, avg(agg6) agg6, avg(agg7) agg7 
-	from results
-	group by i_item_id
-	union all
-	select NULL AS i_item_id, NULL as ca_country, NULL as ca_state, NULL as county, avg(agg1) agg1, avg(agg2) agg2, avg(agg3) agg3,
-		avg(agg4) agg4, avg(agg5) agg5, avg(agg6) agg6, avg(agg7) agg7 
-	from results
- ) foo
- order by ca_country, ca_state, ca_county, i_item_id
+       ca_state in ('NV','AL','CA'
+                   ,'WI','SD','OK','KY')
+ group by rollup (i_item_id, ca_country, ca_state, ca_county)
+ order by ca_country,
+        ca_state,
+        ca_county,
+        i_item_id
  limit 100;
 
--- end template query18a.tpl query 90 in stream 0
+-- end template query18.tpl query 90 in stream 0
 -- start template query13.tpl query 91 in stream 0
 select /* TPC-DS query13.tpl 0.91 */ avg(ss_quantity)
        ,avg(ss_ext_sales_price)
@@ -4866,8 +4712,8 @@ order by promotions, total
 limit 100;
 
 -- end template query61.tpl query 97 in stream 0
--- start template query5a.tpl query 98 in stream 0
-with /* TPC-DS query5a.tpl 0.98 */ ssr as
+-- start template query5.tpl query 98 in stream 0
+with /* TPC-DS query5.tpl 0.98 */ ssr as
  (select s_store_id,
         sum(sales_price) as sales,
         sum(profit) as profit,
@@ -4893,7 +4739,7 @@ with /* TPC-DS query5a.tpl 0.98 */ ssr as
      date_dim,
      store
  where date_sk = d_date_sk
-       and d_date between cast('1998-08-11' as date) 
+       and d_date between cast('1998-08-11' as date)
                   and dateadd(day,14,cast('1998-08-11' as date))
        and store_sk = s_store_sk
  group by s_store_id)
@@ -4961,14 +4807,12 @@ with /* TPC-DS query5a.tpl 0.98 */ ssr as
                   and dateadd(day,14,cast('1998-08-11' as date))
        and wsr_web_site_sk = web_site_sk
  group by web_site_id)
- ,
- results as
- (select channel
+  select  channel
         , id
         , sum(sales) as sales
         , sum(returns) as returns
         , sum(profit) as profit
- from 
+ from
  (select 'store channel' as channel
         , 'store' || s_store_id as id
         , sales
@@ -4990,17 +4834,12 @@ with /* TPC-DS query5a.tpl 0.98 */ ssr as
         , (profit - profit_loss) as profit
  from   wsr
  ) x
- group by channel, id)
- select  channel, id, sales, returns, profit from ( 
-  select channel, id, sales, returns, profit from results
-  union
-  select channel, null as id, sum(sales), sum(returns), sum(profit) from results group by channel
-  union
-  select null as channel, null as id, sum(sales), sum(returns), sum(profit) from results) foo
-order by channel, id
-limit 100;
+ group by rollup (channel, id)
+ order by channel
+         ,id
+ limit 100;
 
--- end template query5a.tpl query 98 in stream 0
+-- end template query5.tpl query 98 in stream 0
 -- start template query76.tpl query 99 in stream 0
 select /* TPC-DS query76.tpl 0.99 */  channel, col_name, d_year, d_qoy, i_category, COUNT(*) sales_cnt, SUM(ext_sales_price) sales_amt FROM (
         SELECT 'store' as channel, 'ss_addr_sk' col_name, d_year, d_qoy, i_category, ss_ext_sales_price ext_sales_price
