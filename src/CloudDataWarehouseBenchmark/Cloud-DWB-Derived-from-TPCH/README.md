@@ -36,7 +36,7 @@ To execute the TPC-H Power Run at a particular data scale (e.g. 3TB), perform th
 
 2. Connect to the database you created and execute `ddl.sql`.  This may take several hours, depending on the data scale and data warehouse size.
 
-3. Execute `query_0.sql` several times sequentially (e.g. five times) and record the run time of each execution.
+3. Execute `query_0.sql` three times and record the best run time.
 
 Note that the S3 data is located in US-EAST-1 so you may get faster load times if your test cluster is located in that region.
 
