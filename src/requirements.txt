@@ -2,6 +2,6 @@ wheel==0.38.1
 pg8000==1.11.0
 shortuuid==0.4.3
 six==1.10.0
-boto3==1.5.3
+boto3==1.34.44
 pgpasslib==1.1.0
 redshift-connector==2.0.908
