@@ -16,7 +16,7 @@ import util.log
 from global_config import GlobalConfigParametersReader, config_parameters
 from util.s3_utils import S3Helper, S3Details
 from util.redshift_cluster import RedshiftCluster
-from util.resources import ResourceFactory, TableResource, DBResource
+from util.resources import ResourceFactory, TableResource, DBResource, SchemaResource
 from util.tasks import TaskManager, FailIfResourceDoesNotExistsTask, CreateIfTargetDoesNotExistTask, \
     FailIfResourceClusterDoesNotExistsTask, UnloadDataToS3Task, CopyDataFromS3Task, CleanupS3StagingAreaTask, \
     NoOperationTask
@@ -77,7 +77,19 @@ class UnloadCopyTool:
 
         src_config = self.config_helper.config['unloadSource']
         dest_config = self.config_helper.config['copyTarget']
-        if(src_config['tableNames']):
+
+        if "tableNames" in src_config or "tableName" in src_config:
+            self.setup_table_tasks(src_config, dest_config, global_config_values)
+        elif "schemaNames" in src_config or "schemaName" in src_config:
+            self.setup_schema_tasks(src_config, dest_config, global_config_values)
+        else:
+            logger.fatal("Invalid configuration, must configure either table or schema")
+            raise ValueError("Invalid configuration")
+
+        self.task_manager.run()
+
+    def setup_table_tasks(self, src_config, dest_config, global_config_values):
+        if(src_config.get('tableNames', [])):
             src_tables = src_config['tableNames']
             dest_tables = dest_config['tableNames']
             logger.info("Migrating multiple tables")
@@ -97,7 +109,36 @@ class UnloadCopyTool:
             destination = ResourceFactory.get_target_resource_from_config_helper(self.config_helper, self.region)
             self.add_src_dest_tasks(source,destination,global_config_values)
 
-        self.task_manager.run()
+    def setup_schema_tasks(self, src_config, dest_config, global_config_values):
+        if src_config.get('schemaNames', []):
+            src_schemas = src_config['schemaNames']
+            dest_schemas = dest_config['schemaNames']
+            logger.info("Migrating multiple schemas")
+            if not dest_schemas or len(src_schemas) != len(dest_schemas):
+                logger.fatal(
+                    "When migrating multiple schemas 'schemaNames' property must be configured in unloadSource and copyTarget, and be the same length"
+                )
+                raise NotImplementedError
+            for idx in range(0, len(src_schemas)):
+                logger.info("Migrating schema: " + src_schemas[idx])
+                src_config['schemaName'] = src_schemas[idx]
+                dest_config['schemaName'] = dest_schemas[idx]
+                source: SchemaResource = ResourceFactory.get_source_resource_from_config_helper(
+                    self.config_helper
+                )
+                destination: SchemaResource = ResourceFactory.get_target_resource_from_config_helper(
+                    self.config_helper
+                )
+                self.add_src_dest_tasks(source, destination, global_config_values)
+        else:
+            logger.info("Migrating a single schema")
+            source: SchemaResource = ResourceFactory.get_source_resource_from_config_helper(
+                self.config_helper
+            )
+            destination: SchemaResource = ResourceFactory.get_target_resource_from_config_helper(
+                self.config_helper
+            )
+            self.add_src_dest_tasks(source, destination, global_config_values)
 
     def add_src_dest_tasks(self,source,destination,global_config_values):
         # TODO: Check whether both resources are of type table if that is not the case then perform other scenario's
@@ -112,6 +153,11 @@ class UnloadCopyTool:
                 logger.fatal('Destination should be a database resource')
                 raise NotImplementedError
             pass
+        elif isinstance(source, SchemaResource):
+            if not isinstance(destination, SchemaResource):
+                logger.fatal("Destination should be a schema resource")
+                raise NotImplementedError
+            self.add_schema_migration(source, destination, global_config_values)
         else:
             # TODO: add additional scenario's
             # For example if both resources are of type schema then create target schema and migrate all tables
@@ -164,6 +210,21 @@ class UnloadCopyTool:
 
         s3_cleanup = CleanupS3StagingAreaTask(s3_details)
         self.task_manager.add_task(s3_cleanup, dependencies=copy_data)
+
+    def add_schema_migration(self, source: SchemaResource, destination: SchemaResource, global_config_values):
+        tables = source.list_tables()
+        for table_name in tables:
+            src_table: TableResource = TableResource(
+                source.get_cluster(),
+                source.get_schema(),
+                table_name
+            )
+            dest_table: TableResource = TableResource(
+                destination.get_cluster(),
+                destination.get_schema(),
+                table_name
+            )
+            self.add_table_migration(src_table, dest_table, global_config_values)
 
 def main(args):
     global region
