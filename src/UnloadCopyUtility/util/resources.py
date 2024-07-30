@@ -257,7 +257,7 @@ class SchemaResource(DBResource, ChildObject):
             sql,
             self.get_cluster().db,
         )
-        tables = [tbl["table_name"] for tbl in tbl_dict]
+        tables = [tbl["table_name"] for tbl in tbl_dict if tbl["table_type"] == "TABLE"]
         return tables
 
     def clone_structure_from(self, other):
