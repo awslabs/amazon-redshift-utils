@@ -48,6 +48,12 @@ The [Cloud DW Benchmark](src/CloudDataWarehouseBenchmark) consists of a set of w
 
 The [Redshift Unload/Copy Utility](src/UnloadCopyUtility) helps you to migrate data between Redshift Clusters or Databases. It exports data from a source cluster to a location on S3, and all data is encrypted with Amazon Key Management Service. It then automatically imports the data into the configured Redshift Cluster, and will cleanup S3 if required. This utility is intended to be used as part of an ongoing scheduled activity, for instance run as part of a Data Pipeline Shell Activity (http://docs.aws.amazon.com/datapipeline/latest/DeveloperGuide/dp-object-shellcommandactivity.html).
 
+# Manifest Generator
+
+Data loads into Amazon Redshift tables that have a Sort Key are resource intensive, requiring the system to consume large amounts of memory to sort data. For very large loads, you may observe the run times of `COPY` commands grow non-linearly relative to the data size. Instead of single large multi-TB operations, breaking down the load into chunks could yield faster overall ingestion.
+
+This utility script is to generate Redshift manifest files to be used for `COPY` command to split the ingestion into batches.
+
 # Simple Replay Utility
 
 The [Simple Replay Utility](src/SimpleReplay) helps you to collect and replay cluster workloads. It reads the user activity log files (when audit is enabled) and generates sql files to be replayed. There are two replay tools. One that replays at a arbitrary concurrency and other that tries to reproduce the original cadence of work.
