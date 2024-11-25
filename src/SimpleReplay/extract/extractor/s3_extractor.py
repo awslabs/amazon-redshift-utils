@@ -32,7 +32,7 @@ class S3Extractor:
         last_connections = {}
         databases = set()
 
-        bucket_objects = aws_service_helper.s3_get_bucket_contents(log_bucket, log_prefix)
+        bucket_objects = aws_service_helper.sync_s3_get_bucket_contents(log_bucket, log_prefix)
 
         s3_connection_logs = []
         s3_user_activity_logs = []
