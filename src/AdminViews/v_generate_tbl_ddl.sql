@@ -270,7 +270,7 @@ from (SELECT
   JOIN pg_class c ON c.oid = des.objoid
   JOIN pg_namespace n ON n.oid = c.relnamespace
   LEFT JOIN information_schema."columns" cl
-  ON cl.ordinal_position::integer = des.objsubid AND cl.table_name::NAME = c.relname
+  ON cl.ordinal_position::integer = des.objsubid AND cl.table_name::NAME = c.relname AND cl.table_schema = n.nspname
   WHERE c.relkind = 'r'
 
   UNION
