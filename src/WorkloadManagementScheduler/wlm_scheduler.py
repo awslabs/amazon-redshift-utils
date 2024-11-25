@@ -100,9 +100,12 @@ def get_wlm_config(ruleset, region_name):
     elif CONFIG_KEY in ruleset and isinstance(ruleset[CONFIG_KEY], basestring):
         if ruleset[CONFIG_KEY].startswith('s3://'):
             wlm_config = json.dumps(get_file_contents(ruleset[CONFIG_KEY], region_name))
+        else:  # use json file in the lambda code dir
+            with open(ruleset[CONFIG_KEY]) as config_file:
+                wlm_config = config_file.read()
     else:
         raise Exception(
-            "Malformed Configuration for Ruleset %s. '%s' must be a json based WLM configuration or an S3 file location" % (
+            "Malformed Configuration for Ruleset %s. '%s' must be a json based WLM configuration or a local/S3 json file location" % (
             ruleset[RULESET_NAME_KEY], CONFIG_KEY))
 
     return wlm_config
