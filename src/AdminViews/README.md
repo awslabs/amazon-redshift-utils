@@ -1,4 +1,4 @@
-# Redshift Admin Views 
+# Redshift Admin Views
 Views objective is to help with administration of Redshift.
 All views assume you have a schema called admin.
 
@@ -20,13 +20,14 @@ All views assume you have a schema called admin.
 | v\_generate\_terminate\_session.sql | View to get pg\_terminate\_backend() statements |
 | v\_generate\_udf\_ddl.sql | View to get the DDL for a UDF.
 | v\_generate\_unload\_copy\_cmd.sql |   View to get that will generate unload and copy commands for an object.  After running | 
-|v\_generate\_user\_grant\_revoke\_ddl.sql| View to generate grant or revoke ddl for users and groups in the database|
+| v\_generate\_user\_grant\_revoke\_ddl.sql| View to generate grant or revoke ddl for users and groups in the database|
 | v\_generate\_user\_object\_permissions.sql |   View to get the DDL for a users permissions to tables and views. | 
 | v\_generate\_view\_ddl.sql |   View to get the DDL for a view. | 
 | v\_get\_blocking\_locks.sql | View to identify blocking locks as well as determine what/who is blocking a query |
 | v\_get\_cluster\_restart\_ts.sql | View to get the datetime of when Redshift cluster was recently restarted |
 | v\_get\_obj\_priv\_by\_user.sql |   View to get the table/views that a user has access to | 
 | v\_get\_schema\_priv\_by\_user.sql |   View to get the schema that a user has access to | 
+| v\_get\_running\_queries.sql |   View to get current running queries. | 
 | v\_get\_tbl\_priv\_by\_user.sql |   View to get the tables that a user has access to | 
 | v\_get\_tbl\_priv\_by\_group.sql |   View to get the tables that a user group has access to | 
 | v\_get\_tbl\_reads\_and\_writes.sql | View to get operations performed per table for transactions ID or query ID |
