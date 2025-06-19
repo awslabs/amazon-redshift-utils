@@ -1,12 +1,10 @@
- User Guide: Migrating Redshift Local Users to AWS IAM IDC 
-
 
 This document guides on how to use the utility to migrate local users, groups and roles from your Redshift instance to AWS IAM Identity Center (IDC) users, groups and roles.
 
 Utility Version: 1.0
-Release Date: 05/31/2025
+Release Date: 06/20/2025
 
-Scope:
+# Scope:
 Following are the activities performed by this utility.
 
 1. Create users in IDC for every local user in given Redshift instance.
@@ -16,7 +14,7 @@ Following are the activities performed by this utility.
 5. Grants permissions to IDC roles in Redshift instance based on the current permissions given to local groups and roles.
 
 
-Considerations:
+# Considerations:
 
 * Creating permissions in AWS Lake Formation is currently not in scope
 * IDC and IDP integration setup is out of scope for this utility.  However, “vw_local_ugr_to_idc_urgr_priv.sql” can be used to create roles and grant permissions to the IDP users/groups passed through IDC.
@@ -24,7 +22,7 @@ Considerations:
 * If you have any permissions given directly to local user IDs i.e not via groups or roles, then you need to change that to a role based permission approach for IDC integration.  Please create roles and provide permissions via roles instead of directly giving permissions to users.
 
 
-Utility Artifacts:
+# Utility Artifacts:
 
 Please download the utility artifacts.
 
@@ -36,7 +34,7 @@ Please download the utility artifacts.
 
 
 
-Pre-requisites:
+# Pre-requisites:
 Following are the pre-requisites before running the utility.
 
 * Enable AWS IDC in your account.  Please refer Enabling AWS IAM Identity Center documentation.
@@ -50,7 +48,7 @@ Following are the pre-requisites before running the utility.
 
 
 
-Run Steps:
+# Run Steps:
 
 
 1. Update Redshift cluster details and S3 locations in redshift_config.ini
@@ -60,26 +58,30 @@ Run Steps:
 5. Run idc_redshift_unload_indatabase_groups_roles_users.py either from AWS cloudshell or EC2 instance.
 
 
+```
 python idc_redshift_unload_indatabase_groups_roles_users.py
+```
 
 
-1. Run idc_add_users_groups_roles_psets.py from AWS cloudshell or EC2 instance.
+6. Run idc_add_users_groups_roles_psets.py from AWS cloudshell or EC2 instance.
 
-
+```
 python idc_add_users_groups_roles_psets.py
+```
 
+7. Connect your Redshift cluster using Query Editor V2 or SQL client of your choice.  Please use superuser credentials.
+8. Copy the SQL in “vw_local_ugr_to_idc_urgr_priv.sql” file and run in the editor to create the vw_local_ugr_to_idc_urgr_priv
+9. Run following SQL to generate the SQL statement for creating roles and permissions.
 
-1. Connect your Redshift cluster using Query Editor V2 or SQL client of your choice.  Please use superuser credentials.
-2. Copy the SQL in “vw_local_ugr_to_idc_urgr_priv.sql” file and run in the editor to create the vw_local_ugr_to_idc_urgr_priv
-3. Run following SQL to generate the SQL statement for creating roles and permissions.
-
+```sql
 select existing_grants,idc_based_grants from vw_local_ugr_to_idc_urgr_priv;
+```
 
-1. Review the statements in idc_based_grants column.  
+10. Review the statements in idc_based_grants column.  
 
 NOTE: It generates grant statements on 1/ databases 2/schemas 3/tables 4/views 5/columns 6/functions 7/models 8/data shares. However, please note that this may not be 100% comprehensive list of permissions.  So a review is important and the missing ones needs to manually granted.
 
-1. If all is good, run all the statements from the SQL client.
+11. If all is good, run all the statements from the SQL client.
 
 
 If there is any further help required please reach following contacts
