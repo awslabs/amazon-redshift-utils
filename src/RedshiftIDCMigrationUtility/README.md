@@ -79,9 +79,18 @@ select existing_grants,idc_based_grants from vw_local_ugr_to_idc_urgr_priv;
 
 10. Review the statements in idc_based_grants column.  
 
-NOTE: It generates grant statements on 1/ databases 2/schemas 3/tables 4/views 5/columns 6/functions 7/models 8/data shares. However, please note that this may not be 100% comprehensive list of permissions.  So a review is important and the missing ones needs to manually granted.
+NOTE: The utility generates grant statements for the following objects:
+1. Databases
+2. Schemas
+3. Tables
+4. Views
+5. Columns
+6. Functions
+7. Models
+8. Data Shares
+However, please note that this may not be a 100% comprehensive list of permissions. Therefore, a review is a mandatory step, and any missing permissions will need to be manually granted.
 
-11. If all is good, run all the statements from the SQL client.
+11. Connect to the Redshift cluster from any SQL editor and run all the reviewed SQL statements to create the IDC roles and permissions.
 
 
 If there is any further help required please reach following contacts
