@@ -38,7 +38,7 @@ Please download the utility artifacts.
 Following are the pre-requisites before running the utility.
 
 * Enable AWS IDC in your account.  Please refer Enabling AWS IAM Identity Center documentation.
-* Complete steps 1 to 8 from the blog Integrate Identity Provider (IdP) with Amazon Redshift Query Editor V2 and SQL Client using AWS IAM Identity Center for seamless Single Sign-On.
+* Complete steps 1 to 8 from the blog [Integrate Identity Provider (IdP) with Amazon Redshift Query Editor V2 and SQL Client using AWS IAM Identity Center for seamless Single Sign-On](https://aws.amazon.com/blogs/big-data/integrate-identity-provider-idp-with-amazon-redshift-query-editor-v2-and-sql-client-using-aws-iam-identity-center-for-seamless-single-sign-on/).
 * Disable assignments for IDC application.
     * In IDC console, navigate to Application Assignments → Applications.
     * Select the application.  Choose Actions→ Edit details.
