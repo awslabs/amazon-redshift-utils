@@ -245,6 +245,14 @@ def process_role_memberships(config, aws_clients, user_ids, role_ids):
             
         add_user_to_group(aws_clients['identity_store'], identity_store_id, user_id, role_id)
 
+def delete_s3_file(bucket_name, file_key):
+    s3_client = boto3.client('s3')
+    try:
+        s3_client.delete_object(Bucket=bucket_name, Key=file_key)
+        logger.info(f"Deleted file {file_key} from bucket {bucket_name}")
+    except Exception as e:
+        logger.error(f"Error deleting file {file_key} from bucket {bucket_name}: {e}")
+
 def main():
     try:
         config = load_configuration()
@@ -263,6 +271,11 @@ def main():
     user_ids = process_users(config, aws_clients)
     role_ids = process_roles(config, aws_clients, assign_permission_set=assign_permission_set)
     process_role_memberships(config, aws_clients, user_ids, role_ids)
+    delete_s3_file(config.get('S3', 's3_bucket'), config.get('S3', 'users_file'))
+    delete_s3_file(config.get('S3', 's3_bucket'), config.get('S3', 'roles_file'))
+    delete_s3_file(config.get('S3', 's3_bucket'), config.get('S3', 'role_memberships_file'))
+    logger.info("IDC Migration Utility execution completed successfully.")
+
 
 if __name__ == "__main__":
     main()
