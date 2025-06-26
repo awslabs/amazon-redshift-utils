@@ -147,6 +147,16 @@ def fetch_data_from_redshift(conn, query):
     except Exception as e:
         logger.error(f"Error fetching data: {e}")
         return None, None
+    
+def run_rs_query(conn, query):
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query)
+        cursor.close()
+        return True
+    except Exception as e:
+        logger.error(f"Error running query: {e}")
+        return None    
 
 def write_to_s3(data, cursor_description, s3_key, config):
     try:
@@ -190,6 +200,10 @@ def main():
          if conn is None:
             logger.error("Failed to connect to Redshift. Exiting program.")
             return
+
+         # Setting application name 
+         query_setapp = "set application_name to 'RedshiftIDCIMigrationUtility'"
+         run_rs_query(conn, query_setapp)
 
          # SQL Queries (common to both)
          query_roles = """
