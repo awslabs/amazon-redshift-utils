@@ -4,6 +4,7 @@ import csv
 import logging
 import configparser
 from io import StringIO
+from botocore.exceptions import ClientError
 
 # setup logging
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +47,29 @@ def validate_config(config):
             if param not in config[section]:
                 raise ValueError(f"Missing configuration parameter: {section}.{param}")
 
+def check_bucket_encryption(bucket_name):
+    try:
+        # Create S3 client
+        s3_client = boto3.client('s3')
+        
+        # Get bucket encryption configuration
+        response = s3_client.get_bucket_encryption(Bucket=bucket_name)
+        
+        # If we get here, bucket is encrypted
+        encryption_rules = response['ServerSideEncryptionConfiguration']['Rules']
+        print(f"Bucket {bucket_name} is encrypted with configuration:")
+        print(encryption_rules)
+        return True
+        
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code == 'ServerSideEncryptionConfigurationNotFoundError':
+            print(f"Bucket {bucket_name} is not encrypted")
+            return False
+        else:
+            print(f"Error checking bucket encryption: {str(e)}")
+            raise
+
 def get_redshift_credentials(config):
     """Get Redshift credentials based on cluster type."""
     try:
@@ -64,7 +88,7 @@ def get_redshift_credentials(config):
             credentials = client.get_cluster_credentials(
                 DbUser=config['REDSHIFT']['db_user'],
                 DbName=config['REDSHIFT']['db_name'],
-                ClusterIdentifier="redshift-serverless-"+config['REDSHIFT']['workgroup_name']
+                ClusterIdentifier=f"redshift-serverless-{config['REDSHIFT']['workgroup_name']}"
             )
             client = boto3.client('redshift-serverless', region_name=config['AWS']['region'])
             workgroup = client.get_workgroup(workgroupName=config['REDSHIFT']['workgroup_name'])
@@ -102,7 +126,9 @@ def connect_to_redshift(config):
             user=creds["DbUser"],
             password=creds["DbPassword"],
             host=host,
-            port=config['REDSHIFT']['port']
+            port=config['REDSHIFT']['port'],
+            sslmode='require', 
+            timeout=None
         )
         logger.info("Connected to Redshift successfully!")
         return conn
@@ -153,6 +179,11 @@ def main():
          # Load configuration
          config = load_config()
          validate_config(config)
+
+         # Validate if input bucket is encrypted
+         bucket_name = config['AWS']['s3_bucket']
+         if check_bucket_encryption(bucket_name) is False:
+            logger.error(f"{bucket_name} is not encrypted.  Please enable bucket encryption")
 
          # Connect to Redshift
          conn = connect_to_redshift(config)

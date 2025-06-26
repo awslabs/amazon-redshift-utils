@@ -1,3 +1,4 @@
+
 import boto3
 import csv
 import io
@@ -11,6 +12,34 @@ logger = logging.getLogger(__name__)
 def load_configuration(config_path='idc_config.ini'):
     config = configparser.ConfigParser()
     config.read(config_path)
+
+    required_aws_params = ['region', 'account_id', 'identity_store_id', 'instance_arn', 'permission_set_arn']
+    required_s3_params = ['s3_bucket', 'users_file', 'roles_file', 'role_memberships_file']
+
+    # Check AWS configuration
+    if 'AWS' not in config:
+        raise ValueError("Missing AWS section in the configuration file.")
+    for param in required_aws_params:
+        if not config.get('AWS', param):
+            raise ValueError(f"Missing or empty AWS configuration parameter: {param}")
+
+    # Check S3 configuration
+    if 'S3' not in config:
+        raise ValueError("Missing S3 section in the configuration file.")
+    for param in required_s3_params:
+        if not config.get('S3', param):
+            raise ValueError(f"Missing or empty S3 configuration parameter: {param}")
+            
+    # Check GROUP_MANAGEMENT section and assign_permission_set parameter
+    if 'GROUP_MANAGEMENT' not in config:
+        logger.warning("Missing GROUP_MANAGEMENT section in the configuration file. Defaulting 'assign_permission_set' to True.")
+        config.add_section('GROUP_MANAGEMENT')
+        config.set('GROUP_MANAGEMENT', 'assign_permission_set', 'True')
+    elif not config.get('GROUP_MANAGEMENT', 'assign_permission_set'):
+        logger.warning("Missing or empty 'assign_permission_set' parameter in GROUP_MANAGEMENT section. Defaulting to True.")
+        config.set('GROUP_MANAGEMENT', 'assign_permission_set', 'True')
+
+
     return config
 
 def read_csv_from_s3(s3_client, bucket, file_key):
@@ -155,6 +184,10 @@ def process_roles(config, aws_clients, assign_permission_set=True):
     identity_store_id = config.get('AWS', 'identity_store_id')
 
     roles_data = read_csv_from_s3(aws_clients['s3'], s3_bucket, roles_file)
+    if roles_data is None:
+        logger.error("Could not read roles data. Exiting process_roles.")
+        return {}
+
     role_ids = {}
 
     for row in roles_data[1:]:  # Skip header
@@ -174,6 +207,10 @@ def process_users(config, aws_clients):
     identity_store_id = config.get('AWS', 'identity_store_id')
 
     users_data = read_csv_from_s3(aws_clients['s3'], s3_bucket, users_file)
+    if users_data is None:
+        logger.error("Could not read users data. Exiting process_users.")
+        return {}
+        
     user_ids = {}
 
     for row in users_data[1:]:  # Skip header
@@ -189,6 +226,9 @@ def process_role_memberships(config, aws_clients, user_ids, role_ids):
     identity_store_id = config.get('AWS', 'identity_store_id')
 
     role_memberships_data = read_csv_from_s3(aws_clients['s3'], s3_bucket, role_memberships_file)
+    if role_memberships_data is None:
+        logger.error("Could not read role memberships data. Exiting process_role_memberships.")
+        return
 
     for row in role_memberships_data[1:]:  # Skip header
         user_name, role_name = row
@@ -206,7 +246,11 @@ def process_role_memberships(config, aws_clients, user_ids, role_ids):
         add_user_to_group(aws_clients['identity_store'], identity_store_id, user_id, role_id)
 
 def main():
-    config = load_configuration()
+    try:
+        config = load_configuration()
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        return
 
     aws_clients = {
         's3': boto3.client('s3', region_name=config.get('AWS', 'region')),
@@ -222,3 +266,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
