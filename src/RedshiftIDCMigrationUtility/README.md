@@ -44,6 +44,7 @@ Following are the pre-requisites before running the utility.
     * Select the application.  Choose Actions→ Edit details.
     * Set “User and group assignments” to “Do not require assignments”. After Redshift-idc application is set up in above step, for testing purposes , edit the details of the  application in Identity Center and chose user and group membership not required, so connectivity to Redshift can be tested even without data access
 * Enable Identity Center authentication with admin access from ec2 or cloud shell . https://docs.aws.amazon.com/sdkref/latest/guide/access-sso.html
+* Create S3 bucket with server side encryption.  Please ensure this bucket is accessible to only user/role that runs this script.  If it is open for access by all, then other may be able to view access permissions.
 
 
 
