@@ -271,12 +271,12 @@ def main():
     user_ids = process_users(config, aws_clients)
     role_ids = process_roles(config, aws_clients, assign_permission_set=assign_permission_set)
     process_role_memberships(config, aws_clients, user_ids, role_ids)
-    delete_s3_file(config.get('S3', 's3_bucket'), config.get('S3', 'users_file'))
-    delete_s3_file(config.get('S3', 's3_bucket'), config.get('S3', 'roles_file'))
-    delete_s3_file(config.get('S3', 's3_bucket'), config.get('S3', 'role_memberships_file'))
-    logger.info("IDC Migration Utility execution completed successfully.")
-
 
 if __name__ == "__main__":
-    main()
-
+    try:
+        main()
+    finally:
+        delete_s3_file(config.get('S3', 's3_bucket'), config.get('S3', 'users_file'))
+        delete_s3_file(config.get('S3', 's3_bucket'), config.get('S3', 'roles_file'))
+        delete_s3_file(config.get('S3', 's3_bucket'), config.get('S3', 'role_memberships_file'))
+        logger.info("IDC Migration Utility execution completed successfully.")
