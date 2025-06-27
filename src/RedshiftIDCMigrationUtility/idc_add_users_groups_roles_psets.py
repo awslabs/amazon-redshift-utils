@@ -274,6 +274,7 @@ def main():
 
 if __name__ == "__main__":
     try:
+        config = load_configuration()        
         main()
     finally:
         delete_s3_file(config.get('S3', 's3_bucket'), config.get('S3', 'users_file'))
