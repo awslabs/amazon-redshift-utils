@@ -71,6 +71,10 @@ This [project](src/SnapshotManager) is now deprecated. The automatic capture and
 
 This [project](src/QMRNotificationUtility) enables a scheduled Lambda function to pull records from the QMR action system log table (stl_wlm_rule_action) and publish them to an SNS topic. This utility can be used to send periodic notifications based on the WLM query monitoring rule actions taken for your unique workload and rules configuration.
 
+# Redshift to IDC migration utility
+Some of the existing Redshift customers rely on local users, roles, groups, and permissions, which presents a significant challenge when adopting the SageMaker Lakehouse, Lakeformation, and other cross-service integration features. This [utility](src/RedshiftIDCMigrationUtility) streamlines the process by automatically creating IDC users, groups, and roles that mirror the existing Redshift configuration. It then assigns users to the appropriate groups and grants the necessary permissions to the IDC roles, ensuring a seamless transition to the centralized identity management system.  
+
+
 # Investigations
 This project includes a number of detailed investigations into various types of Redshift edge cases, nuances, and workload scenarios. 
 
