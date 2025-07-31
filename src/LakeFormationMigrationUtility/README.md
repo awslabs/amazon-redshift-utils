@@ -1,5 +1,7 @@
 # Redshift Permissions to Lake Formation Migration Utility
 
+Utility Version: 1.0 Release Date: 31-Jul-2025
+
 A Python script that extracts permissions from Amazon Redshift (datashares or local databases) and generates AWS Lake Formation permission commands for seamless migration to a SageMaker Lakehouse architecture.
 
 ## Overview
@@ -232,4 +234,10 @@ Enable debug mode to see:
 - Test in non-production environments first
 - Ensure your AWS Secrets Manager secret contains the keys 'username' and 'password'
 - The IAM role/user running the script needs secretsmanager:GetSecretValue permission
+
+Authors: adamgatt@amazon.co.uk, ziadwali@amazon.fr
+
+NOTE: This utility is continuously enhanced to close any gaps and add additional functionality. Please send your issues, feedback, and enhancement requests to the authors with subject line: “[issue/feedback/enhancement] Amazon Redshift Permissions to Lake Formation Migration Utility”
+
+
 
