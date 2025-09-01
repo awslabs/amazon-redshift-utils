@@ -20,6 +20,7 @@ This tool automates the migration of data access permissions from Amazon Redshif
 - **Role Inheritance**: Handles IDC roles with granted Redshift roles. This includes Redshift roles that have been granted permissions via other Redshift roles.
 - **Automated Scripts**: Generates executable bash scripts with AWS CLI commands
 - **Rollback Support**: Creates corresponding rollback scripts for permission cleanup
+- **Comprehensive Logging**: Structured logging to both console and timestamped log files
 - **Debug Mode**: Provides detailed logging and user ID lookup commands
 
 ## Prerequisites
@@ -178,6 +179,11 @@ The script generates timestamped files in the output directory:
 - `rollback_lakeformation_YYYYMMDD_HHMMSS.sh`: Rollback script to revoke permissions
 - `get_user_id_commands_YYYYMMDD_HHMMSS.sh`: Debug script for IDC user ID lookups (debug mode only)
 
+### Log Files
+- `logs/lakeformation_migration_YYYYMMDD_HHMMSS.log`: Detailed execution logs with timestamps
+- Logs are automatically created in a `logs/` directory (created if it doesn't exist)
+- Both console and file logging are enabled simultaneously
+
 ### Script Structure
 ```bash
 #!/bin/bash
@@ -224,8 +230,34 @@ Enable debug mode to see:
 - Available schemas in the database
 - Detailed user and table information
 - Sample table grants
+- Enhanced logging with DEBUG level messages
 - User ID lookup commands for Identity Center authentication
 - Query execution details for troubleshooting
+
+## Logging
+
+The utility provides comprehensive logging functionality:
+
+### Log Features
+- **Dual Output**: Logs to both console and timestamped log files
+- **Automatic Directory Creation**: Creates `logs/` directory if it doesn't exist
+- **Structured Format**: Timestamp, log level, and message for each entry
+- **Multiple Log Levels**: INFO, ERROR, WARNING, and DEBUG (with --debug flag)
+- **Operation Tracking**: Logs all major operations, errors, and progress updates
+
+### Log File Location
+- **Default**: `logs/lakeformation_migration_YYYYMMDD_HHMMSS.log` in current directory
+- **With Output Directory**: `{output-dir}/logs/lakeformation_migration_YYYYMMDD_HHMMSS.log`
+
+### What Gets Logged
+- Utility startup and version information
+- Configuration loading and validation
+- AWS Secrets Manager operations
+- Redshift database connections
+- Permission extraction progress
+- Script generation results
+- Error messages and troubleshooting information
+- Debug details (when --debug flag is used)
 
 ## Security Considerations
 

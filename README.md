@@ -74,6 +74,10 @@ This [project](src/QMRNotificationUtility) enables a scheduled Lambda function t
 # Redshift to IDC migration utility
 Some of the existing Redshift customers rely on local users, roles, groups, and permissions, which presents a significant challenge when adopting the SageMaker Lakehouse, Lakeformation, and other cross-service integration features. This [utility](src/RedshiftIDCMigrationUtility) streamlines the process by automatically creating IDC users, groups, and roles that mirror the existing Redshift configuration. It then assigns users to the appropriate groups and grants the necessary permissions to the IDC roles, ensuring a seamless transition to the centralized identity management system.  
 
+# Redshift to Lake Formation migration utility
+
+This utility streamlines the process of migrating data access permissions from Amazon Redshift to AWS Lake Formation through several key functions. It automatically extracts user permissions from both Redshift datashare and local databases by analyzing table-level grants. The utility then generates the necessary AWS CLI commands to establish equivalent permissions in Lake Formation supporting AWS Identity Center (IDC) authentication. Additionally, it creates rollback scripts that enable easy cleanup of permissions if needed.
+
 
 # Investigations
 This project includes a number of detailed investigations into various types of Redshift edge cases, nuances, and workload scenarios. 

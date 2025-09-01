@@ -6,29 +6,67 @@ import configparser
 import subprocess
 import json
 import boto3
+import logging
 from datetime import datetime
+
+__version__ = "1.0"
+
+def setup_logging(debug=False, output_dir=None):
+    """
+    Setup logging configuration
+    """
+    # Create logs directory
+    if output_dir:
+        log_dir = os.path.join(output_dir, 'logs')
+    else:
+        log_dir = 'logs'
+    
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, f'lakeformation_migration_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+    
+    # Set logging level
+    level = logging.DEBUG if debug else logging.INFO
+    
+    # Configure logging
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Lake Formation Migration Utility v{__version__} started")
+    logger.info(f"Log file: {log_file}")
+    return logger
 
 def load_config(config_file='config.ini'):
     """
     Load configuration from config file (default: config.ini)
     """
+    logger = logging.getLogger(__name__)
     if not os.path.exists(config_file):
-        print(f"Error: Config file '{config_file}' not found")
+        logger.error(f"Config file '{config_file}' not found")
         sys.exit(1)
 
     config = configparser.ConfigParser()
     try:
         config.read(config_file)
+        logger.info(f"Configuration loaded from {config_file}")
         return config
     except Exception as e:
-        print(f"Error reading config file: {e}")
+        logger.error(f"Error reading config file: {e}")
         sys.exit(1)
 
 def get_secret(secret_name, region_name=None, config_profile=None):
     """
     Retrieve a secret from AWS Secrets Manager
     """
+    logger = logging.getLogger(__name__)
     try:
+        logger.debug(f"Retrieving secret: {secret_name}")
         # Create a Boto3 session with the specified profile if provided
         session_kwargs = {}
         if config_profile:
@@ -47,18 +85,20 @@ def get_secret(secret_name, region_name=None, config_profile=None):
         # Parse the secret JSON string
         if 'SecretString' in response:
             secret = json.loads(response['SecretString'])
+            logger.info(f"Successfully retrieved secret: {secret_name}")
             return secret
         else:
-            print("Error: Secret value is not a string")
+            logger.error("Secret value is not a string")
             sys.exit(1)
     except Exception as e:
-        print(f"Error retrieving secret from AWS Secrets Manager: {e}")
+        logger.error(f"Error retrieving secret from AWS Secrets Manager: {e}")
         sys.exit(1)
 
 def connect_to_redshift(config):
     """
     Establish connection to Redshift database using config and AWS Secrets Manager
     """
+    logger = logging.getLogger(__name__)
     try:
         redshift_config = config['redshift']
         
@@ -72,7 +112,7 @@ def connect_to_redshift(config):
         # Get credentials from AWS Secrets Manager
         secret_name = redshift_config.get('secret_name')
         if not secret_name:
-            print("Error: 'secret_name' not found in redshift configuration")
+            logger.error("'secret_name' not found in redshift configuration")
             sys.exit(1)
             
         secret = get_secret(secret_name, region_name, config_profile)
@@ -83,15 +123,16 @@ def connect_to_redshift(config):
             port=int(redshift_config.get('port', 5439)),
             dbname=redshift_config['dbname'],
             user=secret['username'],
-            password=secret['password']
+            password=secret['password'],
+            application_name=f'LakeFormationMigrationUtility-v{__version__}'
         )
-        print(f"Connected to Redshift database: {redshift_config['dbname']}")
+        logger.info(f"Connected to Redshift database: {redshift_config['dbname']}")
         return conn
     except KeyError as e:
-        print(f"Missing required configuration parameter: {e}")
+        logger.error(f"Missing required configuration parameter: {e}")
         sys.exit(1)
     except Exception as e:
-        print(f"Error connecting to Redshift: {e}")
+        logger.error(f"Error connecting to Redshift: {e}")
         sys.exit(1)
 
 def get_users_with_usage_permission(conn, p_datashare_database_name=None, identity_provider_namespace='AWSIDC'):
@@ -550,17 +591,18 @@ def generate_lakeformation_commands(tables, user_map, aws_account_id, producer_c
     If object_level_permissions is True, generate table-level permissions based on SHOW GRANTS
     Otherwise, generate schema-level permissions using TableWildcard syntax
     """
+    logger = logging.getLogger(__name__)
     commands = []
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Get the project root directory (parent of src)
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # Create output directory in the same location as logs
+    if output_dir:
+        output_base = output_dir
+    else:
+        output_base = '.'
     
-    # Create a subdirectory for this run under the project's output directory
-    output_base = output_dir if output_dir else os.path.join(project_root, "output")
     run_dir = os.path.join(output_base, f"run_{timestamp}")
-    if not os.path.exists(run_dir):
-        os.makedirs(run_dir)
+    os.makedirs(run_dir, exist_ok=True)
     script_filepath = os.path.join(run_dir, f"lakeformation_permissions_{timestamp}.sh")
 
     # Create debug file for get-user-id commands if debug mode is enabled
@@ -736,7 +778,7 @@ def generate_lakeformation_commands(tables, user_map, aws_account_id, producer_c
                 commands.append(command)
                 commands_count += 1
             
-            print(f"Generated {commands_count} table-level permission commands")
+            logger.info(f"Generated {commands_count} table-level permission commands")
         else:
             # Get unique database-schema combinations
             db_schema_map = {}
@@ -772,7 +814,7 @@ def generate_lakeformation_commands(tables, user_map, aws_account_id, producer_c
                             commands.append(command)
                             commands_count += 1
             
-            print(f"Generated {commands_count} schema-level SELECT and DESCRIBE permission commands")
+            logger.info(f"Generated {commands_count} schema-level SELECT and DESCRIBE permission commands")
 
     # Create rollback script
     rollback_filepath = os.path.join(run_dir, f"rollback_lakeformation_{timestamp}.sh")
@@ -860,8 +902,8 @@ def generate_lakeformation_commands(tables, user_map, aws_account_id, producer_c
                             
                             rollback_file.write(revoke_cmd)
     
-    print(f"Generated {len(commands)} total LakeFormation commands in file: {script_filepath}")
-    print(f"Generated rollback script: {rollback_filepath}")
+    logger.info(f"Generated {len(commands)} total LakeFormation commands in file: {script_filepath}")
+    logger.info(f"Generated rollback script: {rollback_filepath}")
     return commands
 
 def get_identity_provider_namespace(conn):
@@ -894,6 +936,9 @@ def main():
 
     args = parser.parse_args()
 
+    # Setup logging
+    logger = setup_logging(args.debug, args.output_dir)
+
     # Load configuration
     config = load_config(args.config)
 
@@ -910,56 +955,56 @@ def main():
         if 'permissions_type' in config['parameters']:
             permissions_type = config['parameters']['permissions_type'].lower()
     
-    print(f"Permissions type: {permissions_type}")
+    logger.info(f"Permissions type: {permissions_type}")
     
     # Check if datashare object-level permissions are enabled
     object_level_permissions = False
     if 'parameters' in config and 'datashare_object_level_permissions' in config['parameters']:
         object_level_permissions = config['parameters']['datashare_object_level_permissions'].lower() == 'true'
-    print(f"Datashare object-level permissions: {object_level_permissions}")
+    logger.info(f"Datashare object-level permissions: {object_level_permissions}")
     
     # Get identity provider namespace from SVV_IDENTITY_PROVIDERS
     identity_provider_namespace = get_identity_provider_namespace(conn)
-    print(f"Using identity provider namespace: {identity_provider_namespace}")
+    logger.info(f"Using identity provider namespace: {identity_provider_namespace}")
     
     # Process based on permissions_type
     if permissions_type == 'local':
         # Get local database name from config
         local_db_name = config['redshift']['dbname']
-        print(f"Processing local database permissions for: {local_db_name}")
+        logger.info(f"Processing local database permissions for: {local_db_name}")
         
         user_map, tables, table_grants = get_local_database_permissions(conn, local_db_name, identity_provider_namespace)
         user_count = sum(len(users) for users in user_map.values())
-        print(f"Found {user_count} IDC users with permissions on local database {local_db_name}")
-        print(f"Retrieved {len(tables)} tables from local database")
+        logger.info(f"Found {user_count} IDC users with permissions on local database {local_db_name}")
+        logger.info(f"Retrieved {len(tables)} tables from local database")
         
         if table_grants:
             grant_count = sum(len(grants) for grants in table_grants.values())
-            print(f"Retrieved {grant_count} table-level grants for IDC users/roles")
+            logger.info(f"Retrieved {grant_count} table-level grants for IDC users/roles")
     else:
         # Original datashare logic
         if p_datashare_database_name:
-            print(f"Filtering permissions for datashare database: {p_datashare_database_name}")
+            logger.info(f"Filtering permissions for datashare database: {p_datashare_database_name}")
         
         # Get users with USAGE permission on the database (required to access tables)
         user_map = get_users_with_usage_permission(conn, p_datashare_database_name, identity_provider_namespace)
         db_count = len(user_map)
         user_count = sum(len(users) for users in user_map.values())
         
-        print(f"Found {user_count} IDC users (with {identity_provider_namespace}: prefix) with USAGE permission across {db_count} databases")
+        logger.info(f"Found {user_count} IDC users (with {identity_provider_namespace}: prefix) with USAGE permission across {db_count} databases")
 
         # Get all tables in the datashare database(s)
         tables = get_datashare_tables(conn, p_datashare_database_name)
-        print(f"Retrieved {len(tables)} tables from datashare database(s)")
+        logger.info(f"Retrieved {len(tables)} tables from datashare database(s)")
 
         # Get table-level grants if datashare object_level_permissions is enabled
         table_grants = None
         if object_level_permissions and tables:
-            print("Getting table-level grants using SHOW GRANTS...")
+            logger.info("Getting table-level grants using SHOW GRANTS...")
             table_grants = get_table_grants(conn, tables, identity_provider_namespace)
             grant_count = sum(len(grants) for grants in table_grants.values())
             
-            print(f"Retrieved {grant_count} table-level grants for IDC users/roles (with {identity_provider_namespace}: prefix)")
+            logger.info(f"Retrieved {grant_count} table-level grants for IDC users/roles (with {identity_provider_namespace}: prefix)")
 
     if args.debug:
         if user_map:
@@ -990,33 +1035,33 @@ def main():
     # Generate LakeFormation commands
     if tables and (user_map or (object_level_permissions and table_grants)):
         if not user_map and (not table_grants or not any(table_grants.values())):
-            print(f"\nNo IDC users or roles (with {identity_provider_namespace}: prefix) found with permissions. No Lake Formation commands will be generated.")
+            logger.warning(f"No IDC users or roles (with {identity_provider_namespace}: prefix) found with permissions. No Lake Formation commands will be generated.")
             return
         aws_account_id = config.get('aws', 'account_id', fallback=None)
         if not aws_account_id:
-            print("Error: AWS account ID not found in config")
+            logger.error("AWS account ID not found in config")
             sys.exit(1)
 
         # Get producer catalog from config
         producer_catalog = config.get('aws', 'producer_catalog', fallback=None)
         if not producer_catalog:
-            print("Error: producer_catalog not found in config")
+            logger.error("producer_catalog not found in config")
             sys.exit(1)
         
         # Get AWS CLI profile from config (optional)
         config_profile = config.get('aws', 'config_profile', fallback=None)
         if config_profile:
-            print(f"Using AWS CLI profile: {config_profile}")
+            logger.info(f"Using AWS CLI profile: {config_profile}")
         
         # Get identity store ID from config (required for IDC)
         identity_store_id = config.get('aws', 'identity_store_id', fallback=None)
         if not identity_store_id:
-            print("Warning: identity_store_id not found in config")
+            logger.warning("identity_store_id not found in config")
         
         # Get region from config
         region_name = config.get('aws', 'region', fallback=None)
         if region_name:
-            print(f"Using AWS region: {region_name}")
+            logger.info(f"Using AWS region: {region_name}")
         
         # Generate LakeFormation commands, passing the open connection for role user lookup
         generate_lakeformation_commands(
@@ -1028,7 +1073,7 @@ def main():
         # Now close the connection
         conn.close()
     else:
-        print("No datashare tables or users found to convert.")
+        logger.warning("No datashare tables or users found to convert.")
 
 if __name__ == "__main__":
     main()
