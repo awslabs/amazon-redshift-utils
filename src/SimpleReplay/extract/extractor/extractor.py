@@ -200,33 +200,33 @@ class Extractor:
                     )
                     continue
 
-                query.text = remove_line_comments(query.text).strip()
+                query.clear_and_set_text(remove_line_comments(query.get_text_value()).strip())
 
-                if "copy " in query.text.lower() and "from 's3:" in query.text.lower():
+                if "copy " in query.get_text_value().lower() and "from 's3:" in query.get_text_value().lower():
                     bucket = re.search(
-                        r"from 's3:\/\/[^']*", query.text, re.IGNORECASE
+                        r"from 's3:\/\/[^']*", query.get_text_value(), re.IGNORECASE
                     ).group()[6:]
                     replacements.add(bucket)
-                    query.text = re.sub(
+                    query.clear_and_set_text(re.sub(
                         r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'",
                         f" IAM_ROLE ''",
-                        query.text,
+                        query.get_text_value(),
                         flags=re.IGNORECASE,
-                    )
-                if "unload" in query.text.lower() and "to 's3:" in query.text.lower():
-                    query.text = re.sub(
+                    ))
+                if "unload" in query.get_text_value().lower() and "to 's3:" in query.get_text_value().lower():
+                    query.clear_and_set_text(re.sub(
                         r"IAM_ROLE 'arn:aws:iam::\d+:role/\S+'",
                         f" IAM_ROLE ''",
-                        query.text,
+                        query.get_text_value(),
                         flags=re.IGNORECASE,
-                    )
+                    ))
 
-                query.text = f"{query.text.strip()}"
-                if not len(query.text) == 0:
-                    if not query.text.endswith(";"):
-                        query.text += ";"
+                query.clear_and_set_text(f"{query.get_text_value().strip()}")
+                if not len(query.get_text_value()) == 0:
+                    if not query.get_text_value().endswith(";"):
+                        query.append_text(";")
 
-                query_info["text"] = query.text
+                query_info["text"] = query.get_text_value()
                 sql_json["transactions"][query.xid]["queries"].append(query_info)
 
                 if not hash((query.database_name, query.username, query.pid)) in last_connections:
