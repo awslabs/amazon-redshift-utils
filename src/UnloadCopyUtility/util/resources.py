@@ -1,6 +1,7 @@
 import re
 from abc import abstractmethod
 import logging
+from typing import List
 
 from util.child_object import ChildObject
 from util.kms_helper import KMSHelper
@@ -246,6 +247,18 @@ class SchemaResource(DBResource, ChildObject):
 
     def get_statement_to_retrieve_ddl_create_statement_text(self):
         return SchemaDDLHelper().get_schema_ddl_SQL(schema_name=self.get_schema())
+
+    def list_tables(self) -> List[str]:
+        sql = f"""
+            SHOW TABLES FROM SCHEMA {self.get_db()}.{self.get_schema()};
+        """
+        sql = SQLTextHelper.get_sql_without_commands_newlines_and_whitespace(sql)
+        tbl_dict = self.get_cluster().get_query_full_result_as_list_of_dict(
+            sql,
+            self.get_cluster().db,
+        )
+        tables = [tbl["table_name"] for tbl in tbl_dict if tbl["table_type"] == "TABLE"]
+        return tables
 
     def clone_structure_from(self, other):
         ddl = other.get_create_sql(generate=True)
