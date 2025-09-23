@@ -1,0 +1,3 @@
+[submodule "src/src/Roar"]
+	path = src/src/Roar
+	url = ssh://git.amazon.com/pkg/Roar
