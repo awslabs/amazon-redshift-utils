@@ -23,9 +23,10 @@ Parameters:
 History:
 2019-05-25 - joeharris76 - Created
 2019-11-04 - joeharris76 - Revised for publication
+2025-10-07 - enkeboll - fix drop procedure def
 **********************************************************************************************/
 
--- DROP PROCEDURE sp_pivot(VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR,REFCURSOR);
+-- DROP PROCEDURE sp_pivot_for(VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR,VARCHAR,REFCURSOR);
 CREATE OR REPLACE PROCEDURE sp_pivot_for (
       select_cols  IN    VARCHAR(512)
     , table_name   IN    VARCHAR(256)
