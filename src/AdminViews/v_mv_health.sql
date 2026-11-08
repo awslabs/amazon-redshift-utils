@@ -124,15 +124,22 @@ mv_rows AS (
     WHERE t."table" IN (SELECT mv_name FROM mv_info)
 ),
 
-chain_depth (mv_name, ancestor, depth) AS (
-    SELECT name, dependent_name, 1
+-- Every ancestor of each MV, keyed on (schema, name) so same-named MVs in
+-- different schemas keep separate chains.
+chain_depth (mv_schema, mv_name, ancestor_schema, ancestor, depth) AS (
+    SELECT TRIM(schema_name)::VARCHAR(128), TRIM(name)::VARCHAR(128),
+           TRIM(dependent_schema_name)::VARCHAR(128), TRIM(dependent_name)::VARCHAR(128), 1
     FROM SVV_MV_DEPENDENCY
 
     UNION ALL
 
-    SELECT cd.mv_name, d.dependent_name, cd.depth + 1
+    SELECT cd.mv_schema, cd.mv_name,
+           TRIM(d.dependent_schema_name)::VARCHAR(128), TRIM(d.dependent_name)::VARCHAR(128),
+           cd.depth + 1
     FROM chain_depth cd
-    JOIN SVV_MV_DEPENDENCY d ON cd.ancestor = d.name
+    JOIN SVV_MV_DEPENDENCY d
+        ON TRIM(d.schema_name) = cd.ancestor_schema
+       AND TRIM(d.name)        = cd.ancestor
     -- Cap recursion at depth 10. SVV_MV_DEPENDENCY should be a DAG, so this is a
     -- safety guard against an unexpected cycle or runaway fan-out rather than an
     -- expected limit; 10 is well beyond realistic MV-on-MV nesting.
@@ -140,26 +147,29 @@ chain_depth (mv_name, ancestor, depth) AS (
 ),
 
 max_chain AS (
-    SELECT mv_name, MAX(depth) AS chain_depth
+    SELECT mv_schema, mv_name, MAX(depth) AS chain_depth
     FROM chain_depth
-    GROUP BY mv_name
+    GROUP BY mv_schema, mv_name
 ),
 
 dep_list AS (
-    SELECT mv_name,
+    SELECT mv_schema, mv_name,
            LISTAGG(DISTINCT ancestor, ', ') WITHIN GROUP (ORDER BY ancestor) AS mv_dependencies
     FROM chain_depth
-    GROUP BY mv_name
+    GROUP BY mv_schema, mv_name
 ),
 
 stale_chain AS (
     SELECT
+        cd.mv_schema,
         cd.mv_name,
         LISTAGG(DISTINCT CASE WHEN i.is_stale = 't' THEN cd.ancestor END, ', ')
             WITHIN GROUP (ORDER BY cd.ancestor) AS stale_ancestors
     FROM chain_depth cd
-    JOIN mv_info i ON cd.ancestor = i.mv_name
-    GROUP BY cd.mv_name
+    JOIN mv_info i
+        ON i.schema_name = cd.ancestor_schema
+       AND i.mv_name     = cd.ancestor
+    GROUP BY cd.mv_schema, cd.mv_name
 ),
 
 -- Denominator for pct_of_cluster_time: all successful queries, plus refreshes
@@ -209,31 +219,35 @@ last_refresh AS (
 SELECT
     i.schema_name                                   AS mv_schema,
     i.mv_name,
-    i.state || ' (' || i.state_label || ')'         AS state,
-    CASE i.is_stale WHEN 't' THEN 'true' WHEN 'f' THEN 'false' ELSE 'unknown' END AS is_stale,
-    CASE i.autorefresh_enabled WHEN 't' THEN 'true' ELSE 'false' END               AS is_autorefresh,
+    i.state,
+    i.state_label,
+    -- SVV_MV_INFO flags are char(1) 't'/'f'; the comparisons return BOOLEAN.
+    -- is_stale can also be 'u' (unknown, for example MVs on external tables), which maps to NULL.
+    CASE i.is_stale WHEN 't' THEN TRUE WHEN 'f' THEN FALSE END AS is_stale,
+    (i.autorefresh_enabled = 't')                   AS is_autorefresh,
     i.autorefresh_interval                          AS autorefresh_interval_sec,
-    CASE i.has_default_autorefresh_interval WHEN 't' THEN 'true' ELSE 'false' END   AS is_default_autorefresh_interval,
-    CASE i.autorewrite_eligible WHEN 't' THEN 'true' ELSE 'false' END               AS is_autorewrite_eligible,
+    (i.has_default_autorefresh_interval = 't')      AS is_default_autorefresh_interval,
+    (i.autorewrite_eligible = 't')                  AS is_autorewrite_eligible,
     COALESCE(rs.refresh_count, 0)                   AS refresh_count,
     COALESCE(rd.query_count, 0)                     AS query_count,
     CASE WHEN COALESCE(rd.query_count, 0) > 0
          THEN ROUND(COALESCE(rs.recompute_count, 0)::FLOAT / rd.query_count, 1)
     END                                             AS recompute_to_query_ratio,
     ROUND(COALESCE(rs.avg_refresh_sec, 0), 1)       AS avg_refresh_sec,
-    COALESCE(lr.last_refresh_status, '')            AS last_refresh_status,
+    -- NULL (not '') when there is nothing to report, so IS NULL checks work.
+    lr.last_refresh_status,
     COALESCE(mr.mv_rows, 0)                         AS mv_rows,
     COALESCE(mc.chain_depth, 0)                     AS chain_depth,
-    COALESCE(dl.mv_dependencies, '')                AS mv_dependencies,
-    COALESCE(sc.stale_ancestors, '')                AS stale_ancestors,
+    NULLIF(dl.mv_dependencies, '')                  AS mv_dependencies,
+    NULLIF(sc.stale_ancestors, '')                  AS stale_ancestors,
     ROUND(COALESCE(rc.refresh_us, 0)::FLOAT / tw.total_us * 100, 2) AS pct_of_cluster_time
 FROM mv_info i
 LEFT JOIN refresh_stats rs  ON i.mv_name = rs.mv_name AND i.schema_name = rs.schema_name
 LEFT JOIN mv_reads rd       ON i.mv_name = rd.mv_name AND i.schema_name = rd.schema_name
 LEFT JOIN mv_rows mr        ON i.mv_name = mr.mv_name AND i.schema_name = mr.mv_schema
-LEFT JOIN max_chain mc      ON i.mv_name = mc.mv_name
-LEFT JOIN dep_list dl       ON i.mv_name = dl.mv_name
-LEFT JOIN stale_chain sc    ON i.mv_name = sc.mv_name
+LEFT JOIN max_chain mc      ON i.mv_name = mc.mv_name AND i.schema_name = mc.mv_schema
+LEFT JOIN dep_list dl       ON i.mv_name = dl.mv_name AND i.schema_name = dl.mv_schema
+LEFT JOIN stale_chain sc    ON i.mv_name = sc.mv_name AND i.schema_name = sc.mv_schema
 LEFT JOIN refresh_cost rc   ON i.mv_name = rc.mv_name AND i.schema_name = rc.schema_name
 LEFT JOIN last_refresh lr   ON i.mv_name = lr.mv_name AND i.schema_name = lr.schema_name
 CROSS JOIN total_workload tw
