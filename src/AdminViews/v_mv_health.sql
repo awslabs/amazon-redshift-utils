@@ -27,7 +27,6 @@ Usage:
 
 History:
 2026-11-06 nickbarc Created
-2026-11-10 nickbarc Added mv_database; refresh columns no longer count same-named MVs in other databases
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_mv_health AS
 WITH RECURSIVE
