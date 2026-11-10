@@ -7,6 +7,8 @@ Purpose: View to report the health of every materialized view in the current dat
 Notes:   Reads SVV_MV_INFO, SVV_MV_DEPENDENCY, SYS_MV_REFRESH_HISTORY, SYS_QUERY_DETAIL and
          SYS_QUERY_HISTORY, with a 7-day lookback (default system table retention).
          Requires Amazon Redshift patch 206 or later (autorefresh_interval columns).
+         Reports the MVs in the current database only. Create the view in each database
+         that contains MVs. pct_of_cluster_time divides by the workload of all databases.
          To see activity across all users, query it as a superuser, or as a user with the
          sys:monitor role and USAGE on each schema that contains MVs.
          Does not depend on mv_definitions. Join to it to add blocker_hint.
@@ -25,6 +27,7 @@ Usage:
 
 History:
 2026-11-06 nickbarc Created
+2026-11-10 nickbarc Added mv_database; refresh columns no longer count same-named MVs in other databases
 **********************************************************************************************/
 CREATE OR REPLACE VIEW admin.v_mv_health AS
 WITH RECURSIVE
@@ -58,8 +61,12 @@ mv_info AS (
     FROM SVV_MV_INFO
 ),
 
+-- SYS_MV_REFRESH_HISTORY covers every database, so the refresh CTEs carry
+-- database_name and join on it. Otherwise a same-named MV in another database
+-- adds its refreshes to this one.
 refresh_stats AS (
     SELECT
+        TRIM(database_name) AS database_name,
         TRIM(schema_name) AS schema_name,
         TRIM(mv_name) AS mv_name,
         COUNT(*) AS refresh_count,
@@ -69,7 +76,7 @@ refresh_stats AS (
     FROM SYS_MV_REFRESH_HISTORY
     CROSS JOIN params
     WHERE start_time >= params.min_start_time
-    GROUP BY 1, 2
+    GROUP BY 1, 2, 3
 ),
 
 -- Each MV stores its result in an internal table in the pg_mv schema. Resolve
@@ -197,19 +204,21 @@ total_workload AS (
 ),
 
 refresh_cost AS (
-    SELECT TRIM(schema_name) AS schema_name, TRIM(mv_name) AS mv_name,
+    SELECT TRIM(database_name) AS database_name, TRIM(schema_name) AS schema_name,
+           TRIM(mv_name) AS mv_name,
            SUM(DATEDIFF('us', start_time, end_time)) AS refresh_us
     FROM SYS_MV_REFRESH_HISTORY
     CROSS JOIN params
     WHERE start_time >= params.min_start_time
-    GROUP BY 1, 2
+    GROUP BY 1, 2, 3
 ),
 
 last_refresh AS (
-    SELECT schema_name, mv_name, status AS last_refresh_status
+    SELECT database_name, schema_name, mv_name, status AS last_refresh_status
     FROM (
-        SELECT TRIM(schema_name) AS schema_name, TRIM(mv_name) AS mv_name, status,
-               ROW_NUMBER() OVER (PARTITION BY TRIM(schema_name), TRIM(mv_name)
+        SELECT TRIM(database_name) AS database_name, TRIM(schema_name) AS schema_name,
+               TRIM(mv_name) AS mv_name, status,
+               ROW_NUMBER() OVER (PARTITION BY TRIM(database_name), TRIM(schema_name), TRIM(mv_name)
                                   ORDER BY start_time DESC) AS rn
         FROM SYS_MV_REFRESH_HISTORY
     )
@@ -217,6 +226,7 @@ last_refresh AS (
 )
 
 SELECT
+    i.database_name                                 AS mv_database,
     i.schema_name                                   AS mv_schema,
     i.mv_name,
     i.state,
@@ -243,13 +253,16 @@ SELECT
     ROUND(COALESCE(rc.refresh_us, 0)::FLOAT / tw.total_us * 100, 2) AS pct_of_cluster_time
 FROM mv_info i
 LEFT JOIN refresh_stats rs  ON i.mv_name = rs.mv_name AND i.schema_name = rs.schema_name
+                           AND i.database_name = rs.database_name
 LEFT JOIN mv_reads rd       ON i.mv_name = rd.mv_name AND i.schema_name = rd.schema_name
 LEFT JOIN mv_rows mr        ON i.mv_name = mr.mv_name AND i.schema_name = mr.mv_schema
 LEFT JOIN max_chain mc      ON i.mv_name = mc.mv_name AND i.schema_name = mc.mv_schema
 LEFT JOIN dep_list dl       ON i.mv_name = dl.mv_name AND i.schema_name = dl.mv_schema
 LEFT JOIN stale_chain sc    ON i.mv_name = sc.mv_name AND i.schema_name = sc.mv_schema
 LEFT JOIN refresh_cost rc   ON i.mv_name = rc.mv_name AND i.schema_name = rc.schema_name
+                           AND i.database_name = rc.database_name
 LEFT JOIN last_refresh lr   ON i.mv_name = lr.mv_name AND i.schema_name = lr.schema_name
+                           AND i.database_name = lr.database_name
 CROSS JOIN total_workload tw
 ORDER BY
     CASE WHEN i.state >= 101 THEN 0 WHEN i.state = 0 THEN 1 ELSE 2 END,
