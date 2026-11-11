@@ -8,7 +8,12 @@ Notes:   Reads SVV_MV_INFO, SVV_MV_DEPENDENCY, SYS_MV_REFRESH_HISTORY, SYS_QUERY
          SYS_QUERY_HISTORY, with a 7-day lookback (default system table retention).
          Requires Amazon Redshift patch 206 or later (autorefresh_interval columns).
          Reports the MVs in the current database only. Create the view in each database
-         that contains MVs. pct_of_cluster_time divides by the workload of all databases.
+         that contains MVs. pct_of_total_query_time divides by the query time of all
+         databases.
+         refresh_count counts every refresh attempt, including failed refreshes and
+         refreshes that found the MV already up to date; avg_refresh_sec excludes the latter.
+         query_count is NULL when the MV's storage table can't be resolved from the catalog,
+         so a resolution failure doesn't read as "never queried".
          To see activity across all users, query it as a superuser, or as a user with the
          sys:monitor role and USAGE on each schema that contains MVs.
          Does not depend on mv_definitions. Join to it to add blocker_hint.
@@ -78,21 +83,30 @@ refresh_stats AS (
     GROUP BY 1, 2, 3
 ),
 
--- Each MV stores its result in an internal table in the pg_mv schema. Resolve
--- that table through the MV's rewrite rule rather than deriving its name: long
--- MV names get a hashed storage-table name. The name (unlike the OID) survives
--- a full recompute, so scans logged before the last recompute still match.
+-- Each MV stores its result in an internal table. MVs created since the pg_mv
+-- rollout keep it in schema pg_mv as mv_tbl__<schema>__<mv>; older MVs keep it
+-- in the MV's own schema as mv_tbl__<mv>__0 until the engine migrates them.
+-- Resolve the table through the MV's _RETURN rule (the same path SVV_TABLE_INFO
+-- uses) and carry its schema, rather than assuming pg_mv or deriving the name:
+-- long MV names get a hashed storage-table name. The name (unlike the OID)
+-- survives a full recompute, so scans logged before the last recompute match.
+-- When the engine migrates an MV to pg_mv, scans logged under the old name no
+-- longer match, so query_count undercounts until they age out of the lookback.
 mv_storage AS (
     SELECT DISTINCT
         vn.nspname::VARCHAR(128) AS mv_schema,
         v.relname::VARCHAR(128)  AS mv_name,
+        tn.nspname::VARCHAR(128) AS storage_schema,
         t.relname::VARCHAR(128)  AS storage_table
     FROM pg_class v
     JOIN pg_namespace vn ON vn.oid = v.relnamespace
-    JOIN pg_rewrite r    ON r.ev_class = v.oid
+    JOIN pg_rewrite r    ON r.ev_class = v.oid AND r.rulename = '_RETURN'
     JOIN pg_depend d     ON d.objid = r.oid
-    JOIN pg_class t      ON t.oid = d.refobjid
-    JOIN pg_namespace tn ON tn.oid = t.relnamespace AND tn.nspname = 'pg_mv'
+                        AND d.refclassid = 'pg_class'::regclass
+                        AND d.deptype = 'n'
+    JOIN pg_class t      ON t.oid = d.refobjid AND t.relkind = 'r'
+                        AND t.relname LIKE 'mv\\_tbl\\_\\_%'
+    JOIN pg_namespace tn ON tn.oid = t.relnamespace
     WHERE v.relkind = 'v'
 ),
 
@@ -100,7 +114,9 @@ mv_storage AS (
 -- the MV and queries the optimizer served through automatic query rewriting.
 -- Scans made by refreshes (including a nested MV refreshing from its parent)
 -- and by DDL (CREATE MATERIALIZED VIEW populating a nested MV from its parent)
--- are excluded.
+-- are excluded. The refresh exclusion drops every statement in a refresh's
+-- transaction, so a read that shares a transaction with a manual REFRESH is
+-- not counted.
 mv_reads AS (
     SELECT
         i.schema_name,
@@ -113,7 +129,7 @@ mv_reads AS (
     CROSS JOIN params
     JOIN SYS_QUERY_DETAIL qd
         ON TRIM(qd.step_name) = 'scan'
-       AND TRIM(qd.table_name) = i.database_name || '.pg_mv.' || s.storage_table
+       AND TRIM(qd.table_name) = i.database_name || '.' || s.storage_schema || '.' || s.storage_table
        AND qd.start_time >= params.min_start_time
     JOIN SYS_QUERY_HISTORY q
         ON q.query_id = qd.query_id
@@ -124,6 +140,7 @@ mv_reads AS (
     GROUP BY i.schema_name, i.mv_name
 ),
 
+-- SVV_TABLE_INFO has no row for an empty table, so a missing row means 0 rows.
 mv_rows AS (
     SELECT t.schema AS mv_schema, t."table" AS mv_name, t.tbl_rows AS mv_rows
     FROM SVV_TABLE_INFO t
@@ -178,10 +195,12 @@ stale_chain AS (
     GROUP BY cd.mv_schema, cd.mv_name
 ),
 
--- Denominator for pct_of_cluster_time: all successful queries, plus refreshes
+-- Denominator for pct_of_total_query_time: all successful queries, plus refreshes
 -- that SYS_QUERY_HISTORY doesn't record (autorefresh runs internally and is only
 -- logged in SYS_MV_REFRESH_HISTORY). Manual refreshes are already counted in
--- SYS_QUERY_HISTORY, so only refreshes absent from it are added.
+-- SYS_QUERY_HISTORY, so only refreshes absent from it are added. Elapsed times
+-- are summed, so concurrent queries overlap: the result is a share of total
+-- query time, not of wall-clock time.
 total_workload AS (
     SELECT GREATEST(q.query_us + a.auto_refresh_us, 1) AS total_us
     FROM (
@@ -238,7 +257,9 @@ SELECT
     (i.has_default_autorefresh_interval = 't')      AS is_default_autorefresh_interval,
     (i.autorewrite_eligible = 't')                  AS is_autorewrite_eligible,
     COALESCE(rs.refresh_count, 0)                   AS refresh_count,
-    COALESCE(rd.query_count, 0)                     AS query_count,
+    -- NULL when the MV's storage table could not be resolved from the catalog,
+    -- so a resolution failure is visible instead of reading as "never queried".
+    CASE WHEN s.mv_name IS NOT NULL THEN COALESCE(rd.query_count, 0) END AS query_count,
     CASE WHEN COALESCE(rd.query_count, 0) > 0
          THEN ROUND(COALESCE(rs.recompute_count, 0)::FLOAT / rd.query_count, 1)
     END                                             AS recompute_to_query_ratio,
@@ -249,11 +270,13 @@ SELECT
     COALESCE(mc.chain_depth, 0)                     AS chain_depth,
     NULLIF(dl.mv_dependencies, '')                  AS mv_dependencies,
     NULLIF(sc.stale_ancestors, '')                  AS stale_ancestors,
-    ROUND(COALESCE(rc.refresh_us, 0)::FLOAT / tw.total_us * 100, 2) AS pct_of_cluster_time
+    ROUND(COALESCE(rc.refresh_us, 0)::FLOAT / tw.total_us * 100, 2) AS pct_of_total_query_time
 FROM mv_info i
 LEFT JOIN refresh_stats rs  ON i.mv_name = rs.mv_name AND i.schema_name = rs.schema_name
                            AND i.database_name = rs.database_name
 LEFT JOIN mv_reads rd       ON i.mv_name = rd.mv_name AND i.schema_name = rd.schema_name
+LEFT JOIN (SELECT DISTINCT mv_schema, mv_name FROM mv_storage) s
+                            ON i.mv_name = s.mv_name AND i.schema_name = s.mv_schema
 LEFT JOIN mv_rows mr        ON i.mv_name = mr.mv_name AND i.schema_name = mr.mv_schema
 LEFT JOIN max_chain mc      ON i.mv_name = mc.mv_name AND i.schema_name = mc.mv_schema
 LEFT JOIN dep_list dl       ON i.mv_name = dl.mv_name AND i.schema_name = dl.mv_schema

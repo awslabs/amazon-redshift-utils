@@ -8,6 +8,8 @@ Purpose: View to get the views and materialized views that
     rule; materialized views record it directly against the MV,
     so each has its own branch. Late-binding views (WITH NO
     SCHEMA BINDING) record no dependencies and don't appear.
+    Automated materialized views (AutoMV, schema pg_automv)
+    are excluded.
 
 Usage: To find views depending on 'my_col' of table 'my_tbl'
        SELECT * FROM admin.v_view_table_column_dependency
@@ -58,5 +60,6 @@ JOIN pg_attribute pa ON pa.attrelid = pd.refobjid
 WHERE classid=(SELECT oid FROM pg_class WHERE relname='pg_class') -- dependency from a relation (materialized view)
   AND refclassid=(SELECT oid FROM pg_class WHERE relname='pg_class') -- dependency on a relation
   AND pc1.relkind = 'v' -- Only materialized views
+  AND pn1.nspname <> 'pg_automv' -- Skip automated materialized views (AutoMV)
   AND pc2.relowner > 1 -- Only dependencies on non-system relations
 ;
