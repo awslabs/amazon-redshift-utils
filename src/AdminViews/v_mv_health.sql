@@ -1,0 +1,291 @@
+--DROP VIEW admin.v_mv_health;
+/**********************************************************************************************
+Purpose: View to report the health of every materialized view in the current database, with
+         one row per MV: state, staleness, autorefresh interval, refresh cost, query activity,
+         and MV-on-MV dependencies.
+
+Notes:   Reads SVV_MV_INFO, SVV_MV_DEPENDENCY, SYS_MV_REFRESH_HISTORY, SYS_QUERY_DETAIL and
+         SYS_QUERY_HISTORY, with a 7-day lookback (default system table retention).
+         Requires Amazon Redshift patch 206 or later (autorefresh_interval columns).
+         Reports the MVs in the current database only. Create the view in each database
+         that contains MVs. pct_of_total_query_time divides by the query time of all
+         databases.
+         refresh_count counts every refresh attempt, including failed refreshes and
+         refreshes that found the MV already up to date; avg_refresh_sec excludes the latter.
+         query_count is NULL when the MV's storage table can't be resolved from the catalog,
+         so a resolution failure doesn't read as "never queried".
+         To see activity across all users, query it as a superuser, or as a user with the
+         sys:monitor role and USAGE on each schema that contains MVs.
+         Does not depend on mv_definitions. Join to it to add blocker_hint.
+
+Usage:
+    SELECT * FROM admin.v_mv_health;
+
+    -- Add blocker_hint with sp_populate_mv_definitions() from amazon-redshift-udfs:
+    -- https://github.com/aws-samples/amazon-redshift-udfs/tree/master/stored-procedures/sp_populate_mv_definitions
+    CALL sp_populate_mv_definitions();
+    SELECT v.*, d.blocker_hint
+    FROM admin.v_mv_health v
+    LEFT JOIN mv_definitions d
+        ON v.mv_schema = d.mv_schema
+       AND v.mv_name   = d.mv_name;
+
+History:
+2026-11-06 nickbarc Created
+**********************************************************************************************/
+CREATE OR REPLACE VIEW admin.v_mv_health AS
+WITH RECURSIVE
+
+params AS (
+    SELECT DATEADD('day', -7, GETDATE()) AS min_start_time
+),
+
+mv_info AS (
+    SELECT
+        TRIM(database_name) AS database_name,
+        TRIM(schema_name) AS schema_name,
+        TRIM(name) AS mv_name,
+        state,
+        CASE
+            WHEN state = 1 THEN 'incremental'
+            WHEN state = 0 THEN 'full_recompute'
+            WHEN state = 101 THEN 'broken:column_dropped'
+            WHEN state = 102 THEN 'broken:type_changed'
+            WHEN state = 103 THEN 'broken:table_renamed'
+            WHEN state = 104 THEN 'broken:column_renamed'
+            WHEN state = 105 THEN 'broken:schema_renamed'
+            WHEN state >= 101 THEN 'broken:' || state
+            ELSE 'unknown'
+        END AS state_label,
+        is_stale,
+        autorefresh AS autorefresh_enabled,
+        autorefresh_interval,
+        has_default_autorefresh_interval,
+        autorewrite AS autorewrite_eligible
+    FROM SVV_MV_INFO
+),
+
+-- SYS_MV_REFRESH_HISTORY covers every database, so the refresh CTEs carry
+-- database_name and join on it. Otherwise a same-named MV in another database
+-- adds its refreshes to this one.
+refresh_stats AS (
+    SELECT
+        TRIM(database_name) AS database_name,
+        TRIM(schema_name) AS schema_name,
+        TRIM(mv_name) AS mv_name,
+        COUNT(*) AS refresh_count,
+        AVG(CASE WHEN status NOT ILIKE '%already updated%'
+                 THEN DATEDIFF('ms', start_time, end_time) / 1000.0 END) AS avg_refresh_sec,
+        SUM(CASE WHEN status ILIKE '%recompute%' THEN 1 ELSE 0 END) AS recompute_count
+    FROM SYS_MV_REFRESH_HISTORY
+    CROSS JOIN params
+    WHERE start_time >= params.min_start_time
+    GROUP BY 1, 2, 3
+),
+
+-- Each MV stores its result in an internal table. MVs created since the pg_mv
+-- rollout keep it in schema pg_mv as mv_tbl__<schema>__<mv>; older MVs keep it
+-- in the MV's own schema as mv_tbl__<mv>__0 until the engine migrates them.
+-- Resolve the table through the MV's _RETURN rule (the same path SVV_TABLE_INFO
+-- uses) and carry its schema, rather than assuming pg_mv or deriving the name:
+-- long MV names get a hashed storage-table name. The name (unlike the OID)
+-- survives a full recompute, so scans logged before the last recompute match.
+-- When the engine migrates an MV to pg_mv, scans logged under the old name no
+-- longer match, so query_count undercounts until they age out of the lookback.
+mv_storage AS (
+    SELECT DISTINCT
+        vn.nspname::VARCHAR(128) AS mv_schema,
+        v.relname::VARCHAR(128)  AS mv_name,
+        tn.nspname::VARCHAR(128) AS storage_schema,
+        t.relname::VARCHAR(128)  AS storage_table
+    FROM pg_class v
+    JOIN pg_namespace vn ON vn.oid = v.relnamespace
+    JOIN pg_rewrite r    ON r.ev_class = v.oid AND r.rulename = '_RETURN'
+    JOIN pg_depend d     ON d.objid = r.oid
+                        AND d.refclassid = 'pg_class'::regclass
+                        AND d.deptype = 'n'
+    JOIN pg_class t      ON t.oid = d.refobjid AND t.relkind = 'r'
+                        AND t.relname LIKE 'mv\\_tbl\\_\\_%'
+    JOIN pg_namespace tn ON tn.oid = t.relnamespace
+    WHERE v.relkind = 'v'
+),
+
+-- Queries that scanned the MV's stored result. This counts queries that name
+-- the MV and queries the optimizer served through automatic query rewriting.
+-- Scans made by refreshes (including a nested MV refreshing from its parent)
+-- and by DDL (CREATE MATERIALIZED VIEW populating a nested MV from its parent)
+-- are excluded. The refresh exclusion drops every statement in a refresh's
+-- transaction, so a read that shares a transaction with a manual REFRESH is
+-- not counted.
+mv_reads AS (
+    SELECT
+        i.schema_name,
+        i.mv_name,
+        COUNT(DISTINCT q.query_id) AS query_count
+    FROM mv_info i
+    JOIN mv_storage s
+        ON s.mv_schema = i.schema_name
+       AND s.mv_name   = i.mv_name
+    CROSS JOIN params
+    JOIN SYS_QUERY_DETAIL qd
+        ON TRIM(qd.step_name) = 'scan'
+       AND TRIM(qd.table_name) = i.database_name || '.' || s.storage_schema || '.' || s.storage_table
+       AND qd.start_time >= params.min_start_time
+    JOIN SYS_QUERY_HISTORY q
+        ON q.query_id = qd.query_id
+       AND q.status = 'success'
+       AND q.query_type <> 'DDL'
+       AND q.transaction_id NOT IN (SELECT transaction_id FROM SYS_MV_REFRESH_HISTORY
+                                    WHERE transaction_id IS NOT NULL)
+    GROUP BY i.schema_name, i.mv_name
+),
+
+-- SVV_TABLE_INFO has no row for an empty table, so a missing row means 0 rows.
+mv_rows AS (
+    SELECT t.schema AS mv_schema, t."table" AS mv_name, t.tbl_rows AS mv_rows
+    FROM SVV_TABLE_INFO t
+    WHERE t."table" IN (SELECT mv_name FROM mv_info)
+),
+
+-- Every ancestor of each MV, keyed on (schema, name) so same-named MVs in
+-- different schemas keep separate chains.
+chain_depth (mv_schema, mv_name, ancestor_schema, ancestor, depth) AS (
+    SELECT TRIM(schema_name)::VARCHAR(128), TRIM(name)::VARCHAR(128),
+           TRIM(dependent_schema_name)::VARCHAR(128), TRIM(dependent_name)::VARCHAR(128), 1
+    FROM SVV_MV_DEPENDENCY
+
+    UNION ALL
+
+    SELECT cd.mv_schema, cd.mv_name,
+           TRIM(d.dependent_schema_name)::VARCHAR(128), TRIM(d.dependent_name)::VARCHAR(128),
+           cd.depth + 1
+    FROM chain_depth cd
+    JOIN SVV_MV_DEPENDENCY d
+        ON TRIM(d.schema_name) = cd.ancestor_schema
+       AND TRIM(d.name)        = cd.ancestor
+    -- Cap recursion at depth 10. SVV_MV_DEPENDENCY should be a DAG, so this is a
+    -- safety guard against an unexpected cycle or runaway fan-out rather than an
+    -- expected limit; 10 is well beyond realistic MV-on-MV nesting.
+    WHERE cd.depth < 10
+),
+
+max_chain AS (
+    SELECT mv_schema, mv_name, MAX(depth) AS chain_depth
+    FROM chain_depth
+    GROUP BY mv_schema, mv_name
+),
+
+dep_list AS (
+    SELECT mv_schema, mv_name,
+           LISTAGG(DISTINCT ancestor, ', ') WITHIN GROUP (ORDER BY ancestor) AS mv_dependencies
+    FROM chain_depth
+    GROUP BY mv_schema, mv_name
+),
+
+stale_chain AS (
+    SELECT
+        cd.mv_schema,
+        cd.mv_name,
+        LISTAGG(DISTINCT CASE WHEN i.is_stale = 't' THEN cd.ancestor END, ', ')
+            WITHIN GROUP (ORDER BY cd.ancestor) AS stale_ancestors
+    FROM chain_depth cd
+    JOIN mv_info i
+        ON i.schema_name = cd.ancestor_schema
+       AND i.mv_name     = cd.ancestor
+    GROUP BY cd.mv_schema, cd.mv_name
+),
+
+-- Denominator for pct_of_total_query_time: all successful queries, plus refreshes
+-- that SYS_QUERY_HISTORY doesn't record (autorefresh runs internally and is only
+-- logged in SYS_MV_REFRESH_HISTORY). Manual refreshes are already counted in
+-- SYS_QUERY_HISTORY, so only refreshes absent from it are added. Elapsed times
+-- are summed, so concurrent queries overlap: the result is a share of total
+-- query time, not of wall-clock time.
+total_workload AS (
+    SELECT GREATEST(q.query_us + a.auto_refresh_us, 1) AS total_us
+    FROM (
+        SELECT COALESCE(SUM(elapsed_time), 0) AS query_us
+        FROM SYS_QUERY_HISTORY
+        CROSS JOIN params
+        WHERE start_time >= params.min_start_time
+          AND status = 'success'
+    ) q
+    CROSS JOIN (
+        SELECT COALESCE(SUM(DATEDIFF('us', r.start_time, r.end_time)), 0) AS auto_refresh_us
+        FROM SYS_MV_REFRESH_HISTORY r
+        CROSS JOIN params
+        LEFT JOIN (SELECT DISTINCT transaction_id FROM SYS_QUERY_HISTORY) h
+            ON h.transaction_id = r.transaction_id
+        WHERE r.start_time >= params.min_start_time
+          AND h.transaction_id IS NULL
+    ) a
+),
+
+refresh_cost AS (
+    SELECT TRIM(database_name) AS database_name, TRIM(schema_name) AS schema_name,
+           TRIM(mv_name) AS mv_name,
+           SUM(DATEDIFF('us', start_time, end_time)) AS refresh_us
+    FROM SYS_MV_REFRESH_HISTORY
+    CROSS JOIN params
+    WHERE start_time >= params.min_start_time
+    GROUP BY 1, 2, 3
+),
+
+last_refresh AS (
+    SELECT database_name, schema_name, mv_name, status AS last_refresh_status
+    FROM (
+        SELECT TRIM(database_name) AS database_name, TRIM(schema_name) AS schema_name,
+               TRIM(mv_name) AS mv_name, status,
+               ROW_NUMBER() OVER (PARTITION BY TRIM(database_name), TRIM(schema_name), TRIM(mv_name)
+                                  ORDER BY start_time DESC) AS rn
+        FROM SYS_MV_REFRESH_HISTORY
+    )
+    WHERE rn = 1
+)
+
+SELECT
+    i.database_name                                 AS mv_database,
+    i.schema_name                                   AS mv_schema,
+    i.mv_name,
+    i.state,
+    i.state_label,
+    -- SVV_MV_INFO flags are char(1) 't'/'f'; the comparisons return BOOLEAN.
+    -- is_stale can also be 'u' (unknown, for example MVs on external tables), which maps to NULL.
+    CASE i.is_stale WHEN 't' THEN TRUE WHEN 'f' THEN FALSE END AS is_stale,
+    (i.autorefresh_enabled = 't')                   AS is_autorefresh,
+    i.autorefresh_interval                          AS autorefresh_interval_sec,
+    (i.has_default_autorefresh_interval = 't')      AS is_default_autorefresh_interval,
+    (i.autorewrite_eligible = 't')                  AS is_autorewrite_eligible,
+    COALESCE(rs.refresh_count, 0)                   AS refresh_count,
+    -- NULL when the MV's storage table could not be resolved from the catalog,
+    -- so a resolution failure is visible instead of reading as "never queried".
+    CASE WHEN s.mv_name IS NOT NULL THEN COALESCE(rd.query_count, 0) END AS query_count,
+    CASE WHEN COALESCE(rd.query_count, 0) > 0
+         THEN ROUND(COALESCE(rs.recompute_count, 0)::FLOAT / rd.query_count, 1)
+    END                                             AS recompute_to_query_ratio,
+    ROUND(COALESCE(rs.avg_refresh_sec, 0), 1)       AS avg_refresh_sec,
+    -- NULL (not '') when there is nothing to report, so IS NULL checks work.
+    lr.last_refresh_status,
+    COALESCE(mr.mv_rows, 0)                         AS mv_rows,
+    COALESCE(mc.chain_depth, 0)                     AS chain_depth,
+    NULLIF(dl.mv_dependencies, '')                  AS mv_dependencies,
+    NULLIF(sc.stale_ancestors, '')                  AS stale_ancestors,
+    ROUND(COALESCE(rc.refresh_us, 0)::FLOAT / tw.total_us * 100, 2) AS pct_of_total_query_time
+FROM mv_info i
+LEFT JOIN refresh_stats rs  ON i.mv_name = rs.mv_name AND i.schema_name = rs.schema_name
+                           AND i.database_name = rs.database_name
+LEFT JOIN mv_reads rd       ON i.mv_name = rd.mv_name AND i.schema_name = rd.schema_name
+LEFT JOIN (SELECT DISTINCT mv_schema, mv_name FROM mv_storage) s
+                            ON i.mv_name = s.mv_name AND i.schema_name = s.mv_schema
+LEFT JOIN mv_rows mr        ON i.mv_name = mr.mv_name AND i.schema_name = mr.mv_schema
+LEFT JOIN max_chain mc      ON i.mv_name = mc.mv_name AND i.schema_name = mc.mv_schema
+LEFT JOIN dep_list dl       ON i.mv_name = dl.mv_name AND i.schema_name = dl.mv_schema
+LEFT JOIN stale_chain sc    ON i.mv_name = sc.mv_name AND i.schema_name = sc.mv_schema
+LEFT JOIN refresh_cost rc   ON i.mv_name = rc.mv_name AND i.schema_name = rc.schema_name
+                           AND i.database_name = rc.database_name
+LEFT JOIN last_refresh lr   ON i.mv_name = lr.mv_name AND i.schema_name = lr.schema_name
+                           AND i.database_name = lr.database_name
+CROSS JOIN total_workload tw
+ORDER BY
+    CASE WHEN i.state >= 101 THEN 0 WHEN i.state = 0 THEN 1 ELSE 2 END,
+    COALESCE(rc.refresh_us, 0) DESC;
