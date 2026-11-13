@@ -16,15 +16,15 @@ Notes:   Reads SVV_MV_INFO, SVV_MV_DEPENDENCY, SYS_MV_REFRESH_HISTORY, SYS_QUERY
          so a resolution failure doesn't read as "never queried".
          To see activity across all users, query it as a superuser, or as a user with the
          sys:monitor role and USAGE on each schema that contains MVs.
-         Does not depend on mv_definitions. Join to it to add blocker_hint.
+         Does not depend on mv_definitions. Join to it to add incremental_blocker_hint.
 
 Usage:
     SELECT * FROM admin.v_mv_health;
 
-    -- Add blocker_hint with sp_populate_mv_definitions() from amazon-redshift-udfs:
-    -- https://github.com/aws-samples/amazon-redshift-udfs/tree/master/stored-procedures/sp_populate_mv_definitions
+    -- Add incremental_blocker_hint with sp_populate_mv_definitions() from amazon-redshift-udfs:
+    -- https://github.com/aws-samples/amazon-redshift-udfs/blob/master/stored-procedures/sp_populate_mv_definitions/sp_populate_mv_definitions.sql
     CALL sp_populate_mv_definitions();
-    SELECT v.*, d.blocker_hint
+    SELECT v.*, d.incremental_blocker_hint
     FROM admin.v_mv_health v
     LEFT JOIN mv_definitions d
         ON v.mv_schema = d.mv_schema
