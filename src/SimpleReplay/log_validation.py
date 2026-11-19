@@ -44,18 +44,18 @@ def is_valid_log(log, start_time, end_time):
     if end_time and log.record_time > end_time:
         return False
 
-    if any(word in log.text for word in problem_keywords):
+    if any(word in log.get_text_value() for word in problem_keywords):
         return False
 
-    if any(word in log.text for word in potential_problem_keywords) and not any(word in log.text for word in not_problem_keywords):
+    if any(word in log.get_text_value() for word in potential_problem_keywords) and not any(word in log.get_text_value() for word in not_problem_keywords):
         return False
 
     # filter internal statement rewrites with parameter markers
-    if re.search('\$\d',log.text):
+    if re.search('\$\d',log.get_text_value()):
         # remove \$\d in string literals ( select '$1' ) or comment blocks ( */ $1 */ )
-        text_without_valid_parameter_markers = re.sub("""'.*\\$\\d.*'|\\/\\*.*\\$\\d.*\\*\\/""",'',log.text,flags=re.DOTALL)
+        text_without_valid_parameter_markers = re.sub("""'.*\\$\\d.*'|\\/\\*.*\\$\\d.*\\*\\/""",'',log.get_text_value(),flags=re.DOTALL)
         # remove \$\d in single line quotes ( -- $1 )
-        if '--' in log.text:
+        if '--' in log.get_text_value():
             text_without_valid_parameter_markers = re.sub('^\s*--.*\$\d','',text_without_valid_parameter_markers)
         # if there are still parameter markers remaining after removing them from valid cases, the query text is invalid
         if re.search('\$\d',text_without_valid_parameter_markers):
