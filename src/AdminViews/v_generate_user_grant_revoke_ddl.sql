@@ -236,7 +236,7 @@ SELECT objowner::text, schemaname::text, objname::varchar(5000), objtype::text, 
 decode(objtype,'default acl',0,'function',0,'procedure',1,'table',1,'view',1,'column',1,'schema',2,'language',2,'database',3) AS objseq,
 CASE WHEN (grantor <> current_user AND grantor <> 'rdsdb' AND objtype <> 'default acl' AND grantor <> objowner) THEN 'SET SESSION AUTHORIZATION '||QUOTE_IDENT(grantor)||';' ELSE '' END::varchar(5000)||
 (CASE WHEN objtype = 'default acl' THEN 'ALTER DEFAULT PRIVILEGES for user '||QUOTE_IDENT(grantor)||nvl(' in schema '||QUOTE_IDENT(schemaname)||' ',' ')
-||'REVOKE ALL on '||fullobjname||' FROM '||splitgrantee||';'
+||'REVOKE ALL on '||replace(fullobjname, '"', '')||' FROM '||splitgrantee||';'
 ELSE 'REVOKE ALL on '||(CASE WHEN objtype in ('table', 'view', 'column') THEN '' ELSE objtype||' ' END::varchar(5000))||fullobjname||' FROM '||splitgrantee||';' END::varchar(5000))||
 CASE WHEN (grantor <> current_user AND grantor <> 'rdsdb' AND objtype <> 'default acl' AND grantor <> objowner) THEN 'RESET SESSION AUTHORIZATION;' ELSE '' END::varchar(5000) AS ddl, colname
 FROM objprivs
